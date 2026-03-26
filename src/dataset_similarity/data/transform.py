@@ -1,21 +1,61 @@
+from __future__ import annotations
+
+from typing import Any
+
+from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
+from torchvision.transforms import functional as F
+
+#  initial transformation examples
 
 horizontal_flip = transforms.Compose(
     [
-        transforms.RandomHorizontalFlip(p=1.0),
+        transforms.Lambda(F.hflip),
+    ]
+)
+
+rotation_180 = transforms.Compose(
+    [
+        transforms.Lambda(lambda x: F.rotate(x, 180)),
+    ]
+)
+
+centre_crop = transforms.Compose(
+    [
+        transforms.CenterCrop(224),
+    ]
+)
+
+grayscale = transforms.Compose(
+    [
+        transforms.Grayscale(num_output_channels=3),
+    ]
+)
+
+gaussian_blur = transforms.Compose(
+    [
+        transforms.GaussianBlur(kernel_size=11, sigma=3.0),
+    ]
+)
+
+colour_jitter = transforms.Compose(
+    [
+        transforms.Lambda(lambda x: F.adjust_brightness(x, 1.5)),
+        transforms.Lambda(lambda x: F.adjust_contrast(x, 1.5)),
+        transforms.Lambda(lambda x: F.adjust_saturation(x, 0.5)),
+    ]
+)
+
+grayscale_and_blur = transforms.Compose(
+    [
+        grayscale,
+        gaussian_blur,
     ]
 )
 
 
-def apply_transform(dataset: Dataset, transform: transforms.Compose) -> Dataset:
-    """
-    Apply a simple transformation to the dataset.
-    """
-    return TransformedDataset(dataset, transform)
-
-
-class TransformedDataset(Dataset):
+class TransformedDataset(Dataset):  # type: ignore[misc]
     """
     A dataset wrapper that applies a transformation to the data.
     """
@@ -27,6 +67,13 @@ class TransformedDataset(Dataset):
     def __len__(self) -> int:
         return len(self.dataset)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> tuple[Tensor, Any]:
         item, label = self.dataset[idx]
         return self.transform(item), label
+
+
+def apply_transform(dataset: Dataset, transform: transforms.Compose) -> Dataset:
+    """
+    Apply a simple transformation to the dataset.
+    """
+    return TransformedDataset(dataset, transform)

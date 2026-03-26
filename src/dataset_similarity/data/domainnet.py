@@ -14,8 +14,9 @@ DOMAINNET_DOMAINS = Literal[
 ]
 
 
-class DomainNetDataset(Dataset):
-    """PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
+class DomainNetDataset(Dataset):  # type: ignore[misc]
+    """
+    PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
     Args:
         data_root: Path to the root DomainNet directory.
@@ -91,6 +92,6 @@ class DomainNetDataset(Dataset):
                     err_msg = f"Invalid line in split file {split_file}: {row}"
                     raise ValueError(err_msg)
                 rel_path, label = row[0], row[1]
-                samples.append((rel_path, int(label)))
+                samples.append((Path(rel_path), int(label)))
 
         return samples
