@@ -4,14 +4,17 @@ import csv
 from pathlib import Path
 from typing import Literal
 
-from dataset_similarity.data.base import BaseDataset
+import torch
+from PIL import Image
+from torch.utils.data import Dataset
+from torchvision import transforms
 
 DOMAINNET_DOMAINS = Literal[
     "clipart", "infograph", "painting", "quickdraw", "real", "sketch"
 ]
 
 
-class DomainNetDataset(BaseDataset):
+class DomainNetDataset(Dataset):  # type: ignore[misc]
     """
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
@@ -51,6 +54,21 @@ class DomainNetDataset(BaseDataset):
             raise FileNotFoundError(err_msg)
 
         self.samples = self.read_domain_net_split(self.root, split_file)
+        self.classes = sorted({label for _, label in self.samples})
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+        image_path, label = self.samples[idx]
+        image = Image.open(image_path).convert("RGB")
+        image_tensor = transforms.ToTensor()(image)
+        return image_tensor, label
+
+    @property
+    def class_count(self) -> int:
+        """Number of distinct classes present in this split."""
+        return len(self.classes)
 
     @classmethod
     def read_domain_net_split(
