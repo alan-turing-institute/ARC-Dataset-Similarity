@@ -7,6 +7,7 @@ from typing import Literal
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import transforms
 
 DOMAINNET_DOMAINS = Literal[
     "clipart", "infograph", "painting", "quickdraw", "real", "sketch"
@@ -56,11 +57,12 @@ class DomainNetDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[Image.Image | torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         image_path, label = self.samples[idx]
         image = Image.open(self.root / image_path).convert("RGB")
+        image_tensor = transforms.ToTensor()(image)
 
-        return image, label
+        return image_tensor, label
 
     @property
     def class_count(self) -> int:
