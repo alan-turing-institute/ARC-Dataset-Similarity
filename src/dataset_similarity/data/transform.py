@@ -44,6 +44,7 @@ colour_jitter = transforms.Compose(
         transforms.Lambda(lambda x: F.adjust_brightness(x, 1.5)),
         transforms.Lambda(lambda x: F.adjust_contrast(x, 1.5)),
         transforms.Lambda(lambda x: F.adjust_saturation(x, 0.5)),
+        transforms.Lambda(lambda x: x.clamp(0.0, 1.0)),
     ]
 )
 

@@ -4,17 +4,14 @@ import csv
 from pathlib import Path
 from typing import Literal
 
-import torch
-from PIL import Image
-from torch.utils.data import Dataset
-from torchvision import transforms
+from dataset_similarity.data.base import BaseDataset
 
 DOMAINNET_DOMAINS = Literal[
     "clipart", "infograph", "painting", "quickdraw", "real", "sketch"
 ]
 
 
-class DomainNetDataset(Dataset):  # type: ignore[misc]
+class DomainNetDataset(BaseDataset):  # type: ignore[misc]
     """
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
@@ -53,26 +50,12 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
             )
             raise FileNotFoundError(err_msg)
 
-        self.samples = self.read_domain_net_split(split_file)
-
-    def __len__(self) -> int:
-        return len(self.samples)
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        image_path, label = self.samples[idx]
-        image = Image.open(self.root / image_path).convert("RGB")
-        image_tensor = transforms.ToTensor()(image)
-
-        return image_tensor, label
-
-    @property
-    def class_count(self) -> int:
-        """Number of distinct classes present in this split."""
-        return len({label for _, label in self.samples})
+        self.samples = self.read_domain_net_split(self.root, split_file)
 
     @classmethod
     def read_domain_net_split(
         cls,
+        data_root: str | Path,
         split_file: Path,
     ) -> list[tuple[Path, int]]:
         """
@@ -92,6 +75,6 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
                     err_msg = f"Invalid line in split file {split_file}: {row}"
                     raise ValueError(err_msg)
                 rel_path, label = row[0], row[1]
-                samples.append((Path(rel_path), int(label)))
+                samples.append((Path(data_root) / Path(rel_path), int(label)))
 
         return samples
