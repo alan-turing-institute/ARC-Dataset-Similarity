@@ -61,7 +61,7 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         image_path, label = self.samples[idx]
-        image = Image.open(image_path).convert("RGB")
+        image = Image.open(self.root / image_path).convert("RGB")
         image_tensor = transforms.ToTensor()(image)
         return image_tensor, label
 
@@ -73,7 +73,6 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
     @classmethod
     def read_domain_net_split(
         cls,
-        data_root: str | Path,
         split_file: Path,
     ) -> list[tuple[Path, int]]:
         """
@@ -93,6 +92,6 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
                     err_msg = f"Invalid line in split file {split_file}: {row}"
                     raise ValueError(err_msg)
                 rel_path, label = row[0], row[1]
-                samples.append((Path(data_root) / Path(rel_path), int(label)))
+                samples.append((Path(rel_path), int(label)))
 
         return samples
