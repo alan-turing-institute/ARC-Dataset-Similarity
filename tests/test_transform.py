@@ -8,7 +8,7 @@ from dataset_similarity.data.transform import (
     TransformedDataset,
     apply_transform,
     centre_crop,
-    colour_jitter,
+    deterministic_colour_jitter,
     gaussian_blur,
     grayscale,
     grayscale_and_blur,
@@ -43,7 +43,7 @@ class TestImports:
         assert centre_crop is not None
         assert grayscale is not None
         assert gaussian_blur is not None
-        assert colour_jitter is not None
+        assert deterministic_colour_jitter is not None
         assert grayscale_and_blur is not None
         assert TransformedDataset is not None
         assert apply_transform is not None
@@ -81,7 +81,7 @@ class TestTransforms:
 
     def test_colour_jitter_output_shape(self) -> None:
         img = make_image()
-        jittered = colour_jitter(img)
+        jittered = deterministic_colour_jitter(img)
         assert jittered.shape == img.shape
 
     def test_grayscale_and_blur_output_shape(self) -> None:

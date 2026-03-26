@@ -49,20 +49,21 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
             err_msg = (
                 f"Split file not found: {split_file}\n"
                 "Download DomainNet from http://ai.bu.edu/M3SDA/ and point "
-                "'root' at the extracted directory."
+                "'data_root' at the extracted directory."
             )
             raise FileNotFoundError(err_msg)
 
         self.samples = self.read_domain_net_split(split_file)
         self.classes = sorted({label for _, label in self.samples})
+        self._to_tensor = transforms.ToTensor()
 
     def __len__(self) -> int:
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         image_path, label = self.samples[idx]
-        image = Image.open(self.root / image_path).convert("RGB")
-        image_tensor = transforms.ToTensor()(image)
+        with Image.open(self.root / image_path) as image:
+            image_tensor = self._to_tensor(image.convert("RGB"))
         return image_tensor, label
 
     @property
@@ -76,13 +77,13 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
         split_file: Path,
     ) -> list[tuple[Path, int]]:
         """
-        Read a DomainNet split file and return the list of samples and label name map.
+        Read a DomainNet split file and return the list of (path, label) samples.
 
         Args:
             split_file: Path to the split file.
 
         Returns:
-            list containing file-label tuples
+            list[tuple[Path, int]]: List of (relative file path, integer label) tuples.
         """
         samples = []
         with split_file.open(newline="") as f:

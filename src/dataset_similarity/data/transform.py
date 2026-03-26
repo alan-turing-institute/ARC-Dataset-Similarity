@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from torch import Tensor
@@ -39,7 +40,7 @@ gaussian_blur = transforms.Compose(
     ]
 )
 
-colour_jitter = transforms.Compose(
+deterministic_colour_jitter = transforms.Compose(
     [
         transforms.Lambda(lambda x: F.adjust_brightness(x, 1.5)),
         transforms.Lambda(lambda x: F.adjust_contrast(x, 1.5)),
@@ -61,7 +62,7 @@ class TransformedDataset(Dataset):  # type: ignore[misc]
     A dataset wrapper that applies a transformation to the data.
     """
 
-    def __init__(self, dataset: Dataset, transform: transforms.Compose) -> None:
+    def __init__(self, dataset: Dataset, transform: Callable[[Tensor], Tensor]) -> None:
         self.dataset = dataset
         self.transform = transform
 
@@ -73,7 +74,7 @@ class TransformedDataset(Dataset):  # type: ignore[misc]
         return self.transform(item), label
 
 
-def apply_transform(dataset: Dataset, transform: transforms.Compose) -> Dataset:
+def apply_transform(dataset: Dataset, transform: Callable[[Tensor], Tensor]) -> Dataset:
     """
     Apply a simple transformation to the dataset.
     """

@@ -50,10 +50,19 @@ def class_config_from_yaml(path: str | Path) -> list[ClassConfig]:
         err_msg = f"Expected a YAML mapping, got {type(data).__name__} in {path}"
         raise ValueError(err_msg)
 
-    return [
-        ClassConfig(class_name=str(name), max_samples=count)
-        for name, count in data.items()
-    ]
+    configs: list[ClassConfig] = []
+    for name, count in data.items():
+        if count is not None and not (
+            isinstance(count, int) and not isinstance(count, bool)
+        ):
+            err_msg = (
+                f"Invalid sample count for class {name!r} in {path}: "
+                f"expected int or null, got {type(count).__name__}"
+            )
+            raise ValueError(err_msg)
+        configs.append(ClassConfig(class_name=str(name), max_samples=count))
+
+    return configs
 
 
 class ImageNetDataset(Dataset):  # type: ignore[misc]
@@ -129,6 +138,7 @@ class ImageNetDataset(Dataset):  # type: ignore[misc]
         # Build label index and load all (image_path, label) pairs
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
         self.samples = self._load_samples(split_dir, resolved_config)
+        self._to_tensor = transforms.ToTensor()
 
     def _load_samples(
         self,
@@ -161,8 +171,8 @@ class ImageNetDataset(Dataset):  # type: ignore[misc]
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         image_path, label = self.samples[idx]
-        image = Image.open(image_path).convert("RGB")
-        image_tensor = transforms.ToTensor()(image)
+        with Image.open(image_path) as image:
+            image_tensor = self._to_tensor(image.convert("RGB"))
         return image_tensor, label
 
     @property

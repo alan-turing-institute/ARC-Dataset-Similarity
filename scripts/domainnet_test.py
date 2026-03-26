@@ -8,7 +8,7 @@ from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.transform import (
     TransformedDataset,
     centre_crop,
-    colour_jitter,
+    deterministic_colour_jitter,
     gaussian_blur,
     grayscale,
     grayscale_and_blur,
@@ -38,7 +38,7 @@ def main(domain: str, split: str) -> None:
         ("Centre Crop", centre_crop),
         ("Grayscale", grayscale),
         ("Gaussian Blur", gaussian_blur),
-        ("Colour Jitter", colour_jitter),
+        ("Colour Jitter", deterministic_colour_jitter),
         ("Grayscale + Blur", grayscale_and_blur),
     ]
 
