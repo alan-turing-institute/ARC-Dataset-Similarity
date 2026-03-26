@@ -11,7 +11,7 @@ DOMAINNET_DOMAINS = Literal[
 ]
 
 
-class DomainNetDataset(BaseDataset):  # type: ignore[misc]
+class DomainNetDataset(BaseDataset):
     """
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
