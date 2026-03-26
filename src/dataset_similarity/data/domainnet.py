@@ -53,7 +53,7 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
             )
             raise FileNotFoundError(err_msg)
 
-        self.samples = self.read_domain_net_split(self.root, split_file)
+        self.samples = self.read_domain_net_split(split_file)
         self.classes = sorted({label for _, label in self.samples})
 
     def __len__(self) -> int:
