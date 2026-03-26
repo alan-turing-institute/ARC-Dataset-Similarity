@@ -30,6 +30,7 @@ classifiers = [
 dependencies = [
     "jupyter>=1.1.1",
     "matplotlib>=3.10.8",
+    "pyyaml>=6.0",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
 ]
