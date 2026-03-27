@@ -35,7 +35,7 @@ dependencies = [
     "torchvision>=0.26.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
   "pytest >=6",
   "pytest-cov >=3",
