@@ -7,6 +7,8 @@ name = "dataset_similarity"
 version = "0.1.0"
 authors = [
   { name = "Phil Swatton", email = "pswatton@turing.ac.uk" },
+  { name = "Jack Dymond", email = "j.dymond@turing.ac.uk" },
+  { name = "Colin Laganier", email = "claganier@turing.ac.uk" },
 ]
 description = "Repo for ARC project on dataset similarity measures."
 readme = "README.md"
@@ -36,6 +38,7 @@ dependencies = [
     "pytest-cov >=3",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
+    "pyaml>=26.2.1",
 ]
 
 [project.urls]
