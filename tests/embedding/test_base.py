@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-import numpy as np
+import pytest
 import torch
 from PIL import Image
+from safetensors.torch import load_file
 from torch.utils.data import Dataset
 
-from dataset_similarity.embedding.base import BaseExtractor
+from dataset_similarity.embedding.base import BaseExtractor, _embedding_save_path
 
 _EMBED_DIM = 16
 
@@ -25,16 +27,63 @@ class _DummyExtractor(BaseExtractor):
         return torch.ones(pixel_values.shape[0], _EMBED_DIM)
 
 
-def test_extract_dataset_output_shape(image_dataset: Dataset[Any]) -> None:
-    extractor = _DummyExtractor()
-    result = extractor.extract_dataset(image_dataset, batch_size=2, num_workers=0)
-    assert result.shape == (len(image_dataset), _EMBED_DIM)  # type: ignore[arg-type]
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
-def test_extract_dataset_output_dtype(image_dataset: Dataset[Any]) -> None:
+class _PathDataset(Dataset[tuple[str, Image.Image]]):
+    """Dataset whose items are ``(path_str, image)`` tuples."""
+
+    def __init__(self, images: list[Image.Image], paths: list[str]) -> None:
+        self._data = list(zip(paths, images, strict=True))
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __getitem__(self, idx: int) -> tuple[str, Image.Image]:
+        return self._data[idx]
+
+
+# ---------------------------------------------------------------------------
+# _embedding_save_path
+# ---------------------------------------------------------------------------
+
+
+def test_save_path_with_dataset_root(tmp_path: Path) -> None:
+    src = Path("/data/imagenet/train/n01234/img001.jpg")
+    root = Path("/data/imagenet")
+    result = _embedding_save_path(tmp_path, src, root)
+    assert result == tmp_path / "train" / "n01234" / "img001.safetensors"
+
+
+def test_save_path_absolute_no_root(tmp_path: Path) -> None:
+    src = Path("/data/imagenet/train/n01234/img001.jpg")
+    result = _embedding_save_path(tmp_path, src, None)
+    assert result == tmp_path / "img001.safetensors"
+
+
+def test_save_path_relative_no_root(tmp_path: Path) -> None:
+    src = Path("cats/img001.jpg")
+    result = _embedding_save_path(tmp_path, src, None)
+    assert result == tmp_path / "cats" / "img001.safetensors"
+
+
+def test_save_path_replaces_suffix(tmp_path: Path) -> None:
+    src = Path("img.png")
+    result = _embedding_save_path(tmp_path, src, None)
+    assert result.suffix == ".safetensors"
+
+
+# ---------------------------------------------------------------------------
+# extract_dataset — no saving
+# ---------------------------------------------------------------------------
+
+
+def test_extract_dataset_returns_none(image_dataset: Dataset[Any]) -> None:
     extractor = _DummyExtractor()
     result = extractor.extract_dataset(image_dataset, batch_size=2, num_workers=0)
-    assert result.dtype == np.float32
+    assert result is None
 
 
 def test_extract_dataset_custom_get_image(rgb_images: list[Image.Image]) -> None:
@@ -51,10 +100,88 @@ def test_extract_dataset_custom_get_image(rgb_images: list[Image.Image]) -> None
             return self._data[idx]
 
     extractor = _DummyExtractor()
-    result = extractor.extract_dataset(
+    extractor.extract_dataset(
         _DictDataset(rgb_images),
         batch_size=2,
         num_workers=0,
         get_image=lambda item: item["img"],
     )
-    assert result.shape == (len(rgb_images), _EMBED_DIM)
+
+
+def test_extract_dataset_missing_get_path_raises(
+    image_dataset: Dataset[Any], tmp_path: Path
+) -> None:
+    extractor = _DummyExtractor()
+    with pytest.raises(ValueError, match="get_path"):
+        extractor.extract_dataset(
+            image_dataset,
+            batch_size=2,
+            num_workers=0,
+            output_dir=tmp_path,
+        )
+
+
+# ---------------------------------------------------------------------------
+# extract_dataset — file saving
+# ---------------------------------------------------------------------------
+
+
+def test_extract_dataset_saves_correct_number_of_files(
+    rgb_images: list[Image.Image], tmp_path: Path
+) -> None:
+    paths = [f"img_{i:04d}.png" for i in range(len(rgb_images))]
+    dataset = _PathDataset(rgb_images, paths)
+    extractor = _DummyExtractor()
+    extractor.extract_dataset(
+        dataset,
+        batch_size=2,
+        num_workers=0,
+        get_image=lambda item: item[1],
+        get_path=lambda item: item[0],
+        output_dir=tmp_path,
+    )
+    saved = list(tmp_path.rglob("*.safetensors"))
+    assert len(saved) == len(rgb_images)
+
+
+def test_extract_dataset_saved_tensor_shape(
+    rgb_images: list[Image.Image], tmp_path: Path
+) -> None:
+    paths = [f"img_{i:04d}.png" for i in range(len(rgb_images))]
+    dataset = _PathDataset(rgb_images, paths)
+    extractor = _DummyExtractor()
+    extractor.extract_dataset(
+        dataset,
+        batch_size=2,
+        num_workers=0,
+        get_image=lambda item: item[1],
+        get_path=lambda item: item[0],
+        output_dir=tmp_path,
+    )
+    data = load_file(tmp_path / "img_0000.safetensors")
+    assert data["embedding"].shape == (1, _EMBED_DIM)
+
+
+def test_extract_dataset_mirrors_path_structure(
+    rgb_images: list[Image.Image], tmp_path: Path
+) -> None:
+    dataset_root = tmp_path / "dataset"
+    output_dir = tmp_path / "embeddings"
+    paths = [
+        str(dataset_root / "classA" / f"img_{i:04d}.jpg")
+        for i in range(len(rgb_images))
+    ]
+    dataset = _PathDataset(rgb_images, paths)
+    extractor = _DummyExtractor()
+    extractor.extract_dataset(
+        dataset,
+        batch_size=2,
+        num_workers=0,
+        get_image=lambda item: item[1],
+        get_path=lambda item: item[0],
+        output_dir=output_dir,
+        dataset_root=dataset_root,
+    )
+    for i in range(len(rgb_images)):
+        expected = output_dir / "classA" / f"img_{i:04d}.safetensors"
+        assert expected.exists(), f"Missing: {expected}"
