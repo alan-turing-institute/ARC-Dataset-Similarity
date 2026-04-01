@@ -1,15 +1,31 @@
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
-import numpy as np
-import numpy.typing as npt
 import torch
 from PIL import Image
+from safetensors.torch import save_file
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+
+
+def _embedding_save_path(
+    output_dir: Path,
+    src_path: str | os.PathLike[str],
+    dataset_root: Path | None,
+) -> Path:
+    p = Path(src_path)
+    if dataset_root is not None:
+        rel = p.relative_to(dataset_root)
+    elif p.is_absolute():
+        rel = Path(p.name)
+    else:
+        rel = p
+    return output_dir / rel.with_suffix(".safetensors")
 
 
 class BaseExtractor(ABC):
@@ -48,7 +64,10 @@ class BaseExtractor(ABC):
         batch_size: int = 64,
         num_workers: int = 4,
         get_image: Callable[[Any], Image.Image] = lambda item: item[0],
-    ) -> npt.NDArray[np.float32]:
+        output_dir: Path | str | None = None,
+        get_path: Callable[[Any], str | os.PathLike[str]] | None = None,
+        dataset_root: Path | str | None = None,
+    ) -> None:
         """Extract embeddings for every image in *dataset*.
 
         Args:
@@ -58,13 +77,27 @@ class BaseExtractor(ABC):
             get_image: Callable that extracts a PIL ``Image`` from one
                 dataset item.  Defaults to ``lambda item: item[0]``,
                 which works for ``(image, label)`` tuples.
-
-        Returns:
-            Float32 array of shape ``(N, embedding_dim)``.
+            output_dir: Root directory in which to save per-image embedding
+                files.  When *None* no files are written.
+            get_path: Callable that returns the source file path for a
+                dataset item.  Required when *output_dir* is set.  The path
+                may be absolute or relative; see *dataset_root*.
+            dataset_root: Root of the original dataset used to compute
+                relative paths when *get_path* returns absolute paths.
+                When *None* and the path is absolute, only the filename is
+                preserved.
         """
+        if output_dir is not None and get_path is None:
+            msg = "get_path must be provided when output_dir is set"
+            raise ValueError(msg)
 
-        def collate(batch: list[Any]) -> list[Image.Image]:
-            return [get_image(item) for item in batch]
+        out_root = Path(output_dir) if output_dir is not None else None
+        ds_root = Path(dataset_root) if dataset_root is not None else None
+
+        def collate(batch: list[Any]) -> tuple[list[Image.Image], list[Any]]:
+            images = [get_image(item) for item in batch]
+            paths = [get_path(item) for item in batch] if get_path else batch
+            return images, paths
 
         loader: DataLoader[Any] = DataLoader(
             dataset,
@@ -76,9 +109,13 @@ class BaseExtractor(ABC):
 
         all_embeddings: list[torch.Tensor] = []
         with torch.inference_mode():
-            for images in tqdm(loader, desc=f"Extracting [{self.model_name}]"):
+            for images, paths in tqdm(loader, desc=f"Extracting [{self.model_name}]"):
                 pixel_values = self.preprocess(images).to(self.device)
-                embeddings = self.encode(pixel_values)
-                all_embeddings.append(embeddings.cpu())
+                embeddings = self.encode(pixel_values).cpu()
+                all_embeddings.append(embeddings)
 
-        return torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
+                if out_root is not None:
+                    for emb, src_path in zip(embeddings, paths, strict=True):
+                        dst = _embedding_save_path(out_root, src_path, ds_root)
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        save_file({"embedding": emb.unsqueeze(0)}, dst)
