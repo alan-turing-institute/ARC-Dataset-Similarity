@@ -1,10 +1,9 @@
-import json
 import random
 from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 
-from dataset_similarity.data.domainnet import DomainNetDataset
+from dataset_similarity.data.domainnet import DOMAIN_LABEL_NAME_MAP, DomainNetDataset
 from dataset_similarity.data.transform import (
     TransformedDataset,
     centre_crop,
@@ -17,19 +16,13 @@ from dataset_similarity.data.transform import (
 )
 
 
-def main(domain: str, split: str) -> None:
-    with open("data/domainnet_label_map.json") as f:
-        label_names = json.load(f)
-
+def main(domains: list[str], target_classes: list[str], split: str) -> None:
     data = DomainNetDataset(
         data_root="data/DomainNet",
-        domain=domain,
+        domains=domains,
         split=split,
+        target_classes=target_classes,
     )
-
-    idx = random.randrange(len(data))
-    original_item, original_label = data[idx]
-    label = label_names[str(original_label)]
 
     named_transforms = [
         ("Original", None),
@@ -42,18 +35,35 @@ def main(domain: str, split: str) -> None:
         ("Grayscale + Blur", grayscale_and_blur),
     ]
 
-    fig, axes = plt.subplots(2, 4, figsize=(18, 9))
-    fig.suptitle(f"Class: {label}", fontsize=14)
+    n = 5
+    indices = random.sample(range(len(data)), n)
 
-    for ax, (name, transform) in zip(axes.flat, named_transforms, strict=True):
-        if transform is None:
-            item = original_item
-        else:
-            item, _ = TransformedDataset(data, transform)[idx]
-        # Permute from (C, H, W) to (H, W, C) for visualization
-        ax.imshow(item.permute(1, 2, 0))
-        ax.set_title(name)
-        ax.axis("off")
+    _, axes = plt.subplots(n, len(named_transforms), figsize=(18, n * 2.5))
+
+    for col, (name, _) in enumerate(named_transforms):
+        axes[0, col].set_title(name)
+
+    for ax_row, idx in zip(axes, indices, strict=True):
+        original_item, label = data[idx]
+        class_name = DOMAIN_LABEL_NAME_MAP[label]
+
+        ax_row[0].text(
+            -0.05,
+            0.5,
+            class_name,
+            transform=ax_row[0].transAxes,
+            fontsize=14,
+            va="center",
+            ha="right",
+        )
+
+        for ax, (_, transform) in zip(ax_row, named_transforms, strict=True):
+            if transform is None:
+                item = original_item
+            else:
+                item, _ = TransformedDataset(data, transform)[idx]
+            ax.imshow(item.permute(1, 2, 0))
+            ax.axis("off")
 
     plt.tight_layout()
     plt.show()
@@ -61,8 +71,9 @@ def main(domain: str, split: str) -> None:
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--domain", type=str, default="real")
     parser.add_argument("--split", type=str, default="train")
+    parser.add_argument("--domains", nargs="+", type=str, default=None)
+    parser.add_argument("--target_classes", nargs="+", type=str, default=None)
     args = parser.parse_args()
 
-    main(domain=args.domain, split=args.split)
+    main(domains=args.domains, target_classes=args.target_classes, split=args.split)

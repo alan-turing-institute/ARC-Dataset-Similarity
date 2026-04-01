@@ -30,11 +30,6 @@ def domainnet_root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-class TestImports:
-    def test_domainnet_import(self) -> None:
-        assert DomainNetDataset is not None
-
-
 class TestDomainNetDataset:
     def test_domains(self) -> None:
         assert "real" in DomainNetDataset.DOMAINS
@@ -42,27 +37,27 @@ class TestDomainNetDataset:
 
     def test_invalid_domain(self) -> None:
         with pytest.raises(ValueError, match="Unknown domain"):
-            DomainNetDataset(data_root="data/DomainNet", domain="invalid")  # type: ignore[arg-type]
+            DomainNetDataset(data_root="data/DomainNet", domains="invalid")  # type: ignore[arg-type]
 
     def test_invalid_split(self) -> None:
         with pytest.raises(ValueError, match="Unknown split"):
-            DomainNetDataset(data_root="data/DomainNet", domain="real", split="val")  # type: ignore[arg-type]
+            DomainNetDataset(data_root="data/DomainNet", domains="real", split="val")  # type: ignore[arg-type]
 
     def test_missing_split_file(self, tmp_path: Path) -> None:
         with pytest.raises(FileNotFoundError):
-            DomainNetDataset(data_root=tmp_path, domain="real")
+            DomainNetDataset(data_root=tmp_path, domains="real")
 
     def test_len(self, domainnet_root: Path) -> None:
-        dataset = DomainNetDataset(data_root=domainnet_root, domain="real")
+        dataset = DomainNetDataset(data_root=domainnet_root, domains="real")
         assert len(dataset) == 2
 
     def test_getitem_shape(self, domainnet_root: Path) -> None:
-        dataset = DomainNetDataset(data_root=domainnet_root, domain="real")
+        dataset = DomainNetDataset(data_root=domainnet_root, domains="real")
         image, label = dataset[0]
         assert isinstance(image, torch.Tensor)
         assert image.shape[0] == 3  # C, H, W
         assert isinstance(label, int)
 
     def test_class_count(self, domainnet_root: Path) -> None:
-        dataset = DomainNetDataset(data_root=domainnet_root, domain="real")
+        dataset = DomainNetDataset(data_root=domainnet_root, domains="real")
         assert dataset.class_count == 2
