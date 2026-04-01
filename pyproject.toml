@@ -30,16 +30,12 @@ classifiers = [
 dependencies = [
     "jupyter>=1.1.1",
     "matplotlib>=3.10.8",
+    "pre-commit",
     "pyyaml>=6.0",
+    "pytest >=6",
+    "pytest-cov >=3",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
-]
-
-[dependency-groups]
-dev = [
-  "pytest >=6",
-  "pytest-cov >=3",
-  "pre-commit",
 ]
 
 [project.urls]
