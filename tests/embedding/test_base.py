@@ -53,25 +53,25 @@ class _PathDataset(Dataset[tuple[str, Image.Image]]):
 def test_save_path_with_dataset_root(tmp_path: Path) -> None:
     src = Path("/data/imagenet/train/n01234/img001.jpg")
     root = Path("/data/imagenet")
-    result = _embedding_save_path(tmp_path, src, root)
-    assert result == tmp_path / "train" / "n01234" / "img001.safetensors"
+    result = _embedding_save_path(tmp_path, src, root, "clip")
+    assert result == tmp_path / "clip" / "train" / "n01234" / "img001.safetensors"
 
 
 def test_save_path_absolute_no_root(tmp_path: Path) -> None:
     src = Path("/data/imagenet/train/n01234/img001.jpg")
-    result = _embedding_save_path(tmp_path, src, None)
-    assert result == tmp_path / "img001.safetensors"
+    result = _embedding_save_path(tmp_path, src, None, "clip")
+    assert result == tmp_path / "clip" / "img001.safetensors"
 
 
 def test_save_path_relative_no_root(tmp_path: Path) -> None:
     src = Path("cats/img001.jpg")
-    result = _embedding_save_path(tmp_path, src, None)
-    assert result == tmp_path / "cats" / "img001.safetensors"
+    result = _embedding_save_path(tmp_path, src, None, "clip")
+    assert result == tmp_path / "clip" / "cats" / "img001.safetensors"
 
 
 def test_save_path_replaces_suffix(tmp_path: Path) -> None:
     src = Path("img.png")
-    result = _embedding_save_path(tmp_path, src, None)
+    result = _embedding_save_path(tmp_path, src, None, "clip")
     assert result.suffix == ".safetensors"
 
 
@@ -158,7 +158,7 @@ def test_extract_dataset_saved_tensor_shape(
         get_path=lambda item: item[0],
         output_dir=tmp_path,
     )
-    data = load_file(tmp_path / "img_0000.safetensors")
+    data = load_file(tmp_path / "dummy" / "img_0000.safetensors")
     assert data["embedding"].shape == (1, _EMBED_DIM)
 
 
@@ -183,5 +183,5 @@ def test_extract_dataset_mirrors_path_structure(
         dataset_root=dataset_root,
     )
     for i in range(len(rgb_images)):
-        expected = output_dir / "classA" / f"img_{i:04d}.safetensors"
+        expected = output_dir / "dummy" / "classA" / f"img_{i:04d}.safetensors"
         assert expected.exists(), f"Missing: {expected}"
