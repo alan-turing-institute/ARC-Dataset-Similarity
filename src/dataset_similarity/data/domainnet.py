@@ -7,9 +7,6 @@ from typing import Literal
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import load_domainnet_class_mapping
 
-DOMAINNET_CLASS_MAP = load_domainnet_class_mapping()
-DOMAIN_LABEL_NAME_MAP = {v: k for k, v in DOMAINNET_CLASS_MAP.items()}
-
 
 class DomainNetDataset(ImageDataset):
     """
@@ -23,7 +20,6 @@ class DomainNetDataset(ImageDataset):
     """
 
     DOMAINS = ("clipart", "infograph", "painting", "quickdraw", "real", "sketch")
-    CLASS_MAP = DOMAINNET_CLASS_MAP
 
     def __init__(
         self,
@@ -33,6 +29,13 @@ class DomainNetDataset(ImageDataset):
         split: Literal["train", "test"] = "train",
     ) -> None:
         super().__init__(data_root, split)
+
+        self.descriptor_label_map = load_domainnet_class_mapping(
+            self.root.parent / "metadata" / "domainnet_class_mapping.yaml"
+        )
+        self.label_descriptor_map = {
+            label: name for name, label in self.descriptor_label_map.items()
+        }
 
         if domains is None:
             domains = list(self.DOMAINS)
@@ -53,7 +56,7 @@ class DomainNetDataset(ImageDataset):
 
         if target_classes is not None:
             for cls in target_classes:
-                if cls not in self.CLASS_MAP:
+                if cls not in self.descriptor_label_map:
                     err_msg = (
                         f"Unknown class {cls}. Check the class mapping at "
                         "data/metadata/domainnet_class_mapping.yaml for valid class "
@@ -61,7 +64,7 @@ class DomainNetDataset(ImageDataset):
                     )
                     raise ValueError(err_msg)
         else:
-            target_classes = list(self.CLASS_MAP.keys())
+            target_classes = list(self.descriptor_label_map.keys())
 
         for domain in self.domains:
             split_file = self.root / f"{domain}_{split}.txt"
@@ -78,7 +81,7 @@ class DomainNetDataset(ImageDataset):
         # build the list of classes present in this dataset based on the labels in
         # the split files
         for _, label_id in self.samples:
-            class_name = DOMAIN_LABEL_NAME_MAP[label_id]
+            class_name = self.label_descriptor_map[label_id]
             if class_name not in self.classes:
                 self.classes.append(class_name)
 
@@ -98,9 +101,9 @@ class DomainNetDataset(ImageDataset):
             list[tuple[Path, int]]: List of (absolute file path, integer label) tuples.
         """
         if target_classes is None:
-            class_indexes = list(DOMAINNET_CLASS_MAP.values())
+            class_indexes = list(self.descriptor_label_map.values())
         else:
-            class_indexes = [DOMAINNET_CLASS_MAP[cls] for cls in target_classes]
+            class_indexes = [self.descriptor_label_map[cls] for cls in target_classes]
         samples: list[tuple[Path, int]] = []
         with split_file.open(newline="") as f:
             reader = csv.reader(f, delimiter=" ")

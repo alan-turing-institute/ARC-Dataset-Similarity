@@ -11,12 +11,26 @@ from dataset_similarity.data.domainnet import DomainNetDataset
 
 @pytest.fixture()
 def domainnet_root(tmp_path: Path) -> Path:
-    """Create a minimal fake DomainNet directory structure."""
+    """Create a minimal fake DomainNet directory structure.
+
+    Layout mirrors the real data layout so the dataset can locate metadata::
+
+        tmp_path/
+          metadata/
+            domainnet_class_mapping.yaml
+          DomainNet/          <- returned as data_root
+            real/
+              cat/image_001.jpg
+              dog/image_001.jpg
+            real_train.txt
+    """
     domain = "real"
     classes = ["cat", "dog"]
 
+    data_root = tmp_path / "DomainNet"
+
     for label, class_name in enumerate(classes):
-        class_dir = tmp_path / domain / class_name
+        class_dir = data_root / domain / class_name
         class_dir.mkdir(parents=True)
         img_path = class_dir / "image_001.jpg"
         Image.new("RGB", (64, 64), color=(label * 80, 120, 200)).save(img_path)
@@ -25,9 +39,13 @@ def domainnet_root(tmp_path: Path) -> Path:
         f"{domain}/cat/image_001.jpg 0",
         f"{domain}/dog/image_001.jpg 1",
     ]
-    (tmp_path / f"{domain}_train.txt").write_text("\n".join(split_lines))
+    (data_root / f"{domain}_train.txt").write_text("\n".join(split_lines))
 
-    return tmp_path
+    metadata_dir = tmp_path / "metadata"
+    metadata_dir.mkdir()
+    (metadata_dir / "domainnet_class_mapping.yaml").write_text("cat: 0\ndog: 1\n")
+
+    return data_root
 
 
 class TestDomainNetDataset:
@@ -44,8 +62,13 @@ class TestDomainNetDataset:
             DomainNetDataset(data_root="data/DomainNet", domains="real", split="val")  # type: ignore[arg-type]
 
     def test_missing_split_file(self, tmp_path: Path) -> None:
+        # No metadata dir or split file — expects FileNotFoundError
+        (tmp_path / "metadata").mkdir()
+        (tmp_path / "metadata" / "domainnet_class_mapping.yaml").write_text("cat: 0\n")
+        data_root = tmp_path / "DomainNet"
+        data_root.mkdir()
         with pytest.raises(FileNotFoundError):
-            DomainNetDataset(data_root=tmp_path, domains="real")
+            DomainNetDataset(data_root=data_root, domains="real")
 
     def test_len(self, domainnet_root: Path) -> None:
         dataset = DomainNetDataset(data_root=domainnet_root, domains="real")

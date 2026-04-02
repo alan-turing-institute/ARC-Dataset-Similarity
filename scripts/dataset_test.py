@@ -3,8 +3,8 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 
-from dataset_similarity.data.domainnet import DOMAIN_LABEL_NAME_MAP, DomainNetDataset
-from dataset_similarity.data.imagenet import IMAGENET_CLASS_MAP, ImageNetDataset
+from dataset_similarity.data.domainnet import DomainNetDataset
+from dataset_similarity.data.imagenet import ImageNetDataset
 from dataset_similarity.data.transform import (
     TransformedDataset,
     centre_crop,
@@ -14,6 +14,18 @@ from dataset_similarity.data.transform import (
     grayscale_and_blur,
     horizontal_flip,
     rotation_180,
+)
+from dataset_similarity.data.utils import (
+    load_domainnet_class_mapping,
+    load_imagenet_class_mapping,
+)
+
+DOMAIN_LABEL_NAME_MAP = load_domainnet_class_mapping(
+    "data/metadata/domainnet_class_mapping.yaml"
+)
+
+IMAGENET_CLASS_MAP = load_imagenet_class_mapping(
+    "data/metadata/imagenet_class_mapping.yaml"
 )
 
 
@@ -44,7 +56,7 @@ def main(
             split=split,
             target_classes=target_classes,
         )
-        label_name_map = DOMAIN_LABEL_NAME_MAP
+        label_name_map = data.label_descriptor_map
 
     named_transforms = [
         ("Original", None),

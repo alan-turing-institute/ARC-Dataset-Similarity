@@ -4,9 +4,6 @@ from pathlib import Path
 from typing import Literal
 
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import load_imagenet_class_mapping
-
-IMAGENET_CLASS_MAP = load_imagenet_class_mapping()
 
 
 class ImageNetDataset(ImageDataset):
