@@ -17,6 +17,7 @@ def _embedding_save_path(
     output_dir: Path,
     src_path: str | os.PathLike[str],
     dataset_root: Path | None,
+    model_name: str,
 ) -> Path:
     p = Path(src_path)
     if dataset_root is not None:
@@ -25,7 +26,7 @@ def _embedding_save_path(
         rel = Path(p.name)
     else:
         rel = p
-    return output_dir / rel.with_suffix(".safetensors")
+    return output_dir / model_name / rel.with_suffix(".safetensors")
 
 
 class BaseExtractor(ABC):
@@ -106,16 +107,16 @@ class BaseExtractor(ABC):
             num_workers=num_workers,
             collate_fn=collate,
         )
-
-        all_embeddings: list[torch.Tensor] = []
+        model_name = self.model_name.split("/")[-1]
         with torch.inference_mode():
-            for images, paths in tqdm(loader, desc=f"Extracting [{self.model_name}]"):
+            for images, paths in tqdm(loader, desc=f"Extracting [{model_name}]"):
                 pixel_values = self.preprocess(images).to(self.device)
                 embeddings = self.encode(pixel_values).cpu()
-                all_embeddings.append(embeddings)
 
                 if out_root is not None:
                     for emb, src_path in zip(embeddings, paths, strict=True):
-                        dst = _embedding_save_path(out_root, src_path, ds_root)
+                        dst = _embedding_save_path(
+                            out_root, src_path, ds_root, model_name
+                        )
                         dst.parent.mkdir(parents=True, exist_ok=True)
                         save_file({"embedding": emb.unsqueeze(0)}, dst)
