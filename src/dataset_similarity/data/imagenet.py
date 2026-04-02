@@ -3,12 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-import torch
-from torch.utils.data import Dataset
-from torchvision.io import read_image
+from dataset_similarity.data.base import ImageDataset
 
 
-class ImageNetDataset(Dataset):  # type: ignore[misc]
+class ImageNetDataset(ImageDataset):
     """
     PyTorch dataset for `ImageNet ILSVRC <https://image-net.org/>`_.
 
@@ -41,12 +39,12 @@ class ImageNetDataset(Dataset):  # type: ignore[misc]
         split: Literal["train", "val"] = "train",
         target_classes: list[str] | None = None,
     ) -> None:
+        super().__init__(data_root)
+
         # Validate split value
         if split not in ("train", "val"):
             err_msg = f"Unknown split '{split}'. Choose from: 'train' or 'val'"
             raise ValueError(err_msg)
-
-        self.root = Path(data_root)
         self.split = split
 
         # Verify the split directory exists
@@ -88,16 +86,3 @@ class ImageNetDataset(Dataset):  # type: ignore[misc]
             )
             samples.extend((image_path, label) for image_path in images)
         return samples
-
-    def __len__(self) -> int:
-        return len(self.samples)
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        image_path, label = self.samples[idx]
-        image_tensor = read_image(image_path, mode="RGB")
-        return image_tensor, label
-
-    @property
-    def class_count(self) -> int:
-        """Number of distinct classes present in this split."""
-        return len(self.classes)

@@ -4,18 +4,14 @@ import csv
 from pathlib import Path
 from typing import Literal
 
-import torch
-from torch.utils.data import Dataset
-from torchvision import transforms
-from torchvision.io import read_image
-
+from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import load_domainnet_class_mapping
 
 DOMAINNET_CLASS_MAP = load_domainnet_class_mapping()
 DOMAIN_LABEL_NAME_MAP = {v: k for k, v in DOMAINNET_CLASS_MAP.items()}
 
 
-class DomainNetDataset(Dataset):  # type: ignore[misc]
+class DomainNetDataset(ImageDataset):
     """
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
@@ -36,7 +32,7 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
         target_classes: list[str] | None = None,
         split: Literal["train", "test"] = "train",
     ) -> None:
-        self.root = Path(data_root)
+        super().__init__(data_root)
 
         if domains is None:
             domains = list(self.DOMAINS)
@@ -67,8 +63,6 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
         else:
             target_classes = list(self.CLASS_MAP.keys())
 
-        self.classes: list[str] = []
-        self.samples: list[tuple[Path, int]] = []
         for domain in self.domains:
             split_file = self.root / f"{domain}_{split}.txt"
             if not split_file.exists():
@@ -89,21 +83,6 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
             class_name = DOMAIN_LABEL_NAME_MAP[label_id]
             if class_name not in self.classes:
                 self.classes.append(class_name)
-
-        self._to_tensor = transforms.ToTensor()
-
-    def __len__(self) -> int:
-        return len(self.samples)
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        image_path, label = self.samples[idx]
-        image_tensor = read_image(self.root / image_path, mode="RGB")
-        return image_tensor, label
-
-    @property
-    def class_count(self) -> int:
-        """Number of distinct classes present in this split."""
-        return len(self.classes)
 
     @classmethod
     def read_domain_net_split(
