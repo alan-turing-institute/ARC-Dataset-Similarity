@@ -39,17 +39,41 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         """
         resample dataset to have defined size and a fixed number of samples per class.
         """
+        if not isinstance(size, float | int):
+            err_msg = "size must be either a float in (0, 1) or a positive integer"  # type: ignore[unreachable]
+            raise TypeError(err_msg)
+        if isinstance(size, float):
+            if not (0 < size < 1):
+                err_msg = "If 'size' is a float, it must be in the range (0, 1)"
+                raise ValueError(err_msg)
+        else:
+            if size <= 0:
+                err_msg = "If 'size' is an int, it must be a positive integer"
+                raise ValueError(err_msg)
+            if size > len(self.classes):
+                err_msg = (
+                    "If 'size' is an int, it cannot be larger than the number of "
+                    "classes in the dataset"
+                )
+                raise ValueError(err_msg)
+            if size > len(self.samples):
+                err_msg = (
+                    "If 'size' is an int, it cannot be larger than the number of "
+                    "samples in the dataset"
+                )
+                raise ValueError(err_msg)
+
         images, labels = zip(*self.samples, strict=True)
         (
             _,
-            _,
             images_stratified,
+            _,
             labels_stratified,
         ) = train_test_split(
             images,
             labels,
             test_size=size,
-            stratify=list(set(labels)),
+            stratify=labels,
             random_state=random_seed,
         )
         self.samples = list(zip(images_stratified, labels_stratified, strict=True))

@@ -43,20 +43,16 @@ def main(
             split=imagenet_split,
             target_classes=target_classes,
         )
-        # Build idx -> human-readable name using the loaded class mapping
-        idx_to_synset = {idx: synset for synset, idx in data.class_to_idx.items()}
-        label_name_map = {
-            idx: IMAGENET_CLASS_MAP[synset]["name"]
-            for idx, synset in idx_to_synset.items()
-        }
     else:
         data = DomainNetDataset(
             data_root="data/DomainNet",
             domains=domains,
             split=split,
             target_classes=target_classes,
+            random_seed=42,
         )
-        label_name_map = data.label_descriptor_map
+
+    print(len(data), "samples loaded")
 
     named_transforms = [
         ("Original", None),
@@ -83,7 +79,7 @@ def main(
         ax_row[0].text(
             -0.05,
             0.5,
-            label_name_map[label],
+            data.label_descriptor_map[label],
             transform=ax_row[0].transAxes,
             fontsize=14,
             va="center",

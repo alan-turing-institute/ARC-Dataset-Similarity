@@ -27,6 +27,8 @@ class DomainNetDataset(ImageDataset):
         domains: str | list[str] | None = None,
         target_classes: list[str] | None = None,
         split: Literal["train", "test"] = "train",
+        size: float | int | None = None,
+        random_seed: int | None = None,
     ) -> None:
         super().__init__(data_root, split)
 
@@ -78,6 +80,9 @@ class DomainNetDataset(ImageDataset):
 
             self.samples = self.samples + self._load_samples(split_file, target_classes)
 
+        if size is not None:
+            self.samples = self.stratify_by_class(size, random_seed)
+
         # build the list of classes present in this dataset based on the labels in
         # the split files
         for _, label_id in self.samples:
@@ -92,6 +97,17 @@ class DomainNetDataset(ImageDataset):
     ) -> list[tuple[Path, int]]:
         """
         Read a DomainNet split file and return the list of (path, label) samples.
+
+        Expects the standard directory layout::
+
+            data_root/
+            ├── [domain]/
+            │   ├── [class_name]/
+            │   │   ├── images.jpg
+            │   │   └── ...
+            │   └── ...
+            ├── [domain]_[split].txt
+            │── ...
 
         Args:
             split_file: Path to the split file.

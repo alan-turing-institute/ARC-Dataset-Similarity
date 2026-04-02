@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.utils import load_imagenet_class_mapping
 
 
 class ImageNetDataset(ImageDataset):
@@ -26,6 +27,26 @@ class ImageNetDataset(ImageDataset):
     ) -> None:
         super().__init__(data_root, split)
 
+        self.synnet_descriptor_map = load_imagenet_class_mapping(
+            self.root.parent / "metadata" / "imagenet_class_mapping.yaml"
+        )
+
+        # synset_id -> class_number
+        self.descriptor_label_map: dict[str, int] = {
+            synset: cast(int, info["class_number"])
+            for synset, info in self.synnet_descriptor_map.items()
+        }
+        # class_number -> human-readable name
+        self.label_descriptor_map: dict[int, str] = {
+            cast(int, info["class_number"]): cast(str, info["name"])
+            for info in self.synnet_descriptor_map.values()
+        }
+        # human-readable name -> synset_id (for accepting names in target_classes)
+        self._name_to_synset: dict[str, str] = {
+            cast(str, info["name"]): synset
+            for synset, info in self.synnet_descriptor_map.items()
+        }
+
         # Validate split value
         if split not in ("train", "val"):
             err_msg = f"Unknown split '{split}'. Choose from: 'train' or 'val'"
@@ -41,18 +62,29 @@ class ImageNetDataset(ImageDataset):
             )
             raise FileNotFoundError(err_msg)
 
-        # Determine which classes to include, filtering out any missing directories
+        # Resolve target_classes: accept synset IDs (e.g. "n02119789") or
+        # human-readable names (e.g. "kit_fox"), silently skipping unknowns.
         if target_classes is not None:
-            self.classes = [cls for cls in target_classes if (split_dir / cls).is_dir()]
+            resolved: list[str] = []
+            for cls in target_classes:
+                if cls in self.synnet_descriptor_map:
+                    resolved.append(cls)
+                elif cls in self._name_to_synset:
+                    resolved.append(self._name_to_synset[cls])
+            self.classes = [cls for cls in resolved if (split_dir / cls).is_dir()]
         else:
-            self.classes = sorted(p.name for p in split_dir.iterdir() if p.is_dir())
+            # Only include directories that correspond to known synsets
+            self.classes = sorted(
+                p.name
+                for p in split_dir.iterdir()
+                if p.is_dir() and p.name in self.synnet_descriptor_map
+            )
 
         if not self.classes:
             err_msg = f"No class sub-directories found in {split_dir}"
             raise FileNotFoundError(err_msg)
 
         # Build label index and load all (image_path, label) pairs
-        self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
         self.samples = self._load_samples(split_dir)
 
     def _load_samples(
@@ -78,8 +110,8 @@ class ImageNetDataset(ImageDataset):
                 samples: List of (image_path, label) pairs. Image paths are absolute.
         """
         samples: list[tuple[Path, int]] = []
-        for class_name in self.classes:
-            label = self.class_to_idx[class_name]
+        for class_name in self.classes:  # class_name is always a synset ID
+            label = self.descriptor_label_map[class_name]  # synset_id -> class_number
             class_dir = split_dir / class_name
             images = sorted(
                 p

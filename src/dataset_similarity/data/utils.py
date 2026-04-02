@@ -15,7 +15,7 @@ def load_domainnet_class_mapping(
 
 def load_imagenet_class_mapping(
     yaml_path: str | Path,
-) -> dict[str, int]:
+) -> dict[str, dict[str, str | int]]:
     with Path(yaml_path).open() as f:
-        dictionary: dict[str, int] = safe_load(f)
+        dictionary: dict[str, dict[str, str | int]] = safe_load(f)
     return dictionary
