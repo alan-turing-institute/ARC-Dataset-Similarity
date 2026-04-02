@@ -32,7 +32,7 @@ class DomainNetDataset(ImageDataset):
         target_classes: list[str] | None = None,
         split: Literal["train", "test"] = "train",
     ) -> None:
-        super().__init__(data_root)
+        super().__init__(data_root, split)
 
         if domains is None:
             domains = list(self.DOMAINS)
@@ -73,9 +73,7 @@ class DomainNetDataset(ImageDataset):
                 )
                 raise FileNotFoundError(err_msg)
 
-            self.samples = self.samples + self.read_domain_net_split(
-                split_file, target_classes
-            )
+            self.samples = self.samples + self._load_samples(split_file, target_classes)
 
         # build the list of classes present in this dataset based on the labels in
         # the split files
@@ -84,9 +82,8 @@ class DomainNetDataset(ImageDataset):
             if class_name not in self.classes:
                 self.classes.append(class_name)
 
-    @classmethod
-    def read_domain_net_split(
-        cls,
+    def _load_samples(
+        self,
         split_file: Path,
         target_classes: list[str] | None = None,
     ) -> list[tuple[Path, int]]:
@@ -98,7 +95,7 @@ class DomainNetDataset(ImageDataset):
             target_classes: List of class names to include in the split.
 
         Returns:
-            list[tuple[Path, int]]: List of (relative file path, integer label) tuples.
+            list[tuple[Path, int]]: List of (absolute file path, integer label) tuples.
         """
         if target_classes is None:
             class_indexes = list(DOMAINNET_CLASS_MAP.values())
@@ -114,6 +111,6 @@ class DomainNetDataset(ImageDataset):
                 rel_path, label = row[0], row[1]
 
                 if int(label) in class_indexes:
-                    samples.append((Path(rel_path), int(label)))
+                    samples.append(((self.root / Path(rel_path)), int(label)))
 
         return samples

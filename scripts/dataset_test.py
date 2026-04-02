@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 
 from dataset_similarity.data.domainnet import DOMAIN_LABEL_NAME_MAP, DomainNetDataset
+from dataset_similarity.data.imagenet import IMAGENET_CLASS_MAP, ImageNetDataset
 from dataset_similarity.data.transform import (
     TransformedDataset,
     centre_crop,
@@ -16,13 +17,34 @@ from dataset_similarity.data.transform import (
 )
 
 
-def main(domains: list[str], target_classes: list[str], split: str) -> None:
-    data = DomainNetDataset(
-        data_root="data/DomainNet",
-        domains=domains,
-        split=split,
-        target_classes=target_classes,
-    )
+def main(
+    dataset: str,
+    domains: list[str] | None,
+    target_classes: list[str] | None,
+    split: str,
+) -> None:
+    if dataset == "imagenet":
+        # ImageNet val split maps to "val"; train is the default
+        imagenet_split = "val" if split in ("test", "val") else "train"
+        data = ImageNetDataset(
+            data_root="data/ImageNet",
+            split=imagenet_split,
+            target_classes=target_classes,
+        )
+        # Build idx -> human-readable name using the loaded class mapping
+        idx_to_synset = {idx: synset for synset, idx in data.class_to_idx.items()}
+        label_name_map = {
+            idx: IMAGENET_CLASS_MAP[synset]["name"]
+            for idx, synset in idx_to_synset.items()
+        }
+    else:
+        data = DomainNetDataset(
+            data_root="data/DomainNet",
+            domains=domains,
+            split=split,
+            target_classes=target_classes,
+        )
+        label_name_map = DOMAIN_LABEL_NAME_MAP
 
     named_transforms = [
         ("Original", None),
@@ -45,12 +67,11 @@ def main(domains: list[str], target_classes: list[str], split: str) -> None:
 
     for ax_row, idx in zip(axes, indices, strict=True):
         original_item, label = data[idx]
-        class_name = DOMAIN_LABEL_NAME_MAP[label]
 
         ax_row[0].text(
             -0.05,
             0.5,
-            class_name,
+            label_name_map[label],
             transform=ax_row[0].transAxes,
             fontsize=14,
             va="center",
@@ -62,7 +83,7 @@ def main(domains: list[str], target_classes: list[str], split: str) -> None:
                 item = original_item
             else:
                 item, _ = TransformedDataset(data, transform)[idx]
-            ax.imshow(item.permute(1, 2, 0))
+            ax.imshow(data.denormalise(item).permute(1, 2, 0))
             ax.axis("off")
 
     plt.tight_layout()
@@ -71,9 +92,20 @@ def main(domains: list[str], target_classes: list[str], split: str) -> None:
 
 if __name__ == "__main__":
     parser = ArgumentParser()
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="domainnet",
+        choices=["domainnet", "imagenet"],
+    )
     parser.add_argument("--split", type=str, default="train")
     parser.add_argument("--domains", nargs="+", type=str, default=None)
     parser.add_argument("--target_classes", nargs="+", type=str, default=None)
     args = parser.parse_args()
 
-    main(domains=args.domains, target_classes=args.target_classes, split=args.split)
+    main(
+        dataset=args.dataset,
+        domains=args.domains,
+        target_classes=args.target_classes,
+        split=args.split,
+    )
