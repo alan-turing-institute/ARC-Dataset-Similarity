@@ -8,17 +8,15 @@ from torch.utils.data import Dataset
 
 
 class _ImageDataset(Dataset[Any]):
-    """Minimal dataset returning ``(image,)`` tuples, matching the default
-    ``get_image = lambda item: item[0]`` in :meth:`BaseExtractor.extract_dataset`.
-    """
+    """Minimal dataset returning ``(image, label)`` tuples."""
 
     def __init__(self, images: list[Image.Image]) -> None:
-        self._data = [(img,) for img in images]
+        self._data = [(img, 0) for img in images]
 
     def __len__(self) -> int:
         return len(self._data)
 
-    def __getitem__(self, idx: int) -> tuple[Image.Image]:
+    def __getitem__(self, idx: int) -> tuple[Image.Image, int]:
         return self._data[idx]
 
 

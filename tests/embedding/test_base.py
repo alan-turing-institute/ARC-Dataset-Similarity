@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pytest
 import torch
 from PIL import Image
 from safetensors.torch import load_file
@@ -32,16 +31,16 @@ class _DummyExtractor(BaseExtractor):
 # ---------------------------------------------------------------------------
 
 
-class _PathDataset(Dataset[tuple[str, Image.Image]]):
-    """Dataset whose items are ``(path_str, image)`` tuples."""
+class _PathDataset(Dataset[tuple[Image.Image, str]]):
+    """Dataset whose items are ``(image, path_str)`` tuples."""
 
     def __init__(self, images: list[Image.Image], paths: list[str]) -> None:
-        self._data = list(zip(paths, images, strict=True))
+        self._data = list(zip(images, paths, strict=True))
 
     def __len__(self) -> int:
         return len(self._data)
 
-    def __getitem__(self, idx: int) -> tuple[str, Image.Image]:
+    def __getitem__(self, idx: int) -> tuple[Image.Image, str]:
         return self._data[idx]
 
 
@@ -96,29 +95,16 @@ def test_extract_dataset_custom_get_image(rgb_images: list[Image.Image]) -> None
         def __len__(self) -> int:
             return len(self._data)
 
-        def __getitem__(self, idx: int) -> dict[str, Any]:
-            return self._data[idx]
+        def __getitem__(self, idx: int) -> tuple[Image.Image, int]:
+            item = self._data[idx]
+            return item["img"], item["label"]
 
     extractor = _DummyExtractor()
     extractor.extract_dataset(
         _DictDataset(rgb_images),
         batch_size=2,
         num_workers=0,
-        get_image=lambda item: item["img"],
     )
-
-
-def test_extract_dataset_missing_get_path_raises(
-    image_dataset: Dataset[Any], tmp_path: Path
-) -> None:
-    extractor = _DummyExtractor()
-    with pytest.raises(ValueError, match="get_path"):
-        extractor.extract_dataset(
-            image_dataset,
-            batch_size=2,
-            num_workers=0,
-            output_dir=tmp_path,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -136,8 +122,6 @@ def test_extract_dataset_saves_correct_number_of_files(
         dataset,
         batch_size=2,
         num_workers=0,
-        get_image=lambda item: item[1],
-        get_path=lambda item: item[0],
         output_dir=tmp_path,
     )
     saved = list(tmp_path.rglob("*.safetensors"))
@@ -154,8 +138,6 @@ def test_extract_dataset_saved_tensor_shape(
         dataset,
         batch_size=2,
         num_workers=0,
-        get_image=lambda item: item[1],
-        get_path=lambda item: item[0],
         output_dir=tmp_path,
     )
     data = load_file(tmp_path / "dummy" / "img_0000.safetensors")
@@ -177,8 +159,6 @@ def test_extract_dataset_mirrors_path_structure(
         dataset,
         batch_size=2,
         num_workers=0,
-        get_image=lambda item: item[1],
-        get_path=lambda item: item[0],
         output_dir=output_dir,
         dataset_root=dataset_root,
     )

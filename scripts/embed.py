@@ -52,8 +52,6 @@ def main(args: argparse.Namespace) -> None:
         dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        get_image=lambda item: item[0],
-        get_path=lambda item: item[1],
         output_dir=output_dir,
         dataset_root=dataset_root,
     )
@@ -83,7 +81,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset_split",
-        choices=["train", "test"],
+        choices=["train", "val"],
         default="train",
         help="Dataset split to embed (default: train).",
     )
