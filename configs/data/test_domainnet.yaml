@@ -1,0 +1,5 @@
+name: "domainnet"
+data_root: "data/DomainNet"
+kwargs:
+  domains: ["infograph", "painting", "quickdraw", "sketch"]
+  target_classes: null

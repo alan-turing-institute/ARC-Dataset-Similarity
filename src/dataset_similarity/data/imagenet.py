@@ -7,7 +7,7 @@ from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import load_imagenet_class_mapping
 
 
-class ImageNetDataset(ImageDataset):
+class ImageNetDataset(ImageDataset, name="imagenet"):
     """
     PyTorch dataset for `ImageNet ILSVRC <https://image-net.org/>`_.
 
@@ -90,7 +90,7 @@ class ImageNetDataset(ImageDataset):
     def _load_samples(
         self,
         split_dir: Path,
-    ) -> list[tuple[Path, int]]:
+    ) -> list[tuple[Path, int | str]]:
         """
 
         Expects the standard directory layout::
@@ -109,7 +109,7 @@ class ImageNetDataset(ImageDataset):
             Returns:
                 samples: List of (image_path, label) pairs. Image paths are absolute.
         """
-        samples: list[tuple[Path, int]] = []
+        samples: list[tuple[Path, int | str]] = []
         for class_name in self.classes:  # class_name is always a synset ID
             label = self.descriptor_label_map[class_name]  # synset_id -> class_number
             class_dir = split_dir / class_name

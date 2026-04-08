@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 
+from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
 from dataset_similarity.data.transform import (
@@ -34,23 +35,29 @@ def main(
     domains: list[str] | None,
     target_classes: list[str] | None,
     split: str,
+    config_file: str | None,
 ) -> None:
-    if dataset == "imagenet":
-        # ImageNet val split maps to "val"; train is the default
-        imagenet_split = "val" if split in ("test", "val") else "train"
-        data = ImageNetDataset(
-            data_root="data/ImageNet",
-            split=imagenet_split,
-            target_classes=target_classes,
-        )
+    if config_file is not None:
+        data = ImageDataset.from_yaml(config_file)
+
     else:
-        data = DomainNetDataset(
-            data_root="data/DomainNet",
-            domains=domains,
-            split=split,
-            target_classes=target_classes,
-            random_seed=42,
-        )
+        if dataset == "imagenet":
+            # ImageNet val split maps to "val"; train is the default
+            imagenet_split = "val" if split in ("test", "val") else "train"
+            data = ImageNetDataset(
+                data_root="data/ImageNet",
+                split=imagenet_split,
+                target_classes=target_classes,
+            )
+        else:
+            data = DomainNetDataset(
+                data_root="data/DomainNet",
+                domains=domains,
+                split=split,
+                target_classes=target_classes,
+                random_seed=42,
+                size=0.1,
+            )
 
     print(len(data), "samples loaded")
 
@@ -108,7 +115,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--split", type=str, default="train")
     parser.add_argument("--domains", nargs="+", type=str, default=None)
-    parser.add_argument("--target_classes", nargs="+", type=str, default=None)
+    parser.add_argument("--target-classes", nargs="+", type=str, default=None)
+    parser.add_argument("--config-file", type=str, default=None)
+
     args = parser.parse_args()
 
     main(
@@ -116,4 +125,5 @@ if __name__ == "__main__":
         domains=args.domains,
         target_classes=args.target_classes,
         split=args.split,
+        config_file=args.config_file,
     )
