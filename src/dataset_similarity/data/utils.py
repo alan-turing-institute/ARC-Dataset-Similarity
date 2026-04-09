@@ -17,6 +17,31 @@ model_mapping: dict[str, Callable[..., ImageDataset]] = {
 def from_yaml(
     yaml_path: str | Path,
 ) -> ImageDataset:
+    """
+    Instantiate a dataset from a YAML config file.
+
+    The YAML file must contain a ``name`` key matching an entry in
+    ``model_mapping`` and an ``args`` section whose keys are forwarded as
+    keyword arguments to the dataset constructor.  ``args`` must include at
+    least a ``data_root`` key.
+
+    Example config::
+
+        name: domainnet
+        args:
+          data_root: data/DomainNet
+          domains: [real, sketch]
+          split: train
+
+    Args:
+        yaml_path: Path to the YAML config file.
+
+    Raises:
+        ValueError: If the config is missing a ``name`` or ``data_root`` key.
+
+    Returns:
+        An instantiated ``ImageDataset`` subclass corresponding to ``name``.
+    """
     with Path(yaml_path).open() as f:
         yaml_dict: dict[str, object] = safe_load(f)
 
