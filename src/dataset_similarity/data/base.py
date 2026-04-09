@@ -58,12 +58,6 @@ class ImageDataset(Dataset):  # type: ignore[misc]
             if size <= 0:
                 err_msg = "If 'size' is an int, it must be a positive integer"
                 raise ValueError(err_msg)
-            if size > len(self.classes):
-                err_msg = (
-                    "If 'size' is an int, it cannot be larger than the number of "
-                    "classes in the dataset"
-                )
-                raise ValueError(err_msg)
             if size > len(self.samples):
                 err_msg = (
                     "If 'size' is an int, it cannot be larger than the number of "
