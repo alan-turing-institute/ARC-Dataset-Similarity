@@ -10,7 +10,7 @@ from PIL import Image
 from safetensors.torch import load_file
 from torch.utils.data import Dataset
 
-from dataset_similarity.embedding.base import (
+from dataset_similarity.embedding import (
     MODEL_NAMES,
     Extractor,
     _embedding_save_path,
@@ -94,11 +94,11 @@ def test_unknown_model_raises_value_error() -> None:
     with (
         pytest.raises(ValueError, match="Unknown model"),
         patch(
-            "dataset_similarity.embedding.base." "AutoProcessor.from_pretrained",
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
             return_value=MagicMock(),
         ),
         patch(
-            "dataset_similarity.embedding.base." "AutoModel.from_pretrained",
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
             return_value=MagicMock(),
         ),
     ):
@@ -109,11 +109,11 @@ def test_unknown_model_raises_value_error() -> None:
 def test_constructor_sets_model_name(model_name: str) -> None:
     with (
         patch(
-            "dataset_similarity.embedding.base.AutoProcessor.from_pretrained",
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
             return_value=MagicMock(),
         ),
         patch(
-            "dataset_similarity.embedding.base.AutoModel.from_pretrained",
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
             return_value=MagicMock(),
         ),
     ):
@@ -124,11 +124,11 @@ def test_constructor_sets_model_name(model_name: str) -> None:
 def test_constructor_uses_default_hf_model_id() -> None:
     with (
         patch(
-            "dataset_similarity.embedding.base.AutoProcessor.from_pretrained",
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
             return_value=MagicMock(),
         ) as proc_patch,
         patch(
-            "dataset_similarity.embedding.base.AutoModel.from_pretrained",
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
             return_value=MagicMock(),
         ) as model_patch,
     ):
@@ -141,11 +141,11 @@ def test_constructor_hf_model_id_override() -> None:
     custom_id = "my-org/my-clip-model"
     with (
         patch(
-            "dataset_similarity.embedding.base.AutoProcessor.from_pretrained",
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
             return_value=MagicMock(),
         ) as proc_patch,
         patch(
-            "dataset_similarity.embedding.base.AutoModel.from_pretrained",
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
             return_value=MagicMock(),
         ) as model_patch,
     ):
@@ -164,11 +164,11 @@ def _make_extractor(model_name: str) -> tuple[Extractor, MagicMock, MagicMock]:
     mock_model = MagicMock()
     with (
         patch(
-            "dataset_similarity.embedding.base.AutoProcessor.from_pretrained",
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
             return_value=mock_proc,
         ),
         patch(
-            "dataset_similarity.embedding.base.AutoModel.from_pretrained",
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
             return_value=mock_model,
         ),
     ):
