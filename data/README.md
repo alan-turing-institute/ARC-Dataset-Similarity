@@ -1,6 +1,24 @@
 ## DomainNet
 [DomainNet](http://ai.bu.edu/M3SDA/) is a large-scale domain-adaptation benchmark containing ~0.6 M images across 345 categories and 6 domains.
-Directory layout expected after downloading:
+
+### Downloading
+
+Use the provided helper script to download and extract all domains into the expected directory layout:
+
+```bash
+python scripts/download_data.py --dataset domainnet --data-root data/DomainNet
+```
+
+To download only specific domains, pass `--domains`:
+
+```bash
+python scripts/download_data.py --dataset domainnet --data-root data/DomainNet \
+    --domains clipart real sketch
+```
+
+Alternatively, download the cleaned zip files and split `.txt` files manually from [http://ai.bu.edu/M3SDA/](http://ai.bu.edu/M3SDA/) and extract them into `data/DomainNet/`.
+
+### Directory layout
 
     data/
         DomainNet/
@@ -33,7 +51,21 @@ The `data/metadata/domainnet_class_mapping.yaml` file maps each human-readable c
 ## ImageNet
 
 [ImageNet ILSVRC](https://image-net.org/) is a large-scale image classification benchmark containing ~1.2 M training images across 1,000 synset categories.
-Directory layout expected after downloading:
+
+### Downloading
+
+ImageNet requires a free account at [https://image-net.org/](https://image-net.org/). Once registered:
+
+1. Download the ILSVRC 2012 training set (`ILSVRC2012_img_train.tar`, ~138 GB) and validation set (`ILSVRC2012_img_val.tar`, ~6.3 GB) from the [ImageNet download page](https://image-net.org/download-images).
+2. Extract and organise them using the helper script:
+
+```bash
+python scripts/download_data.py --dataset imagenet --data-root data/ImageNet \
+    --train-tar /path/to/ILSVRC2012_img_train.tar \
+    --val-tar /path/to/ILSVRC2012_img_val.tar
+```
+
+### Directory layout
 
     data/
         ImageNet/
