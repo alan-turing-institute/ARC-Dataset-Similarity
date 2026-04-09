@@ -106,7 +106,7 @@ class DomainNetDataset(ImageDataset):
             for label_id in self.data["label"].unique()
         ]
 
-    def _load_data(
+    def _load_data(  # type: ignore[override]
         self,
         split_file: Path,
         domain_index: int,

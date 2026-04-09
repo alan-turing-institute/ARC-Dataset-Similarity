@@ -27,7 +27,7 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         self.root = Path(data_root)
         self._classes: list[str] = []
         self.split: str = split
-        self.data: DataFrame = DataFrame()
+        self.data: DataFrame = None  # to be populated by subclass
 
     @property
     def classes(self) -> list[str]:
@@ -52,6 +52,8 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         Returns:
             The new ``self.data`` DataFrame after resampling.
         """
+        self._strip_single_classes_from_samples()
+
         _, new_data = train_test_split(
             self.data,
             test_size=size,
@@ -112,7 +114,7 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         return len(self.classes)
 
     @abstractmethod
-    def _load_data(*args: Any, **kwargs: Any) -> DataFrame:
+    def _load_data(self) -> DataFrame:
         """
         Load the dataset split into a DataFrame with columns ["path", "label"].
 

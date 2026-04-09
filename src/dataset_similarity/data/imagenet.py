@@ -97,7 +97,7 @@ class ImageNetDataset(ImageDataset):
         # Build label index and load all (image_path, label) pairs
         self.data = self._load_data(split_dir)
 
-    def _load_data(
+    def _load_data(  # type: ignore[override]
         self,
         split_dir: Path,
     ) -> DataFrame:
