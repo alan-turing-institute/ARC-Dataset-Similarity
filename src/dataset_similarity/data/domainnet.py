@@ -100,10 +100,10 @@ class DomainNetDataset(ImageDataset):
 
         # build the list of classes present in this dataset based on the labels in
         # the split files
-        for label_id in self.data["label"].unique():
-            class_name = self.label_descriptor_map[int(label_id)]
-            if class_name not in self.classes:
-                self.classes.append(class_name)
+        self._classes = [
+            self.label_descriptor_map[int(label_id)]
+            for label_id in self.data["label"].unique()
+        ]
 
     def _load_samples(
         self,

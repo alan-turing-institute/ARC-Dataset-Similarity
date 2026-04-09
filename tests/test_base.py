@@ -29,7 +29,6 @@ def _make_fake_dataset(
 ) -> FakeDataset:
     """Return a FakeDataset with synthetic samples."""
     ds = FakeDataset(data_root=tmp_path, split="train")
-    ds.classes = [str(i) for i in range(n_classes)]
     ds.data = DataFrame(
         [
             {"path": str(tmp_path / f"class{cls}_img{i}.jpg"), "label": cls}

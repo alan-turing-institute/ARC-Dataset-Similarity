@@ -81,16 +81,16 @@ class ImageNetDataset(ImageDataset):
                     resolved.append(cls)
                 elif cls in self._name_to_synset:
                     resolved.append(self._name_to_synset[cls])
-            self.classes = [cls for cls in resolved if (split_dir / cls).is_dir()]
+            self._classes = [cls for cls in resolved if (split_dir / cls).is_dir()]
         else:
             # Only include directories that correspond to known synsets
-            self.classes = sorted(
+            self._classes = sorted(
                 p.name
                 for p in split_dir.iterdir()
                 if p.is_dir() and p.name in self.synset_descriptor_map
             )
 
-        if not self.classes:
+        if not self._classes:
             err_msg = f"No class sub-directories found in {split_dir}"
             raise FileNotFoundError(err_msg)
 

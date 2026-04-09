@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,7 @@ from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
 
-model_mapping: dict[str, type[ImageDataset]] = {
+model_mapping: dict[str, Callable[..., ImageDataset]] = {
     "domainnet": DomainNetDataset,
     "imagenet": ImageNetDataset,
 }

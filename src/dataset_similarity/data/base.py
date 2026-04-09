@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -13,10 +14,13 @@ class ImageDataset(Dataset):  # type: ignore[misc]
 
     def __init__(self, data_root: Path | str, split: str, **kwargs: Any) -> None:
         self.root = Path(data_root)
-        self.samples: DataFrame = DataFrame(columns=["path", "label"])
-        self.classes: list[str] = []
+        self._classes: list[str] = []
         self.split: str = split
         self.data: DataFrame = DataFrame()
+
+    @property
+    def classes(self) -> list[str]:
+        return self._classes
 
     def stratify_by_class(
         self,
@@ -60,3 +64,19 @@ class ImageDataset(Dataset):  # type: ignore[misc]
     def num_classes(self) -> int:
         """Number of distinct classes present in this split."""
         return len(self.classes)
+
+    @abstractmethod
+    def _load_data(self) -> DataFrame:
+        """
+        Load the dataset split into a DataFrame with columns ["path", "label"].
+
+        Paths should be absolute strings. Labels should be integers.
+        The set of labels should correspond to the classes in self.classes.
+
+        This method is called by the constructor of the base class, and should not
+        be called directly.
+
+        Subclasses must implement this method to load their specific dataset format.
+        """
+        err_msg = "Subclasses must implement _load_data() to load the dataset samples"
+        raise NotImplementedError(err_msg)
