@@ -7,43 +7,53 @@ from typing import Any
 import torch
 import torchvision
 
+from dataset_similarity.constants import DEFAULT_DATA_DIR
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
-from dataset_similarity.embedding import get_extractor
+from dataset_similarity.embedding import Extractor
 
 
 def get_image_and_path(self: Any, idx: int) -> tuple[torch.Tensor, Path]:
-    """Override __getitem__ to return (image, path) instead of (image, label)."""
+    """Temporary override before issue #9 is done to allow for embedding+label,
+    image+label and embedding+label loading. Overrides __getitem__ to return
+    (image, path) instead of (image, label).
+    WARNING: This breaks number of workers > 0 since the dataset is not picklable."""
     image_path, _ = self.samples[idx]
     image_tensor = torchvision.io.read_image(str(self.root / image_path), mode="RGB")
     return image_tensor, self.root / image_path
 
 
 def main(args: argparse.Namespace) -> None:
+    init_kwargs = {
+        "data_root": Path(args.dataset_dir)
+        if args.dataset_dir
+        else DEFAULT_DATA_DIR / args.dataset,
+        "split": args.dataset_split,
+    }
     if args.dataset == "domainnet":
-        dataset_root = Path(args.dataset_dir) if args.dataset_dir else None
+        if args.dataset_split == "val":
+            err_msg = "DomainNet does not have a 'val' split. Choose 'train' or 'test'."
+            raise ValueError(err_msg)
         dataset_fn = DomainNetDataset
-        dataset = DomainNetDataset(
-            data_root=dataset_root or "../data/DomainNet",
-            domain=args.domain,
-            split=args.dataset_split,
-        )
+        init_kwargs["domain"] = args.domain
     elif args.dataset == "imagenet":
-        dataset_root = Path(args.dataset_dir) if args.dataset_dir else None
+        if args.dataset_split == "test":
+            err_msg = "ImageNet does not have a 'test' split. Choose 'train' or 'val'."
+            raise ValueError(err_msg)
         dataset_fn = ImageNetDataset
-        dataset = ImageNetDataset(
-            data_root=dataset_root or "../data/ImageNet",
-            split=args.dataset_split,
-        )
 
+    # Temporary override to return (image, path) instead of (image, label) until
+    # issue #9 is done
     dataset_fn.__getitem__ = get_image_and_path
+    dataset = dataset_fn(**init_kwargs)
 
-    print(f"  {len(dataset)} images ready.")
-
+    print(f"{len(dataset)} images ready.")
     print(f"Loading extractor '{args.extractor}' on device '{args.device}' …")
-    extractor = get_extractor(
-        args.extractor,
-        **({"model_name": args.model_name} if args.model_name else {}),
+
+    extractor = Extractor(
+        model_name=args.extractor,
+        hf_model_id=args.model_name,
+        **({"hf_model_id": args.model_name} if args.model_name else {}),
         device=args.device,
     )
 
@@ -53,9 +63,9 @@ def main(args: argparse.Namespace) -> None:
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         output_dir=output_dir,
-        dataset_root=dataset_root,
+        dataset_root=init_kwargs["data_root"],
     )
-    print(f"Saved to         : {output_dir}")
+    print(f"Saved to: {output_dir}")
 
 
 if __name__ == "__main__":
@@ -81,7 +91,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset_split",
-        choices=["train", "val"],
+        choices=["train", "test", "val"],
         default="train",
         help="Dataset split to embed (default: train).",
     )

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -10,9 +9,23 @@ from PIL import Image
 from safetensors.torch import save_file
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+from transformers import AutoModel, AutoProcessor
+
+MODEL_NAMES: dict[str, str] = {
+    "clip": "openai/clip-vit-base-patch32",
+    "siglip": "google/siglip-base-patch16-224",
+    "dinov3": "facebook/dinov3-vitl16-pretrain-lvd1689m",
+}
 
 
 def _collate(batch: list[Any]) -> tuple[list[Image.Image], list[Any]]:
+    """Return images and labels as plain lists, bypassing the default collate.
+
+    PyTorch's default collate_fn attempts to stack items into tensors, which
+    fails when images have different sizes or when labels are arbitrary types
+    (e.g. file paths). Returning lists defers any stacking to the model's
+    preprocessor. See https://pytorch.org/docs/stable/data.html#dataloader-collate-fn
+    """
     images = [item[0] for item in batch]
     label = [item[1] for item in batch]
     return images, label
@@ -34,24 +47,45 @@ def _embedding_save_path(
     return output_dir / model_name / rel.with_suffix(".safetensors")
 
 
-class BaseExtractor(ABC):
-    """Abstract base class for image embedding extractors.
+class Extractor:
+    """Image embedding extractor supporting CLIP, SigLIP, and DINOv3 models.
 
-    Subclasses must implement :meth:`preprocess` and :meth:`encode`.
-    The :meth:`extract_dataset` method handles DataLoader creation,
-    batching, and device transfer.
+    Args:
+        model_name: Model family to use. One of ``"clip"``, ``"siglip"``, or
+            ``"dinov3"``.
+        hf_model_id: HuggingFace model ID override. Defaults to the standard
+            model for the chosen family (see :data:`MODEL_NAMES`).
+        device: Torch device string or object.
+
+    Example::
+
+        extractor = Extractor("clip", device="cuda")
+        embeddings = extractor.extract_dataset(dataset)
     """
 
-    def __init__(self, model_name: str, device: str | torch.device = "cpu") -> None:
+    def __init__(
+        self,
+        model_name: str,
+        hf_model_id: str | None = None,
+        device: str | torch.device = "cpu",
+    ) -> None:
+        if model_name not in MODEL_NAMES:
+            msg = f"Unknown model '{model_name}'. Available: {sorted(MODEL_NAMES)}"
+            raise ValueError(msg)
         self.model_name = model_name
         self.device = torch.device(device)
+        _hf_model_id = (
+            hf_model_id if hf_model_id is not None else MODEL_NAMES[model_name]
+        )
+        self._processor = AutoProcessor.from_pretrained(_hf_model_id)
+        self._model = AutoModel.from_pretrained(_hf_model_id)
+        self._model.to(self.device)
+        self._model.eval()
 
-    @abstractmethod
-    def preprocess(self, images: list[Image.Image]) -> torch.Tensor:
+    def preprocess(self, images: list[Image.Image] | torch.Tensor) -> torch.Tensor:
         """Preprocess a list of PIL images into a batch pixel-values tensor."""
-        ...
+        return self._processor(images=images, return_tensors="pt")["pixel_values"]
 
-    @abstractmethod
     def encode(self, pixel_values: torch.Tensor) -> torch.Tensor:
         """Encode a preprocessed pixel-values tensor into embeddings.
 
@@ -62,7 +96,10 @@ class BaseExtractor(ABC):
         Returns:
             Embedding tensor of shape ``(B, D)``.
         """
-        ...
+        encoder = (
+            self._model if self.model_name == "dinov3" else self._model.vision_model
+        )
+        return encoder(pixel_values=pixel_values).pooler_output
 
     def extract_dataset(
         self,
@@ -84,7 +121,6 @@ class BaseExtractor(ABC):
                 relative paths for saved embeddings.  Only relevant if
                 *output_dir* is not *None*.
         """
-
         out_root = Path(output_dir) if output_dir is not None else None
         ds_root = Path(dataset_root) if dataset_root is not None else None
 
@@ -95,9 +131,8 @@ class BaseExtractor(ABC):
             num_workers=num_workers,
             collate_fn=_collate,
         )
-        model_name = self.model_name.split("/")[-1]
         with torch.inference_mode():
-            for images, paths in tqdm(loader, desc=f"Extracting [{model_name}]"):
+            for images, paths in tqdm(loader, desc=f"Extracting [{self.model_name}]"):
                 pixel_values = self.preprocess(images).to(self.device)
                 embeddings = self.encode(pixel_values).cpu()
 
@@ -110,7 +145,7 @@ class BaseExtractor(ABC):
                             )
                             raise ValueError(msg)
                         dst = _embedding_save_path(
-                            out_root, src_path, ds_root, model_name
+                            out_root, src_path, ds_root, self.model_name
                         )
                         dst.parent.mkdir(parents=True, exist_ok=True)
                         save_file({"embedding": emb.unsqueeze(0)}, dst)
