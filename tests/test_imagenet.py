@@ -82,9 +82,9 @@ class TestImageNetDataset:
         assert image.shape[0] == 3  # C, H, W
         assert isinstance(label, int)
 
-    def test_class_count(self, imagenet_root: Path) -> None:
+    def test_num_classes(self, imagenet_root: Path) -> None:
         dataset = ImageNetDataset(data_root=imagenet_root, split="train")
-        assert dataset.class_count == 2
+        assert dataset.num_classes == 2
 
     def test_val_split(self, imagenet_root: Path) -> None:
         dataset = ImageNetDataset(data_root=imagenet_root, split="val")

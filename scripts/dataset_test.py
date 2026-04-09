@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 
-from dataset_similarity.data.base import ImageDataset
+from dataset_similarity import data
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
 from dataset_similarity.data.transform import (
@@ -26,19 +26,19 @@ def main(
     config_file: str | None,
 ) -> None:
     if config_file is not None:
-        data = ImageDataset.from_yaml(config_file)
+        dataset = data.from_yaml(config_file)
 
     else:
         if dataset == "imagenet":
             # ImageNet val split maps to "val"; train is the default
             imagenet_split = "val" if split in ("test", "val") else "train"
-            data = ImageNetDataset(
+            dataset = ImageNetDataset(
                 data_root="data/ImageNet",
                 split=imagenet_split,
                 target_classes=target_classes,
             )
         else:
-            data = DomainNetDataset(
+            dataset = DomainNetDataset(
                 data_root="data/DomainNet",
                 domains=domains,
                 split=split,
@@ -47,7 +47,7 @@ def main(
                 size=0.1,
             )
 
-    print(len(data), "samples loaded")
+    print(len(dataset), "samples loaded")
 
     named_transforms = [
         ("Original", None),
@@ -61,7 +61,7 @@ def main(
     ]
 
     n = 5
-    indices = random.sample(range(len(data)), n)
+    indices = random.sample(range(len(dataset)), n)
 
     _, axes = plt.subplots(n, len(named_transforms), figsize=(18, n * 2.5))
 
@@ -69,12 +69,12 @@ def main(
         axes[0, col].set_title(name)
 
     for ax_row, idx in zip(axes, indices, strict=True):
-        original_item, label = data[idx]
+        original_item, label = dataset[idx]
 
         ax_row[0].text(
             -0.05,
             0.5,
-            data.label_descriptor_map[label],
+            dataset.label_descriptor_map[label],
             transform=ax_row[0].transAxes,
             fontsize=14,
             va="center",
@@ -85,8 +85,8 @@ def main(
             if transform is None:
                 item = original_item
             else:
-                item, _ = TransformedDataset(data, transform)[idx]
-            ax.imshow(data.denormalise(item).permute(1, 2, 0))
+                item, _ = TransformedDataset(dataset, transform)[idx]
+            ax.imshow(item.clamp(0, 1).permute(1, 2, 0))
             ax.axis("off")
 
     plt.tight_layout()

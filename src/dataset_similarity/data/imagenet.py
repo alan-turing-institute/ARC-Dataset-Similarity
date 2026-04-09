@@ -3,11 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, cast
 
+from pandas import DataFrame
+from yaml import safe_load
+
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import load_imagenet_class_mapping
 
 
-class ImageNetDataset(ImageDataset, name="imagenet"):
+def load_imagenet_class_mapping(
+    yaml_path: str | Path,
+) -> dict[str, dict[str, str | int]]:
+    with Path(yaml_path).open() as f:
+        dictionary: dict[str, dict[str, str | int]] = safe_load(f)
+    return dictionary
+
+
+class ImageNetDataset(ImageDataset):
     """
     PyTorch dataset for `ImageNet ILSVRC <https://image-net.org/>`_.
 
@@ -85,12 +95,12 @@ class ImageNetDataset(ImageDataset, name="imagenet"):
             raise FileNotFoundError(err_msg)
 
         # Build label index and load all (image_path, label) pairs
-        self.samples = self._load_samples(split_dir)
+        self.data = self._load_samples(split_dir)
 
     def _load_samples(
         self,
         split_dir: Path,
-    ) -> list[tuple[Path, int | str]]:
+    ) -> DataFrame:
         """
 
         Expects the standard directory layout::
@@ -107,9 +117,9 @@ class ImageNetDataset(ImageDataset, name="imagenet"):
                 └── ...
 
             Returns:
-                samples: List of (image_path, label) pairs. Image paths are absolute.
+                DataFrame with columns ["path", "label"]. Paths are absolute strings.
         """
-        samples: list[tuple[Path, int | str]] = []
+        rows: list[dict[str, str | int]] = []
         for class_name in self.classes:  # class_name is always a synset ID
             label = self.descriptor_label_map[class_name]  # synset_id -> class_number
             class_dir = split_dir / class_name
@@ -118,5 +128,7 @@ class ImageNetDataset(ImageDataset, name="imagenet"):
                 for p in class_dir.iterdir()
                 if p.suffix.lower() in {".jpeg", ".jpg", ".png"}
             )
-            samples.extend((image_path, label) for image_path in images)
-        return samples
+            rows.extend(
+                {"path": str(image_path), "label": label} for image_path in images
+            )
+        return DataFrame(rows, columns=["path", "label"])

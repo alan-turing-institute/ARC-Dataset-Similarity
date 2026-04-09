@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 from typing import Literal
 
+from pandas import DataFrame, concat, read_csv
+from yaml import safe_load
+
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import load_domainnet_class_mapping
 
 
-class DomainNetDataset(ImageDataset, name="domainnet"):
+def load_domainnet_class_mapping(
+    yaml_path: str | Path,
+) -> dict[str, int]:
+    with Path(yaml_path).open() as f:
+        dictionary: dict[str, int] = safe_load(f)
+    return dictionary
+
+
+class DomainNetDataset(ImageDataset):
     """
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
@@ -69,6 +78,7 @@ class DomainNetDataset(ImageDataset, name="domainnet"):
         else:
             target_classes = list(self.descriptor_label_map.keys())
 
+        dfs = []
         for domain_index, domain in enumerate(self.domains):
             split_file = self.root / f"{domain}_{self.split}.txt"
             if not split_file.exists():
@@ -79,18 +89,18 @@ class DomainNetDataset(ImageDataset, name="domainnet"):
                 )
                 raise FileNotFoundError(err_msg)
 
-            self.samples.extend(
-                self._load_samples(split_file, domain_index, target_classes)
-            )
+            dfs.append(self._load_samples(split_file, domain_index, target_classes))
+
+        self.data = concat(dfs, ignore_index=True)
 
         if size is not None:
-            self.samples = self.stratify_by_class(size, random_seed)
+            self.data = self.stratify_by_class(size, random_seed)
 
         self._strip_domain_from_labels()
 
         # build the list of classes present in this dataset based on the labels in
         # the split files
-        for _, label_id in self.samples:
+        for label_id in self.data["label"].unique():
             class_name = self.label_descriptor_map[int(label_id)]
             if class_name not in self.classes:
                 self.classes.append(class_name)
@@ -100,7 +110,7 @@ class DomainNetDataset(ImageDataset, name="domainnet"):
         split_file: Path,
         domain_index: int,
         target_classes: list[str] | None = None,
-    ) -> list[tuple[Path, int | str]]:
+    ) -> DataFrame:
         """
         Read a DomainNet split file and return the list of (path, label) samples.
 
@@ -120,59 +130,24 @@ class DomainNetDataset(ImageDataset, name="domainnet"):
             target_classes: List of class names to include in the split.
 
         Returns:
-            list[tuple[Path, int | str]]: List of (absolute file path, integer label)
-            tuples.
+            df: DataFrame with columns ["path", "label", "domain"] containing the
+            samples in the split.
         """
-        if target_classes is None:
-            class_indexes = list(self.descriptor_label_map.values())
-        else:
-            class_indexes = [self.descriptor_label_map[cls] for cls in target_classes]
-        samples: list[tuple[Path, int | str]] = []
-        with split_file.open(newline="") as f:
-            reader = csv.reader(f, delimiter=" ")
-            for row in reader:
-                if not row:
-                    err_msg = f"Invalid line in split file {split_file}: {row}"
-                    raise ValueError(err_msg)
-                rel_path, label = row[0], row[1]
+        df = read_csv(split_file, delimiter=" ", header=None, names=["path", "label"])
+        if target_classes is not None:
+            target_label_ids = {
+                self.descriptor_label_map[cls] for cls in target_classes
+            }
+            df = df[df["label"].isin(target_label_ids)]
 
-                if int(label) in class_indexes:
-                    samples.append(
-                        (
-                            (self.root / Path(rel_path)),
-                            f"{label}:{domain_index}",
-                        ),
-                    )
-
-        return samples
+        df["path"] = df["path"].apply(lambda rel_pth: str(self.root / rel_pth))
+        # prepend domain index to label to ensure unique labels across domains
+        df["label"] = df["label"].apply(lambda label: f"{label}:{domain_index}")
+        return df
 
     def _strip_domain_from_labels(self) -> None:
         """
-        Convert a label with domain index back to the original class label.
-
-        Domain indices are appended to the class label for stratified sampling across
-        domains. This method modifies the dataset samples in-place to strip the domain
-        index from the labels.
-
-        sample = (path, label) where label is of the form "label_id:domain_index". This
-        method modifies the sample to be (path, original_label_id) where
-        original_label_id is the integer label
-
-        Args:
-            None
-
-        Returns:
-            None
+        Strip domain index from labels in-place, leaving only the class number.
         """
-
-        stripped_samples: list[tuple[Path, int | str]] = []
-
-        for sample in self.samples:
-            path: Path = sample[0]
-            label = str(sample[1])
-            label_id_str = label.split(":", maxsplit=1)[0]
-            label_id = int(label_id_str)
-            original_label_id = label_id
-            stripped_samples.append((path, original_label_id))
-
-        self.samples = stripped_samples
+        # add domain as a seperate column and remove it from the label
+        self.data[["label", "domain"]] = self.data["label"].str.split(":", expand=True)
