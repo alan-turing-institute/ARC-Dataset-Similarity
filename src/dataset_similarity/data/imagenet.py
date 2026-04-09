@@ -95,9 +95,9 @@ class ImageNetDataset(ImageDataset):
             raise FileNotFoundError(err_msg)
 
         # Build label index and load all (image_path, label) pairs
-        self.data = self._load_samples(split_dir)
+        self.data = self._load_data(split_dir)
 
-    def _load_samples(
+    def _load_data(
         self,
         split_dir: Path,
     ) -> DataFrame:

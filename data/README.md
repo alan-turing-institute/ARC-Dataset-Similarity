@@ -6,13 +6,13 @@
 Use the provided helper script to download and extract all domains into the expected directory layout:
 
 ```bash
-python scripts/download_data.py --dataset domainnet --data-root data/DomainNet
+python scripts/download_domainnet.py --dataset domainnet --data-root data/DomainNet
 ```
 
 To download only specific domains, pass `--domains`:
 
 ```bash
-python scripts/download_data.py --dataset domainnet --data-root data/DomainNet \
+python scripts/download_domainnet.py --dataset domainnet --data-root data/DomainNet \
     --domains clipart real sketch
 ```
 
@@ -57,13 +57,7 @@ The `data/metadata/domainnet_class_mapping.yaml` file maps each human-readable c
 ImageNet requires a free account at [https://image-net.org/](https://image-net.org/). Once registered:
 
 1. Download the ILSVRC 2012 training set (`ILSVRC2012_img_train.tar`, ~138 GB) and validation set (`ILSVRC2012_img_val.tar`, ~6.3 GB) from the [ImageNet download page](https://image-net.org/download-images).
-2. Extract and organise them using the helper script:
-
-```bash
-python scripts/download_data.py --dataset imagenet --data-root data/ImageNet \
-    --train-tar /path/to/ILSVRC2012_img_train.tar \
-    --val-tar /path/to/ILSVRC2012_img_val.tar
-```
+2. Extract and organise them like so
 
 ### Directory layout
 

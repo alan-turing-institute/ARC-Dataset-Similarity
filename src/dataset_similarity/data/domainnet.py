@@ -71,7 +71,8 @@ class DomainNetDataset(ImageDataset):
                 if cls not in self.descriptor_label_map:
                     err_msg = (
                         f"Unknown class {cls}. Check the class mapping at "
-                        "data/metadata/domainnet_class_mapping.yaml for valid class "
+                        f"{self.root.parent}"
+                        "/metadata/domainnet_class_mapping.yaml for valid class "
                         "names."
                     )
                     raise ValueError(err_msg)
@@ -89,7 +90,7 @@ class DomainNetDataset(ImageDataset):
                 )
                 raise FileNotFoundError(err_msg)
 
-            dfs.append(self._load_samples(split_file, domain_index, target_classes))
+            dfs.append(self._load_data(split_file, domain_index, target_classes))
 
         self.data = concat(dfs, ignore_index=True)
 
@@ -105,7 +106,7 @@ class DomainNetDataset(ImageDataset):
             for label_id in self.data["label"].unique()
         ]
 
-    def _load_samples(
+    def _load_data(
         self,
         split_file: Path,
         domain_index: int,
@@ -149,5 +150,5 @@ class DomainNetDataset(ImageDataset):
         """
         Strip domain index from labels in-place, leaving only the class number.
         """
-        # add domain as a seperate column and remove it from the label
+        # add domain as a separate column and remove it from the label
         self.data[["label", "domain"]] = self.data["label"].str.split(":", expand=True)

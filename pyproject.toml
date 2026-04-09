@@ -38,7 +38,6 @@ dependencies = [
     "pytest-cov >=3",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
-    "pyaml>=26.2.1",
     "scikit-learn>=1.7.2",
     "pandas>=2.3.3",
 ]

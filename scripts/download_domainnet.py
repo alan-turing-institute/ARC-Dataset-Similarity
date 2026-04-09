@@ -1,5 +1,5 @@
 """
-Helper script to download and extract DomainNet or ImageNet into the expected layout.
+Helper script to download and extract DomainNet into the expected layout.
 """
 
 import zipfile

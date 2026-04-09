@@ -6,7 +6,7 @@ import torch
 from pandas import DataFrame
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
-from torchvision.io import decode_image
+from torchvision.io import read_image
 
 
 class ImageDataset(Dataset):  # type: ignore[misc]
@@ -98,7 +98,7 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         items = self.data.iloc[idx]
         image_path = items["path"]
         label = items["label"]
-        image_tensor = decode_image(image_path, mode="RGB")
+        image_tensor = read_image(image_path, mode="RGB")
         return image_tensor.float() / 255.0, int(label)
 
     @property
@@ -112,7 +112,7 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         return len(self.classes)
 
     @abstractmethod
-    def _load_data(self) -> DataFrame:
+    def _load_data(*args: Any, **kwargs: Any) -> DataFrame:
         """
         Load the dataset split into a DataFrame with columns ["path", "label"].
 

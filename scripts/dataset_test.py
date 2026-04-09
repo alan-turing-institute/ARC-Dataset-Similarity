@@ -19,7 +19,7 @@ from dataset_similarity.data.transform import (
 
 
 def main(
-    dataset: str,
+    dataset_name: str,
     domains: list[str] | None,
     target_classes: list[str] | None,
     split: str,
@@ -29,7 +29,7 @@ def main(
         dataset = data.from_yaml(config_file)
 
     else:
-        if dataset == "imagenet":
+        if dataset_name == "imagenet":
             # ImageNet val split maps to "val"; train is the default
             imagenet_split = "val" if split in ("test", "val") else "train"
             dataset = ImageNetDataset(
@@ -37,7 +37,7 @@ def main(
                 split=imagenet_split,
                 target_classes=target_classes,
             )
-        else:
+        elif dataset_name == "domainnet":
             dataset = DomainNetDataset(
                 data_root="data/DomainNet",
                 domains=domains,
@@ -46,6 +46,9 @@ def main(
                 random_seed=42,
                 size=0.1,
             )
+        else:
+            err_msg = f"Unsupported dataset: {dataset_name}"
+            raise ValueError(err_msg)
 
     print(len(dataset), "samples loaded")
 
@@ -109,7 +112,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(
-        dataset=args.dataset,
+        dataset_name=args.dataset,
         domains=args.domains,
         target_classes=args.target_classes,
         split=args.split,

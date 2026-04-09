@@ -43,14 +43,20 @@ def from_yaml(
         An instantiated ``ImageDataset`` subclass corresponding to ``name``.
     """
     with Path(yaml_path).open() as f:
-        yaml_dict: dict[str, object] = safe_load(f)
+        yaml_dict: object = safe_load(f)
+
+    if not isinstance(yaml_dict, dict):
+        err_msg = (
+            f"Expected YAML config to be a dictionary, got {type(yaml_dict)} instead"
+        )
+        raise ValueError(err_msg)
 
     name = yaml_dict.get("name")
     if name is None:
         err_msg = "YAML config must contain a 'name' key specifying the dataset name"
         raise ValueError(err_msg)
 
-    class_args: dict[str, Any] = yaml_dict.get("args") or {}  # type: ignore[assignment]
+    class_args: dict[str, Any] = yaml_dict.get("args") or {}
 
     if "data_root" not in class_args:
         err_msg = (
@@ -59,5 +65,14 @@ def from_yaml(
         )
         raise ValueError(err_msg)
 
-    model_mapping_cls = model_mapping[str(name)]
+    dataset_name = str(name)
+    if dataset_name not in model_mapping:
+        supported_names = ", ".join(sorted(model_mapping))
+        err_msg = (
+            f"Unsupported dataset name '{dataset_name}'. "
+            f"Supported dataset names are: {supported_names}"
+        )
+        raise ValueError(err_msg)
+
+    model_mapping_cls = model_mapping[dataset_name]
     return model_mapping_cls(**class_args)

@@ -164,3 +164,23 @@ class TestFromYaml:
             " root directory",
         ):
             from_yaml(yaml_path)
+
+    def test_non_dict_yaml_raises(self, tmp_path: Path) -> None:
+        yaml_path = tmp_path / "config.yaml"
+        yaml_path.write_text("- item1\n- item2\n")
+
+        with pytest.raises(
+            ValueError,
+            match="Expected YAML config to be a dictionary",
+        ):
+            from_yaml(yaml_path)
+
+    def test_unknown_dataset_name_raises(self, tmp_path: Path) -> None:
+        yaml_path = tmp_path / "config.yaml"
+        yaml_path.write_text(f"name: unknown\nargs:\n  data_root: {tmp_path}\n")
+
+        with pytest.raises(
+            ValueError,
+            match="Unsupported dataset name 'unknown'",
+        ):
+            from_yaml(yaml_path)
