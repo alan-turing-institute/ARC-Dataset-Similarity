@@ -23,14 +23,12 @@ Each split (`.txt`) file contains one entry per line:
     clipart/aircraft_carrier/image_002.jpg 0
     ...
 
-The `domainnet_label_map.json` file in this directory maps each integer class label to its human-readable name:
+The `data/metadata/domainnet_class_mapping.yaml` file maps each human-readable class name to its integer label:
 
-    {
-        "0": "aircraft_carrier",
-        "1": "airplane",
-        ...
-        "344": "zigzag"
-    }
+    aircraft_carrier: 0
+    airplane: 1
+    ...
+    zigzag: 344
 
 ## ImageNet
 
@@ -48,10 +46,19 @@ Directory layout expected after downloading:
                     *.JPEG
                 ...
 
-Each class sub-directory is named by its WordNet synset ID (e.g. `n01440764`). A YAML class config file can be used to select a subset of classes and limit the number of samples per class:
+Each class sub-directory is named by its WordNet synset ID (e.g. `n01440764`). The `data/metadata/imagenet_class_mapping.yaml` file maps each synset ID to its class number and human-readable name:
 
-    n01440764: 100
-    n01443537: 50
-    n01484850:          # null → load all available images
+    n01440764:
+      class_number: 1
+      name: tench
+    n01443537:
+      class_number: 2
+      name: goldfish
+    ...
 
-The `imagenet_class_labels.yaml` file in this directory maps each synset ID to its class number and human-readable name.
+When constructing an `ImageNetDataset`, you can optionally pass a `target_classes` list to restrict loading to a subset of classes. Each entry can be either a synset ID (e.g. `"n01440764"`) or a human-readable name (e.g. `"tench"`):
+
+    target_classes:
+      - n01440764
+      - tench
+      - n01484850

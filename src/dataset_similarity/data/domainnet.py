@@ -79,8 +79,8 @@ class DomainNetDataset(ImageDataset, name="domainnet"):
                 )
                 raise FileNotFoundError(err_msg)
 
-            self.samples = self.samples + self._load_samples(
-                split_file, domain_index, target_classes
+            self.samples.extend(
+                self._load_samples(split_file, domain_index, target_classes)
             )
 
         if size is not None:

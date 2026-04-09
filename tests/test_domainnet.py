@@ -55,11 +55,11 @@ class TestDomainNetDataset:
 
     def test_invalid_domain(self) -> None:
         with pytest.raises(ValueError, match="Unknown domain"):
-            DomainNetDataset(data_root="data/DomainNet", domains="invalid")  # type: ignore[arg-type]
+            DomainNetDataset(data_root="data/DomainNet", domains="invalid")
 
     def test_invalid_split(self) -> None:
         with pytest.raises(ValueError, match="Unknown split"):
-            DomainNetDataset(data_root="data/DomainNet", domains="real", split="val")  # type: ignore[arg-type]
+            DomainNetDataset(data_root="data/DomainNet", domains="real", split="val")
 
     def test_missing_split_file(self, tmp_path: Path) -> None:
         # No metadata dir or split file — expects FileNotFoundError

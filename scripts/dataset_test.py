@@ -16,18 +16,6 @@ from dataset_similarity.data.transform import (
     horizontal_flip,
     rotation_180,
 )
-from dataset_similarity.data.utils import (
-    load_domainnet_class_mapping,
-    load_imagenet_class_mapping,
-)
-
-DOMAIN_LABEL_NAME_MAP = load_domainnet_class_mapping(
-    "data/metadata/domainnet_class_mapping.yaml"
-)
-
-IMAGENET_CLASS_MAP = load_imagenet_class_mapping(
-    "data/metadata/imagenet_class_mapping.yaml"
-)
 
 
 def main(

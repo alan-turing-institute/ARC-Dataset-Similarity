@@ -27,24 +27,24 @@ class ImageNetDataset(ImageDataset, name="imagenet"):
     ) -> None:
         super().__init__(data_root, split)
 
-        self.synnet_descriptor_map = load_imagenet_class_mapping(
+        self.synset_descriptor_map = load_imagenet_class_mapping(
             self.root.parent / "metadata" / "imagenet_class_mapping.yaml"
         )
 
         # synset_id -> class_number
         self.descriptor_label_map: dict[str, int] = {
             synset: cast(int, info["class_number"])
-            for synset, info in self.synnet_descriptor_map.items()
+            for synset, info in self.synset_descriptor_map.items()
         }
         # class_number -> human-readable name
         self.label_descriptor_map: dict[int, str] = {
             cast(int, info["class_number"]): cast(str, info["name"])
-            for info in self.synnet_descriptor_map.values()
+            for info in self.synset_descriptor_map.values()
         }
         # human-readable name -> synset_id (for accepting names in target_classes)
         self._name_to_synset: dict[str, str] = {
             cast(str, info["name"]): synset
-            for synset, info in self.synnet_descriptor_map.items()
+            for synset, info in self.synset_descriptor_map.items()
         }
 
         # Validate split value
@@ -67,7 +67,7 @@ class ImageNetDataset(ImageDataset, name="imagenet"):
         if target_classes is not None:
             resolved: list[str] = []
             for cls in target_classes:
-                if cls in self.synnet_descriptor_map:
+                if cls in self.synset_descriptor_map:
                     resolved.append(cls)
                 elif cls in self._name_to_synset:
                     resolved.append(self._name_to_synset[cls])
@@ -77,7 +77,7 @@ class ImageNetDataset(ImageDataset, name="imagenet"):
             self.classes = sorted(
                 p.name
                 for p in split_dir.iterdir()
-                if p.is_dir() and p.name in self.synnet_descriptor_map
+                if p.is_dir() and p.name in self.synset_descriptor_map
             )
 
         if not self.classes:

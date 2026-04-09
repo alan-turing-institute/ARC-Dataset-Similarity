@@ -21,9 +21,7 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         if name is not None:
             ImageDataset._registry[name] = cls
 
-    def __init__(
-        self, data_root: Path | str, split: str, **kwargs: dict[Any, Any] | None
-    ) -> None:
+    def __init__(self, data_root: Path | str, split: str, **kwargs: Any) -> None:
         self.root = Path(data_root)
         self.samples: list[tuple[Path, int | str]] = []
         self.classes: list[str] = []
