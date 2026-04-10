@@ -3,10 +3,12 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ARC-Dataset-Similarity"
+name = "dataset_similarity"
 version = "0.1.0"
 authors = [
   { name = "Phil Swatton", email = "pswatton@turing.ac.uk" },
+  { name = "Jack Dymond", email = "j.dymond@turing.ac.uk" },
+  { name = "Colin Laganier", email = "claganier@turing.ac.uk" },
 ]
 description = "Repo for ARC project on dataset similarity measures."
 readme = "README.md"
@@ -27,13 +29,17 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
-dependencies = []
-
-[project.optional-dependencies]
-dev = [
-  "pytest >=6",
-  "pytest-cov >=3",
-  "pre-commit",
+dependencies = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.8",
+    "pre-commit",
+    "pyyaml>=6.0",
+    "pytest >=6",
+    "pytest-cov >=3",
+    "torch>=2.11.0",
+    "torchvision>=0.26.0",
+    "scikit-learn>=1.7.2",
+    "pandas>=2.3.3",
 ]
 
 [project.urls]

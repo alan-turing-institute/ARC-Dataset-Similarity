@@ -1,3 +1,9 @@
+# Project stuff — ignore root-level data folder but not src/
+/data/
+
+# ignore temporary files
+.temp/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -156,3 +162,6 @@ Thumbs.db
 # Common editor files
 *~
 *.swp
+
+# VScode
+.vscode/
