@@ -3,7 +3,6 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 
-from dataset_similarity import data
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
 from dataset_similarity.data.transform import (
@@ -16,6 +15,7 @@ from dataset_similarity.data.transform import (
     horizontal_flip,
     rotation_180,
 )
+from dataset_similarity.data.utils import load_yaml_from_path
 
 
 def main(
@@ -25,19 +25,36 @@ def main(
     split: str,
     config_file: str | None,
 ) -> None:
-    if config_file is not None:
-        dataset = data.from_yaml(config_file)
+    if dataset_name == "imagenet":
+        # ImageNet val split maps to "val"; train is the default
+        imagenet_split = "val" if split in ("test", "val") else "train"
 
-    else:
-        if dataset_name == "imagenet":
-            # ImageNet val split maps to "val"; train is the default
-            imagenet_split = "val" if split in ("test", "val") else "train"
+        if config_file is not None:
+            data_cfg = load_yaml_from_path(config_file)
+            if data_cfg.pop("name") != "imagenet":
+                err_msg = (
+                    f"Config file name mismatch: expected 'imagenet',"
+                    f"got '{data_cfg.get('name')}'"
+                )
+                raise ValueError(err_msg)
+            dataset = ImageNetDataset.from_dict(data_cfg)
+        else:
             dataset = ImageNetDataset(
                 data_root="data/ImageNet",
                 split=imagenet_split,
                 target_classes=target_classes,
             )
-        elif dataset_name == "domainnet":
+    elif dataset_name == "domainnet":
+        if config_file is not None:
+            data_cfg = load_yaml_from_path(config_file)
+            if data_cfg.pop("name") != "domainnet":
+                err_msg = (
+                    f"Config file name mismatch: expected 'domainnet',"
+                    f"got '{data_cfg.get('name')}'"
+                )
+                raise ValueError(err_msg)
+            dataset = DomainNetDataset.from_dict(data_cfg)
+        else:
             dataset = DomainNetDataset(
                 data_root="data/DomainNet",
                 domains=domains,
@@ -46,9 +63,9 @@ def main(
                 random_seed=42,
                 size=0.1,
             )
-        else:
-            err_msg = f"Unsupported dataset: {dataset_name}"
-            raise ValueError(err_msg)
+    else:
+        err_msg = f"Unsupported dataset: {dataset_name}"
+        raise ValueError(err_msg)
 
     print(len(dataset), "samples loaded")
 
@@ -77,7 +94,7 @@ def main(
         ax_row[0].text(
             -0.05,
             0.5,
-            dataset.label_descriptor_map[label],
+            dataset.classnumber_to_name_map[label],
             transform=ax_row[0].transAxes,
             fontsize=14,
             va="center",
@@ -89,7 +106,7 @@ def main(
                 item = original_item
             else:
                 item, _ = TransformedDataset(dataset, transform)[idx]
-            ax.imshow(item.clamp(0, 1).permute(1, 2, 0))
+            ax.imshow(item.permute(1, 2, 0))
             ax.axis("off")
 
     plt.tight_layout()

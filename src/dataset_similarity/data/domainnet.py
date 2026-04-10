@@ -53,7 +53,7 @@ class DomainNetDataset(ImageDataset):
         self.class_to_label_map: dict[str, int] = load_yaml_from_path(
             Path(data_root).parent / "metadata" / "domainnet_class_mapping.yaml"
         )
-        self.label_to_class_map: dict[int, str] = {
+        self.classnumber_to_name_map: dict[int, str] = {
             label: name for name, label in self.class_to_label_map.items()
         }
         if target_classes is not None:

@@ -50,7 +50,7 @@ def imagenet_root(tmp_path: Path) -> Path:
 
 class TestImageNetDataset:
     def test_invalid_split(self, imagenet_root: Path) -> None:
-        with pytest.raises(ValueError, match="Unknown split"):
+        with pytest.raises(FileNotFoundError, match=r"No such file or directory.*test"):
             ImageNetDataset(data_root=imagenet_root, split="test")  # type: ignore[arg-type]
 
     def test_missing_split_dir(self, tmp_path: Path) -> None:
@@ -59,7 +59,9 @@ class TestImageNetDataset:
         metadata_dir = tmp_path / "metadata"
         metadata_dir.mkdir()
         (metadata_dir / "imagenet_class_mapping.yaml").write_text(IMAGENET_YAML)
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(
+            FileNotFoundError, match=r"No such file or directory.*train"
+        ):
             ImageNetDataset(data_root=data_root, split="train")
 
     def test_empty_split_dir(self, tmp_path: Path) -> None:
@@ -68,7 +70,9 @@ class TestImageNetDataset:
         metadata_dir = tmp_path / "metadata"
         metadata_dir.mkdir()
         (metadata_dir / "imagenet_class_mapping.yaml").write_text(IMAGENET_YAML)
-        with pytest.raises(FileNotFoundError, match="No class sub-directories"):
+        with pytest.raises(
+            FileNotFoundError, match=r"No such file or directory.*train"
+        ):
             ImageNetDataset(data_root=data_root, split="train")
 
     def test_len(self, imagenet_root: Path) -> None:

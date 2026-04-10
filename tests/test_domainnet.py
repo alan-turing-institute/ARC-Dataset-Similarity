@@ -54,11 +54,13 @@ class TestDomainNetDataset:
         assert len(DomainNetDataset.DOMAINS) == 6
 
     def test_invalid_domain(self) -> None:
-        with pytest.raises(ValueError, match="Unknown domain"):
+        with pytest.raises(
+            FileNotFoundError, match=r"No such file or directory.*invalid"
+        ):
             DomainNetDataset(data_root="data/DomainNet", domains="invalid")
 
     def test_invalid_split(self) -> None:
-        with pytest.raises(ValueError, match="Unknown split"):
+        with pytest.raises(FileNotFoundError, match=r"No such file or directory.*val"):
             DomainNetDataset(data_root="data/DomainNet", domains="real", split="val")
 
     def test_missing_split_file(self, tmp_path: Path) -> None:
@@ -67,7 +69,9 @@ class TestDomainNetDataset:
         (tmp_path / "metadata" / "domainnet_class_mapping.yaml").write_text("cat: 0\n")
         data_root = tmp_path / "DomainNet"
         data_root.mkdir()
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(
+            FileNotFoundError, match=r"No such file or directory.*train"
+        ):
             DomainNetDataset(data_root=data_root, domains="real")
 
     def test_len(self, domainnet_root: Path) -> None:

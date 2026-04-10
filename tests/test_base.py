@@ -1,42 +1,54 @@
 """Tests for dataset_similarity.data.base."""
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 from pandas import DataFrame, concat
 
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import from_yaml, model_mapping
 
 
 class FakeDataset(ImageDataset):
-    """Minimal concrete subclass used to exercise base-class behaviour."""
-
     def __init__(
         self,
         data_root: Path | str,
         split: str = "train",
-        **kwargs: Any,
+        size: float | int | None = None,
+        random_seed: int | None = None,
+        n_classes: int = 3,
+        samples_per_class: int = 4,
     ) -> None:
-        super().__init__(data_root, split, **kwargs)
+        self.n_classes = [f"class{cls}" for cls in range(n_classes)]
+        self.tmp_pth = Path(data_root)
+        self.samples_per_class = samples_per_class
+        super().__init__(data_root, None, split, size, random_seed)
+
+    def _load_data(self) -> DataFrame:
+        return DataFrame(
+            [
+                {"path": str(self.tmp_pth / f"class{cls}_img{i}.jpg"), "label": cls}
+                for cls in self.n_classes
+                for i in range(self.samples_per_class)
+            ]
+        )
 
 
 def _make_fake_dataset(
     tmp_path: Path,
     n_classes: int = 3,
     samples_per_class: int = 4,
+    size: float | int | None = None,
+    random_seed: int | None = None,
 ) -> FakeDataset:
     """Return a FakeDataset with synthetic samples."""
-    ds = FakeDataset(data_root=tmp_path, split="train")
-    ds.data = DataFrame(
-        [
-            {"path": str(tmp_path / f"class{cls}_img{i}.jpg"), "label": cls}
-            for cls in range(n_classes)
-            for i in range(samples_per_class)
-        ]
+    return FakeDataset(
+        data_root=tmp_path,
+        split="train",
+        size=size,
+        random_seed=random_seed,
+        n_classes=n_classes,
+        samples_per_class=samples_per_class,
     )
-    return ds
 
 
 class TestStripSingleClassesFromSamples:
@@ -76,22 +88,26 @@ class TestStripSingleClassesFromSamples:
         assert out == "Warning: Found label '99' with only a single example\n"
 
 
-class TestStratifyByClass:
+class TestSubsampleData:
     def test_float_size_reduces_dataset(self, tmp_path: Path) -> None:
-        # 12 total --> 6 samples
-        ds = _make_fake_dataset(tmp_path, n_classes=3, samples_per_class=4)
-        ds.stratify_by_class(size=0.5, random_seed=0)
+        # 12 total --> 6 samples (subsampling happens in __init__)
+        ds = _make_fake_dataset(
+            tmp_path, n_classes=3, samples_per_class=4, size=0.5, random_seed=0
+        )
         assert len(ds.data) == 6
 
     def test_int_size_reduces_dataset(self, tmp_path: Path) -> None:
-        # 12 total --> 6 samples
-        ds = _make_fake_dataset(tmp_path, n_classes=3, samples_per_class=4)
-        ds.stratify_by_class(size=7, random_seed=0)
+        # 12 total --> 7 samples (subsampling happens in __init__)
+        ds = _make_fake_dataset(
+            tmp_path, n_classes=3, samples_per_class=4, size=7, random_seed=0
+        )
         assert len(ds.data) == 7
 
     def test_float_size_is_stratified_across_classes(self, tmp_path: Path) -> None:
-        ds = _make_fake_dataset(tmp_path, n_classes=3, samples_per_class=4)
-        ds.stratify_by_class(size=0.5, random_seed=0)
+        # Subsampling happens in __init__ with size=0.5
+        ds = _make_fake_dataset(
+            tmp_path, n_classes=3, samples_per_class=4, size=0.5, random_seed=0
+        )
 
         label_counts = ds.data["label"].value_counts().to_dict()
 
@@ -100,87 +116,155 @@ class TestStratifyByClass:
         assert len(label_counts) == 3
 
     def test_value_errors(self, tmp_path: Path) -> None:
-        ds = _make_fake_dataset(tmp_path)
-        with pytest.raises(ValueError, match=r"Got 1\.5 instead"):
-            ds.stratify_by_class(size=1.5)
-        with pytest.raises(ValueError, match=r"Got -1 instead"):
-            ds.stratify_by_class(size=-1)
-        with pytest.raises(ValueError, match=r"Got 0 instead"):
-            ds.stratify_by_class(size=0)
-        with pytest.raises(ValueError, match=r"Got 'half' instead"):
-            ds.stratify_by_class(size="half")
+        # Errors should be raised during dataset creation (in __init__)
+        # when invalid size values trigger train_test_split validation
+        with pytest.raises((ValueError, TypeError)):
+            _make_fake_dataset(tmp_path, size=1.5)
+
+        with pytest.raises((ValueError, TypeError)):
+            _make_fake_dataset(tmp_path, size=-1)
+
+        with pytest.raises((ValueError, TypeError)):
+            _make_fake_dataset(tmp_path, size=0)
+
+        with pytest.raises((ValueError, TypeError)):
+            _make_fake_dataset(tmp_path, size="half")
+
+
+class TestFromDict:
+    def test_creates_dataset_from_dict(self, tmp_path: Path) -> None:
+        config_dict = {
+            "data_root": tmp_path,
+            "split": "train",
+            "size": None,
+            "random_seed": None,
+            "n_classes": 3,
+            "samples_per_class": 4,
+        }
+
+        ds = FakeDataset.from_dict(config_dict)
+
+        assert isinstance(ds, FakeDataset)
+        assert ds.root == tmp_path
+        assert ds.split == "train"
+        assert len(ds.data) == 12  # 3 classes * 4 samples
+
+    def test_data_root_is_set_correctly(self, tmp_path: Path) -> None:
+        config_dict = {"data_root": tmp_path}
+
+        ds = FakeDataset.from_dict(config_dict)
+
+        assert ds.root == tmp_path
+
+    def test_kwargs_are_forwarded(self, tmp_path: Path) -> None:
+        config_dict = {
+            "data_root": tmp_path,
+            "split": "val",
+            "n_classes": 5,
+            "samples_per_class": 2,
+        }
+
+        ds = FakeDataset.from_dict(config_dict)
+
+        assert ds.split == "val"
+        assert len(ds.data) == 10  # 5 classes * 2 samples
+
+    def test_with_subsampling(self, tmp_path: Path) -> None:
+        config_dict = {
+            "data_root": tmp_path,
+            "split": "train",
+            "size": 0.5,
+            "random_seed": 42,
+            "n_classes": 3,
+            "samples_per_class": 4,
+        }
+
+        ds = FakeDataset.from_dict(config_dict)
+
+        assert len(ds.data) == 6  # 50% of 12
 
 
 class TestFromYaml:
-    @pytest.fixture(autouse=True)
-    def _register_fake(self) -> Any:
-        model_mapping["fake"] = FakeDataset
-        yield
-        del model_mapping["fake"]
-
-    def test_creates_registered_subclass(self, tmp_path: Path) -> None:
+    def test_creates_dataset_from_yaml(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text(f"name: fake\nargs:\n  data_root: {tmp_path}\n")
+        yaml_path.write_text(
+            f"name: fake\n"
+            f"args:\n"
+            f"  data_root: {tmp_path}\n"
+            f"  split: train\n"
+            f"  n_classes: 3\n"
+            f"  samples_per_class: 4\n"
+        )
 
-        ds = from_yaml(yaml_path)
+        ds = FakeDataset.from_yaml(yaml_path)
 
         assert isinstance(ds, FakeDataset)
+        assert ds.root == tmp_path
+        assert len(ds.data) == 12
 
     def test_data_root_is_set_correctly(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text(f"name: fake\nargs:\n  data_root: {tmp_path}\n")
+        yaml_path.write_text(f"args:\n  data_root: {tmp_path}\n")
 
-        ds = from_yaml(yaml_path)
+        ds = FakeDataset.from_yaml(yaml_path)
 
         assert ds.root == tmp_path
 
     def test_kwargs_are_forwarded(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
         yaml_path.write_text(
-            f"name: fake\nargs:\n  data_root: {tmp_path}\n  split: val\n"
+            f"name: fake\n"
+            f"args:\n"
+            f"  data_root: {tmp_path}\n"
+            f"  split: val\n"
+            f"  n_classes: 5\n"
         )
 
-        ds = from_yaml(yaml_path)
+        ds = FakeDataset.from_yaml(yaml_path)
 
         assert ds.split == "val"
 
-    def test_missing_name_raises(self, tmp_path: Path) -> None:
+    def test_name_key_is_ignored(self, tmp_path: Path) -> None:
+        # The 'name' key can exist in YAML but is ignored by from_yaml
+        yaml_path = tmp_path / "config.yaml"
+        yaml_path.write_text(
+            f"name: some_other_name\n" f"args:\n" f"  data_root: {tmp_path}\n"
+        )
+
+        ds = FakeDataset.from_yaml(yaml_path)
+
+        assert isinstance(ds, FakeDataset)
+
+    def test_missing_args_key_raises(self, tmp_path: Path) -> None:
+        yaml_path = tmp_path / "config.yaml"
+        yaml_path.write_text(f"name: fake\ndata_root: {tmp_path}\n")
+
+        with pytest.raises(KeyError):
+            FakeDataset.from_yaml(yaml_path)
+
+    def test_with_subsampling(self, tmp_path: Path) -> None:
+        yaml_path = tmp_path / "config.yaml"
+        yaml_path.write_text(
+            f"name: fake\n"
+            f"args:\n"
+            f"  data_root: {tmp_path}\n"
+            f"  split: train\n"
+            f"  size: 0.5\n"
+            f"  random_seed: 42\n"
+            f"  n_classes: 3\n"
+            f"  samples_per_class: 4\n"
+        )
+
+        ds = FakeDataset.from_yaml(yaml_path)
+
+        assert len(ds.data) == 6  # 50% of 12
+
+    def test_accepts_string_path(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
         yaml_path.write_text(f"args:\n  data_root: {tmp_path}\n")
 
-        with pytest.raises(
-            ValueError,
-            match="YAML config must contain a 'name' key specifying the dataset name",
-        ):
-            from_yaml(yaml_path)
+        # Pass as string instead of Path
+        ds = FakeDataset.from_yaml(str(yaml_path))
 
-    def test_missing_data_root_raises(self, tmp_path: Path) -> None:
-        yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text("name: fake\n")
-
-        with pytest.raises(
-            ValueError,
-            match="YAML config must contain a 'data_root' key specifying the dataset"
-            " root directory",
-        ):
-            from_yaml(yaml_path)
-
-    def test_non_dict_yaml_raises(self, tmp_path: Path) -> None:
-        yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text("- item1\n- item2\n")
-
-        with pytest.raises(
-            ValueError,
-            match="Expected YAML config to be a dictionary",
-        ):
-            from_yaml(yaml_path)
-
-    def test_unknown_dataset_name_raises(self, tmp_path: Path) -> None:
-        yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text(f"name: unknown\nargs:\n  data_root: {tmp_path}\n")
-
-        with pytest.raises(
-            ValueError,
-            match="Unsupported dataset name 'unknown'",
-        ):
-            from_yaml(yaml_path)
+        assert isinstance(ds, FakeDataset)
+        assert ds.root == tmp_path

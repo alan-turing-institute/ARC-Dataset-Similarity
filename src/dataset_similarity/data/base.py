@@ -65,8 +65,8 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             test_size=self.size,
             stratify=self.data["label"],
             random_state=self.random_seed,
-        ).reset_index(drop=True)
-        return new_data
+        )
+        return new_data.reset_index(drop=True)
 
     def _strip_single_classes_from_samples(self) -> None:
         """
@@ -116,7 +116,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         Returns:
             The number of distinct classes in the dataset split.
         """
-        return len(self.classes)
+        return len(self.data["label"].unique())
 
     @abstractmethod
     def _load_data(self) -> DataFrame:
