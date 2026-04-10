@@ -10,6 +10,7 @@ from torchvision.io import read_image
 from dataset_similarity.constants import DEFAULT_DATA_DIR
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
+from dataset_similarity.data.utils import load_yaml_from_path
 from dataset_similarity.embedding import Extractor
 
 
@@ -25,23 +26,53 @@ def get_image_and_path(self: Any, idx: int) -> tuple[torch.Tensor, Path]:
 
 
 def main(args: argparse.Namespace) -> None:
-    init_kwargs = {
-        "data_root": Path(args.dataset_dir)
-        if args.dataset_dir
-        else DEFAULT_DATA_DIR / args.dataset,
-        "split": args.dataset_split,
-    }
+    data_root = (
+        Path(args.dataset_dir) if args.dataset_dir else DEFAULT_DATA_DIR / args.dataset
+    )
+
     if args.dataset == "domainnet":
         if args.dataset_split == "val":
             err_msg = "DomainNet does not have a 'val' split. Choose 'train' or 'test'."
             raise ValueError(err_msg)
-        dataset_fn = DomainNetDataset
-        init_kwargs["domains"] = [args.domain]
+        if args.config_file is not None:
+            data_cfg = load_yaml_from_path(args.config_file)
+            if data_cfg.pop("name") != "domainnet":
+                err_msg = (
+                    f"Config file name mismatch: expected 'domainnet',"
+                    f" got '{data_cfg.get('name')}'"
+                )
+                raise ValueError(err_msg)
+            dataset_fn = DomainNetDataset
+            init_kwargs = data_cfg
+        else:
+            dataset_fn = DomainNetDataset
+            init_kwargs = {
+                "data_root": data_root,
+                "split": args.dataset_split,
+                "domains": args.domains,
+                "target_classes": args.target_classes,
+            }
     elif args.dataset == "imagenet":
         if args.dataset_split == "test":
             err_msg = "ImageNet does not have a 'test' split. Choose 'train' or 'val'."
             raise ValueError(err_msg)
-        dataset_fn = ImageNetDataset
+        if args.config_file is not None:
+            data_cfg = load_yaml_from_path(args.config_file)
+            if data_cfg.pop("name") != "imagenet":
+                err_msg = (
+                    f"Config file name mismatch: expected 'imagenet',"
+                    f" got '{data_cfg.get('name')}'"
+                )
+                raise ValueError(err_msg)
+            dataset_fn = ImageNetDataset
+            init_kwargs = data_cfg
+        else:
+            dataset_fn = ImageNetDataset
+            init_kwargs = {
+                "data_root": data_root,
+                "split": args.dataset_split,
+                "target_classes": args.target_classes,
+            }
 
     # Temporary override to return (image, path) instead of (image, label) until
     # issue #9 is done
@@ -101,12 +132,9 @@ if __name__ == "__main__":
         default="cpu",
         help="Torch device, e.g. cpu, cuda, mps (default: cpu).",
     )
-    parser.add_argument(
-        "--domain",
-        choices=["clipart", "infograph", "painting", "quickdraw", "real", "sketch"],
-        default="clipart",
-        help="Domain to embed (default: clipart). Only for DomainNet.",
-    )
+    parser.add_argument("--domains", nargs="+", type=str, default=None)
+    parser.add_argument("--target-classes", nargs="+", type=str, default=None)
+    parser.add_argument("--config-file", type=str, default=None)
     parser.add_argument(
         "--extractor",
         choices=["clip", "siglip", "dinov3"],
