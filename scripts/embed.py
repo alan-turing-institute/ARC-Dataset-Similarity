@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-import torchvision
+from torchvision.io import read_image
 
 from dataset_similarity.constants import DEFAULT_DATA_DIR
 from dataset_similarity.data.domainnet import DomainNetDataset
@@ -18,9 +18,10 @@ def get_image_and_path(self: Any, idx: int) -> tuple[torch.Tensor, Path]:
     image+label and embedding+label loading. Overrides __getitem__ to return
     (image, path) instead of (image, label).
     WARNING: This breaks number of workers > 0 since the dataset is not picklable."""
-    image_path, _ = self.samples[idx]
-    image_tensor = torchvision.io.read_image(str(self.root / image_path), mode="RGB")
-    return image_tensor, self.root / image_path
+    items = self.data.iloc[idx]
+    image_path = items["path"]
+    image_tensor = read_image(str(image_path), mode="RGB")
+    return image_tensor, image_path
 
 
 def main(args: argparse.Namespace) -> None:
@@ -35,7 +36,7 @@ def main(args: argparse.Namespace) -> None:
             err_msg = "DomainNet does not have a 'val' split. Choose 'train' or 'test'."
             raise ValueError(err_msg)
         dataset_fn = DomainNetDataset
-        init_kwargs["domain"] = args.domain
+        init_kwargs["domains"] = [args.domain]
     elif args.dataset == "imagenet":
         if args.dataset_split == "test":
             err_msg = "ImageNet does not have a 'test' split. Choose 'train' or 'val'."
