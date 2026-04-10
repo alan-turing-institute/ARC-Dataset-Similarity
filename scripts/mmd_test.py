@@ -8,7 +8,6 @@ from torchvision import transforms
 
 from dataset_similarity.metrics.mmd import compute
 from dataset_similarity.metrics.mmd_np import MMD_NP
-from dataset_similarity.metrics.mmd_np_func import compute as compute_np
 
 
 class ImageDataset(Dataset):
@@ -82,7 +81,7 @@ transform = transforms.Compose(
 
 SAME_DATASET = False
 N_SAMPLES = 100
-N_CLASSES = 100  # set to an int to restrict to that many shared classes
+N_CLASSES = 100
 dataset_path = "../data/domainnet"
 root_a = f"{dataset_path}/clipart"
 root_b = f"{dataset_path}/painting"
@@ -121,9 +120,6 @@ arr_b = tensors_b.numpy()
 
 n_features = tensors_a.shape[1]  # 64 * 64 * 3 = 12288
 
-# time each MMD implementation and print results
-
-
 t0 = time.perf_counter()
 mmd_score = compute(tensors_a, tensors_b)
 print(f"MMD^2: {mmd_score:.6f} ({time.perf_counter() - t0:.3f}s)")
@@ -132,8 +128,3 @@ mmd_np = MMD_NP(seed=42)
 t0 = time.perf_counter()
 mmd_score_np = mmd_np.calculate_distance(arr_a, arr_b)
 print(f"MMD^2 (NumPy): {mmd_score_np:.6f} ({time.perf_counter() - t0:.3f}s)")
-
-t0 = time.perf_counter()
-mmd_score_np_func = compute_np(arr_a, arr_b)
-elapsed = time.perf_counter() - t0
-print(f"MMD^2 (NumPy function): {mmd_score_np_func:.6f} ({elapsed:.3f}s)")

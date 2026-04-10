@@ -9,7 +9,7 @@ from .utils import array_to_matrix
 DistMethod = Literal["cdist", "matmul", "chunked"]
 
 
-def _sq_dists_via_matmul(X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
+def _pairwise_sq_dists(X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
     """Compute squared pairwise Euclidean distances using the matmul identity.
 
     Uses ||x - y||^2 = ||x||^2 + ||y||^2 - 2 x·y to avoid an explicit cdist
@@ -59,7 +59,7 @@ def _rbf_kernel_sum(
 
     Dispatches to one of three implementations based on `method`:
     - "chunked": memory-efficient row-wise chunking via `_chunked_rbf_sum`.
-    - "matmul": full matrix via the matmul identity (`_sq_dists_via_matmul`).
+    - "matmul": full matrix via the matmul identity (`_pairwise_sq_dists`).
     - "cdist": full matrix via `torch.cdist`.
 
     Args:
@@ -74,7 +74,7 @@ def _rbf_kernel_sum(
     if method == "chunked":
         return _chunked_rbf_sum(X, Y, gamma)
     if method == "matmul":
-        sq_dists = _sq_dists_via_matmul(X, Y)
+        sq_dists = _pairwise_sq_dists(X, Y)
     else:  # cdist
         sq_dists = torch.cdist(X, Y).pow(2)
     return float(torch.exp(-gamma * sq_dists).sum().item())
@@ -84,7 +84,7 @@ def compute(
     tensors_a: torch.Tensor,
     tensors_b: torch.Tensor,
     use_float64: bool = False,
-    method: DistMethod = "chunked",
+    method: DistMethod = "matmul",
     device: str | torch.device | None = None,
 ) -> float:
     """
