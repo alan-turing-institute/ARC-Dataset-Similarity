@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 from typing import Literal
 
-import torch
-from PIL import Image
-from torch.utils.data import Dataset
-from torchvision import transforms
+import pandas as pd
 
-DOMAINNET_DOMAINS = Literal[
-    "clipart", "infograph", "painting", "quickdraw", "real", "sketch"
-]
+from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.utils import load_yaml_from_path
 
 
-class DomainNetDataset(Dataset):  # type: ignore[misc]
+class DomainNetDataset(ImageDataset):
     """
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
@@ -30,69 +25,109 @@ class DomainNetDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         data_root: str | Path,
-        domain: DOMAINNET_DOMAINS,
+        domains: str | list[str] | None = None,
+        target_classes: list[str] | None = None,
         split: Literal["train", "test"] = "train",
+        size: float | int | None = None,
+        random_seed: int | None = None,
     ) -> None:
-        if domain not in self.DOMAINS:
-            err_msg = f"Unknown domain {domain}. Choose from: {self.DOMAINS}"
-            raise ValueError(err_msg)
-        if split not in ("train", "test"):
-            err_msg = f"Unknown split {split}. Choose from: 'train' or 'test'"
-            raise ValueError(err_msg)
+        # Domain needs to be processed before calling super().__init__()
+        if domains is None:
+            self.domains = list(self.DOMAINS)
+        elif isinstance(domains, str):
+            self.domains = [domains]
+        else:
+            if len(domains) != len(set(domains)):
+                err_msg = (
+                    "Duplicate domains found in input. Please provide a list of unique "
+                    "domain names."
+                )
+                raise ValueError(err_msg)
+            for domain in domains:
+                if domain not in self.DOMAINS:
+                    err_msg = f"Unknown domain {domain}. Choose from: {self.DOMAINS}"
+                    raise ValueError(err_msg)
+            self.domains = domains
 
-        self.root = Path(data_root)
-        self.domain = domain
-        self.split = split
+        # Target classes also need to be processed before calling super().__init__()
+        self.class_to_label_map: dict[str, int] = load_yaml_from_path(
+            Path(data_root).parent / "metadata" / "domainnet_class_mapping.yaml"
+        )
+        self.classnumber_to_name_map: dict[int, str] = {
+            label: name for name, label in self.class_to_label_map.items()
+        }
+        if target_classes is not None:
+            for cls in target_classes:
+                if cls not in self.class_to_label_map:
+                    err_msg = (
+                        f"Unknown class {cls}. Check the class mapping at "
+                        f"{self.root.parent}"
+                        "/metadata/domainnet_class_mapping.yaml for valid class "
+                        "names."
+                    )
+                    raise ValueError(err_msg)
+            self.target_label_ids = {
+                self.class_to_label_map[cls] for cls in target_classes
+            }
 
-        split_file = self.root / f"{domain}_{split}.txt"
-        if not split_file.exists():
-            err_msg = (
-                f"Split file not found: {split_file}\n"
-                "Download DomainNet from http://ai.bu.edu/M3SDA/ and point "
-                "'data_root' at the extracted directory."
-            )
-            raise FileNotFoundError(err_msg)
+        super().__init__(data_root, target_classes, split, size, random_seed)
 
-        self.samples = self.read_domain_net_split(split_file)
-        self.classes = sorted({label for _, label in self.samples})
-        self._to_tensor = transforms.ToTensor()
+    def _load_data(self) -> pd.DataFrame:
+        return pd.concat(
+            [self._load_domain(domain) for domain in self.domains], ignore_index=True
+        )
 
-    def __len__(self) -> int:
-        return len(self.samples)
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        image_path, label = self.samples[idx]
-        with Image.open(self.root / image_path) as image:
-            image_tensor = self._to_tensor(image.convert("RGB"))
-        return image_tensor, label
-
-    @property
-    def class_count(self) -> int:
-        """Number of distinct classes present in this split."""
-        return len(self.classes)
-
-    @classmethod
-    def read_domain_net_split(
-        cls,
-        split_file: Path,
-    ) -> list[tuple[Path, int]]:
+    def _load_domain(
+        self,
+        domain: str,
+    ) -> pd.DataFrame:
         """
-        Read a DomainNet split file and return the list of (path, label) samples.
+        Read a DomainNet split file and return a dataframe with columns ["path",
+        "label", "domain"].
+
+        Expects the standard directory layout::
+
+            data_root/
+            ├── [domain]/
+            │   ├── [class_name]/
+            │   │   ├── images.jpg
+            │   │   └── ...
+            │   └── ...
+            ├── [domain]_[split].txt
+            │── ...
 
         Args:
-            split_file: Path to the split file.
+            domain: DomainNet domain name (e.g. ``"clipart"``). Must be one of the
+                values in ``self.DOMAINS``.
 
         Returns:
-            list[tuple[Path, int]]: List of (relative file path, integer label) tuples.
+            df: DataFrame with columns ["path", "label", "domain"] containing the
+            samples in the split.
         """
-        samples = []
-        with split_file.open(newline="") as f:
-            reader = csv.reader(f, delimiter=" ")
-            for row in reader:
-                if not row:
-                    err_msg = f"Invalid line in split file {split_file}: {row}"
-                    raise ValueError(err_msg)
-                rel_path, label = row[0], row[1]
-                samples.append((Path(rel_path), int(label)))
+        df = pd.read_csv(
+            self.root / f"{domain}_{self.split}.txt",
+            delimiter=" ",
+            header=None,
+            names=["path", "label"],
+        )
+        if self.target_classes is not None:
+            df = df[df["label"].isin(self.target_label_ids)]
+        df["path"] = df["path"].apply(lambda rel_pth: str(self.root / rel_pth))
+        df["domain"] = self.DOMAINS.index(domain)
+        return df
 
-        return samples
+    def subsample_data(self) -> pd.DataFrame:
+        """
+        Resample the dataset to a fixed size, stratified by class label and domain.
+
+        Returns:
+            The new DataFrame after resampling.
+        """
+        if len(self.domains) == 1:
+            return super().subsample_data()
+        self.data.label = self.data.apply(
+            lambda row: str(row.label) + "-" + str(row.domain), axis=1
+        )
+        new_data = super().subsample_data()
+        new_data.label = new_data.label.apply(lambda label: label.split("-")[0])
+        return new_data

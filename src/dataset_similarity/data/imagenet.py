@@ -1,181 +1,112 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict
 
-import torch
-import yaml
-from PIL import Image
-from torch.utils.data import Dataset
-from torchvision import transforms
+import pandas as pd
 
-
-@dataclass
-class ClassConfig:
-    """Per-class configuration for ImageNet loading.
-
-    Attributes:
-        class_name: The synset directory name (e.g. ``"n01440764"``).
-        max_samples: Maximum number of images to load for this class.
-            If ``None``, all available images are loaded.
-    """
-
-    class_name: str
-    max_samples: int | None = None
+from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.utils import load_yaml_from_path
 
 
-def class_config_from_yaml(path: str | Path) -> list[ClassConfig]:
-    """Load a list of :class:`ClassConfig` objects from a YAML file.
-
-    The YAML file should be a mapping of class names to sample counts.
-    A ``null`` value (or absent count) means load all available images.
-
-    Example YAML::
-
-        n01440764: 100
-        n01443537: 50
-        n01484850:
-
-    Args:
-        path: Path to the YAML file.
-
-    Returns:
-        List of :class:`ClassConfig` objects in file order.
-    """
-    with Path(path).open() as f:
-        data = yaml.safe_load(f)
-
-    if not isinstance(data, dict):
-        err_msg = f"Expected a YAML mapping, got {type(data).__name__} in {path}"
-        raise ValueError(err_msg)
-
-    configs: list[ClassConfig] = []
-    for name, count in data.items():
-        if count is not None and not (
-            isinstance(count, int) and not isinstance(count, bool)
-        ):
-            err_msg = (
-                f"Invalid sample count for class {name!r} in {path}: "
-                f"expected int or null, got {type(count).__name__}"
-            )
-            raise ValueError(err_msg)
-        configs.append(ClassConfig(class_name=str(name), max_samples=count))
-
-    return configs
+class SynsetInfo(TypedDict):
+    class_number: int
+    name: str
 
 
-class ImageNetDataset(Dataset):  # type: ignore[misc]
+class ImageNetDataset(ImageDataset):
     """
     PyTorch dataset for `ImageNet ILSVRC <https://image-net.org/>`_.
-
-    Expects the standard directory layout::
-
-        data_root/
-        ├── train/
-        │   ├── n01440764/
-        │   │   ├── n01440764_10026.JPEG
-        │   │   └── ...
-        │   └── ...
-        └── val/
-            ├── n01440764/
-            │   └── ...
-            └── ...
 
     Args:
         data_root: Path to the root ImageNet directory (contains ``train/`` and
             ``val/`` sub-directories).
         split: ``"train"`` or ``"val"``. Defaults to ``"train"``.
-        class_config: Optional path to a YAML file specifying which classes to
-            include and how many samples to take from each. Classes not present
-            in the split directory are silently skipped. If ``None``, all
-            classes and all samples are loaded.
+        target_classes: Optional list of class sub-directory names to include. If
+            None, all classes present in the split directory will be included.
     """
 
     def __init__(
         self,
         data_root: str | Path,
+        target_classes: list[str] | None = None,
         split: Literal["train", "val"] = "train",
-        class_config: str | Path | None = None,
+        size: float | int | None = None,
+        random_seed: int | None = None,
     ) -> None:
-        # Validate split value
-        if split not in ("train", "val"):
-            err_msg = f"Unknown split '{split}'. Choose from: 'train' or 'val'"
-            raise ValueError(err_msg)
-
-        self.root = Path(data_root)
-        self.split = split
-
-        # Parse YAML config into ClassConfig objects if a path was provided
-        resolved_config = (
-            class_config_from_yaml(class_config) if class_config is not None else None
+        # Synset = synonym set. Needs processing before calling super().__init__()
+        # E.g. "n02119789" is a synset ID with name "kit_fox" and class_number 1.
+        self.synset_map: dict[str, SynsetInfo] = load_yaml_from_path(
+            Path(data_root).parent / "metadata" / "imagenet_class_mapping.yaml"
         )
 
-        # Verify the split directory exists
-        split_dir = self.root / split
-        if not split_dir.is_dir():
-            err_msg = (
-                f"Split directory not found: {split_dir}\n"
-                "Download ImageNet from https://image-net.org/ and point "
-                "'data_root' at the extracted directory."
-            )
-            raise FileNotFoundError(err_msg)
+        # synset_id -> class_number
+        self.synsetid_to_classnumber_map: dict[str, int] = {
+            synset: info["class_number"] for synset, info in self.synset_map.items()
+        }
 
-        # Determine which classes to include, filtering out any missing directories
-        if resolved_config is not None:
-            self.classes = [
-                cfg.class_name
-                for cfg in resolved_config
-                if (split_dir / cfg.class_name).is_dir()
-            ]
+        # class_number -> human-readable name
+        self.classnumber_to_name_map: dict[int, str] = {
+            info["class_number"]: info["name"] for info in self.synset_map.values()
+        }
+
+        # human-readable name -> synset_id (for accepting names in target_classes)
+        self._name_to_synsetid_map: dict[str, str] = {
+            info["name"]: synset for synset, info in self.synset_map.items()
+        }
+
+        # Need to resolve target_classes before calling super().__init__()
+        if target_classes is not None:
+            resolved: list[str] = []
+            for cls in target_classes:
+                if cls in self.synset_map:
+                    resolved.append(cls)
+                elif cls in self._name_to_synsetid_map:
+                    resolved.append(self._name_to_synsetid_map[cls])
+                else:
+                    err_msg = (
+                        f"Unknown class '{cls}' in target_classes. Please provide a "
+                        "list of valid synset IDs or human-readable names."
+                    )
+                    raise ValueError(err_msg)
+            target_classes = resolved
+
+        super().__init__(data_root, target_classes, split, size, random_seed)
+
+    def _load_data(self) -> pd.DataFrame:
+        """
+        Expects the standard directory layout::
+
+            data_root/
+            ├── train/
+            │   ├── n01440764/
+            │   │   ├── n01440764_10026.JPEG
+            │   │   └── ...
+            │   └── ...
+            └── val/
+                ├── n01440764/
+                │   └── ...
+                └── ...
+
+            Where 'n01440764' is a synset ID.
+
+            Returns:
+                DataFrame with columns ["path", "label"]. Paths are absolute strings.
+        """
+        rows: list[dict[str, str | int]] = []
+        if self.target_classes is None:
+            classes = list(self.synset_map.keys())
         else:
-            self.classes = sorted(p.name for p in split_dir.iterdir() if p.is_dir())
-
-        if not self.classes:
-            err_msg = f"No class sub-directories found in {split_dir}"
-            raise FileNotFoundError(err_msg)
-
-        # Build label index and load all (image_path, label) pairs
-        self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
-        self.samples = self._load_samples(split_dir, resolved_config)
-        self._to_tensor = transforms.ToTensor()
-
-    def _load_samples(
-        self,
-        split_dir: Path,
-        class_config: list[ClassConfig] | None,
-    ) -> list[tuple[Path, int]]:
-        # Build a lookup of per-class sample limits from the config
-        max_samples_for: dict[str, int | None] = {}
-        if class_config is not None:
-            max_samples_for = {cfg.class_name: cfg.max_samples for cfg in class_config}
-
-        samples: list[tuple[Path, int]] = []
-        for class_name in self.classes:
-            label = self.class_to_idx[class_name]
-            class_dir = split_dir / class_name
-            # Collect and sort image files, then apply the per-class limit
+            classes = self.target_classes
+        for class_name in classes:  # class_name is always a synset ID
+            label = self.synsetid_to_classnumber_map[class_name]
+            class_dir = self.root / self.split / class_name
             images = sorted(
                 p
                 for p in class_dir.iterdir()
                 if p.suffix.lower() in {".jpeg", ".jpg", ".png"}
             )
-            limit = max_samples_for.get(class_name)
-            if limit is not None:
-                images = images[:limit]
-            samples.extend((image_path, label) for image_path in images)
-        return samples
-
-    def __len__(self) -> int:
-        return len(self.samples)
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        image_path, label = self.samples[idx]
-        with Image.open(image_path) as image:
-            image_tensor = self._to_tensor(image.convert("RGB"))
-        return image_tensor, label
-
-    @property
-    def class_count(self) -> int:
-        """Number of distinct classes present in this split."""
-        return len(self.classes)
+            rows.extend(
+                {"path": str(image_path), "label": label} for image_path in images
+            )
+        return pd.DataFrame(rows, columns=["path", "label"])
