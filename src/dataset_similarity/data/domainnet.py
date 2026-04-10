@@ -3,18 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pandas import DataFrame, concat, read_csv
-from yaml import safe_load
+import pandas as pd
 
 from dataset_similarity.data.base import ImageDataset
-
-
-def load_domainnet_class_mapping(
-    yaml_path: str | Path,
-) -> dict[str, int]:
-    with Path(yaml_path).open() as f:
-        dictionary: dict[str, int] = safe_load(f)
-    return dictionary
+from dataset_similarity.data.utils import load_yaml_from_path
 
 
 class DomainNetDataset(ImageDataset):
@@ -39,36 +31,34 @@ class DomainNetDataset(ImageDataset):
         size: float | int | None = None,
         random_seed: int | None = None,
     ) -> None:
-        super().__init__(data_root, split)
-
-        self.descriptor_label_map = load_domainnet_class_mapping(
-            self.root.parent / "metadata" / "domainnet_class_mapping.yaml"
-        )
-        self.label_descriptor_map = {
-            label: name for name, label in self.descriptor_label_map.items()
-        }
-
+        # Domain needs to be processed before calling super().__init__()
         if domains is None:
-            domains = list(self.DOMAINS)
-        if isinstance(domains, str):
-            domains = [domains]
-
-        for domain in domains:
-            if domain not in self.DOMAINS:
-                err_msg = f"Unknown domain {domain}. Choose from: {self.DOMAINS}"
+            self.domains = list(self.DOMAINS)
+        elif isinstance(domains, str):
+            self.domains = [domains]
+        else:
+            if len(domains) != len(set(domains)):
+                err_msg = (
+                    "Duplicate domains found in input. Please provide a list of unique "
+                    "domain names."
+                )
                 raise ValueError(err_msg)
+            for domain in domains:
+                if domain not in self.DOMAINS:
+                    err_msg = f"Unknown domain {domain}. Choose from: {self.DOMAINS}"
+                    raise ValueError(err_msg)
+            self.domains = domains
 
-        self.domains = domains
-
-        if split not in ("train", "test"):
-            err_msg = f"Unknown split {split}. Choose from: 'train' or 'test'"
-            raise ValueError(err_msg)
-
-        self.split = split
-
+        # Target classes also need to be processed before calling super().__init__()
+        self.class_to_label_map: dict[str, int] = load_yaml_from_path(
+            Path(data_root).parent / "metadata" / "domainnet_class_mapping.yaml"
+        )
+        self.label_to_class_map: dict[int, str] = {
+            label: name for name, label in self.class_to_label_map.items()
+        }
         if target_classes is not None:
             for cls in target_classes:
-                if cls not in self.descriptor_label_map:
+                if cls not in self.class_to_label_map:
                     err_msg = (
                         f"Unknown class {cls}. Check the class mapping at "
                         f"{self.root.parent}"
@@ -76,44 +66,24 @@ class DomainNetDataset(ImageDataset):
                         "names."
                     )
                     raise ValueError(err_msg)
-        else:
-            target_classes = list(self.descriptor_label_map.keys())
+            self.target_label_ids = {
+                self.class_to_label_map[cls] for cls in target_classes
+            }
 
-        dfs = []
-        for domain_index, domain in enumerate(self.domains):
-            split_file = self.root / f"{domain}_{self.split}.txt"
-            if not split_file.exists():
-                err_msg = (
-                    f"Split file not found: {split_file}\n"
-                    "Download DomainNet from http://ai.bu.edu/M3SDA/ and point "
-                    "'data_root' at the extracted directory."
-                )
-                raise FileNotFoundError(err_msg)
+        super().__init__(data_root, target_classes, split, size, random_seed)
 
-            dfs.append(self._load_data(split_file, domain_index, target_classes))
+    def _load_data(self) -> pd.DataFrame:
+        return pd.concat(
+            [self._load_domain(domain) for domain in self.domains], ignore_index=True
+        )
 
-        self.data = concat(dfs, ignore_index=True)
-
-        if size is not None:
-            self.data = self.stratify_by_class(size, random_seed)
-
-        self._strip_domain_from_labels()
-
-        # build the list of classes present in this dataset based on the labels in
-        # the split files
-        self._classes = [
-            self.label_descriptor_map[int(label_id)]
-            for label_id in self.data["label"].unique()
-        ]
-
-    def _load_data(  # type: ignore[override]
+    def _load_domain(
         self,
-        split_file: Path,
-        domain_index: int,
-        target_classes: list[str] | None = None,
-    ) -> DataFrame:
+        domain: str,
+    ) -> pd.DataFrame:
         """
-        Read a DomainNet split file and return the list of (path, label) samples.
+        Read a DomainNet split file and return a dataframe with columns ["path",
+        "label", "domain"].
 
         Expects the standard directory layout::
 
@@ -127,28 +97,37 @@ class DomainNetDataset(ImageDataset):
             │── ...
 
         Args:
-            split_file: Path to the split file.
-            target_classes: List of class names to include in the split.
+            domain: DomainNet domain name (e.g. ``"clipart"``). Must be one of the
+                values in ``self.DOMAINS``.
 
         Returns:
             df: DataFrame with columns ["path", "label", "domain"] containing the
             samples in the split.
         """
-        df = read_csv(split_file, delimiter=" ", header=None, names=["path", "label"])
-        if target_classes is not None:
-            target_label_ids = {
-                self.descriptor_label_map[cls] for cls in target_classes
-            }
-            df = df[df["label"].isin(target_label_ids)]
-
+        df = pd.read_csv(
+            self.root / f"{domain}_{self.split}.txt",
+            delimiter=" ",
+            header=None,
+            names=["path", "label"],
+        )
+        if self.target_classes is not None:
+            df = df[df["label"].isin(self.target_label_ids)]
         df["path"] = df["path"].apply(lambda rel_pth: str(self.root / rel_pth))
-        # prepend domain index to label to ensure unique labels across domains
-        df["label"] = df["label"].apply(lambda label: f"{label}:{domain_index}")
+        df["domain"] = self.DOMAINS.index(domain)
         return df
 
-    def _strip_domain_from_labels(self) -> None:
+    def subsample_data(self) -> pd.DataFrame:
         """
-        Strip domain index from labels in-place, leaving only the class number.
+        Resample the dataset to a fixed size, stratified by class label and domain.
+
+        Returns:
+            The new DataFrame after resampling.
         """
-        # add domain as a separate column and remove it from the label
-        self.data[["label", "domain"]] = self.data["label"].str.split(":", expand=True)
+        if len(self.domains) == 1:
+            return super().subsample_data()
+        self.data.label = self.data.apply(
+            lambda row: str(row.label) + "-" + str(row.domain), axis=1
+        )
+        new_data = super().subsample_data()
+        new_data.label = new_data.label.apply(lambda label: label.split("-")[0])
+        return new_data

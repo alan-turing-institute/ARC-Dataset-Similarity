@@ -1,5 +1,7 @@
-from dataset_similarity.data.utils import from_yaml
+from dataset_similarity.data.domainnet import DomainNetDataset
+from dataset_similarity.data.imagenet import ImageNetDataset
 
 __all__ = [
-    "from_yaml",
+    "DomainNetDataset",
+    "ImageNetDataset",
 ]

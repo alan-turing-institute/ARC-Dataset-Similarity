@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, TypedDict
 
-from pandas import DataFrame
-from yaml import safe_load
+import pandas as pd
 
 from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.utils import load_yaml_from_path
 
 
-def load_imagenet_class_mapping(
-    yaml_path: str | Path,
-) -> dict[str, dict[str, str | int]]:
-    with Path(yaml_path).open() as f:
-        dictionary: dict[str, dict[str, str | int]] = safe_load(f)
-    return dictionary
+class SynsetInfo(TypedDict):
+    class_number: int
+    name: str
 
 
 class ImageNetDataset(ImageDataset):
@@ -32,77 +29,52 @@ class ImageNetDataset(ImageDataset):
     def __init__(
         self,
         data_root: str | Path,
-        split: Literal["train", "val"] = "train",
         target_classes: list[str] | None = None,
+        split: Literal["train", "val"] = "train",
+        size: float | int | None = None,
+        random_seed: int | None = None,
     ) -> None:
-        super().__init__(data_root, split)
-
-        self.synset_descriptor_map = load_imagenet_class_mapping(
-            self.root.parent / "metadata" / "imagenet_class_mapping.yaml"
+        # Synset = synonym set. Needs processing before calling super().__init__()
+        # E.g. "n02119789" is a synset ID with name "kit_fox" and class_number 1.
+        self.synset_map: dict[str, SynsetInfo] = load_yaml_from_path(
+            Path(data_root).parent / "metadata" / "imagenet_class_mapping.yaml"
         )
 
         # synset_id -> class_number
-        self.descriptor_label_map: dict[str, int] = {
-            synset: cast(int, info["class_number"])
-            for synset, info in self.synset_descriptor_map.items()
+        self.synsetid_to_classnumber_map: dict[str, int] = {
+            synset: info["class_number"] for synset, info in self.synset_map.items()
         }
+
         # class_number -> human-readable name
-        self.label_descriptor_map: dict[int, str] = {
-            cast(int, info["class_number"]): cast(str, info["name"])
-            for info in self.synset_descriptor_map.values()
+        self.classnumber_to_name_map: dict[int, str] = {
+            info["class_number"]: info["name"] for info in self.synset_map.values()
         }
+
         # human-readable name -> synset_id (for accepting names in target_classes)
-        self._name_to_synset: dict[str, str] = {
-            cast(str, info["name"]): synset
-            for synset, info in self.synset_descriptor_map.items()
+        self._name_to_synsetid_map: dict[str, str] = {
+            info["name"]: synset for synset, info in self.synset_map.items()
         }
 
-        # Validate split value
-        if split not in ("train", "val"):
-            err_msg = f"Unknown split '{split}'. Choose from: 'train' or 'val'"
-            raise ValueError(err_msg)
-
-        # Verify the split directory exists
-        split_dir = self.root / split
-        if not split_dir.is_dir():
-            err_msg = (
-                f"Split directory not found: {split_dir}\n"
-                "Download ImageNet from https://image-net.org/ and point "
-                "'data_root' at the extracted directory."
-            )
-            raise FileNotFoundError(err_msg)
-
-        # Resolve target_classes: accept synset IDs (e.g. "n02119789") or
-        # human-readable names (e.g. "kit_fox"), silently skipping unknowns.
+        # Need to resolve target_classes before calling super().__init__()
         if target_classes is not None:
             resolved: list[str] = []
             for cls in target_classes:
-                if cls in self.synset_descriptor_map:
+                if cls in self.synset_map:
                     resolved.append(cls)
-                elif cls in self._name_to_synset:
-                    resolved.append(self._name_to_synset[cls])
-            self._classes = [cls for cls in resolved if (split_dir / cls).is_dir()]
-        else:
-            # Only include directories that correspond to known synsets
-            self._classes = sorted(
-                p.name
-                for p in split_dir.iterdir()
-                if p.is_dir() and p.name in self.synset_descriptor_map
-            )
+                elif cls in self._name_to_synsetid_map:
+                    resolved.append(self._name_to_synsetid_map[cls])
+                else:
+                    err_msg = (
+                        f"Unknown class '{cls}' in target_classes. Please provide a "
+                        "list of valid synset IDs or human-readable names."
+                    )
+                    raise ValueError(err_msg)
+            target_classes = resolved
 
-        if not self._classes:
-            err_msg = f"No class sub-directories found in {split_dir}"
-            raise FileNotFoundError(err_msg)
+        super().__init__(data_root, target_classes, split, size, random_seed)
 
-        # Build label index and load all (image_path, label) pairs
-        self.data = self._load_data(split_dir)
-
-    def _load_data(  # type: ignore[override]
-        self,
-        split_dir: Path,
-    ) -> DataFrame:
+    def _load_data(self) -> pd.DataFrame:
         """
-
         Expects the standard directory layout::
 
             data_root/
@@ -116,13 +88,19 @@ class ImageNetDataset(ImageDataset):
                 │   └── ...
                 └── ...
 
+            Where 'n01440764' is a synset ID.
+
             Returns:
                 DataFrame with columns ["path", "label"]. Paths are absolute strings.
         """
         rows: list[dict[str, str | int]] = []
-        for class_name in self.classes:  # class_name is always a synset ID
-            label = self.descriptor_label_map[class_name]  # synset_id -> class_number
-            class_dir = split_dir / class_name
+        if self.target_classes is None:
+            classes = list(self.synset_map.keys())
+        else:
+            classes = self.target_classes
+        for class_name in classes:  # class_name is always a synset ID
+            label = self.synsetid_to_classnumber_map[class_name]
+            class_dir = self.root / self.split / class_name
             images = sorted(
                 p
                 for p in class_dir.iterdir()
@@ -131,4 +109,4 @@ class ImageNetDataset(ImageDataset):
             rows.extend(
                 {"path": str(image_path), "label": label} for image_path in images
             )
-        return DataFrame(rows, columns=["path", "label"])
+        return pd.DataFrame(rows, columns=["path", "label"])

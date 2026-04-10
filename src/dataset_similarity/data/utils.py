@@ -1,78 +1,12 @@
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from yaml import safe_load
 
-from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.domainnet import DomainNetDataset
-from dataset_similarity.data.imagenet import ImageNetDataset
 
-model_mapping: dict[str, Callable[..., ImageDataset]] = {
-    "domainnet": DomainNetDataset,
-    "imagenet": ImageNetDataset,
-}
-
-
-def from_yaml(
+def load_yaml_from_path(
     yaml_path: str | Path,
-) -> ImageDataset:
-    """
-    Instantiate a dataset from a YAML config file.
-
-    The YAML file must contain a ``name`` key matching an entry in
-    ``model_mapping`` and an ``args`` section whose keys are forwarded as
-    keyword arguments to the dataset constructor.  ``args`` must include at
-    least a ``data_root`` key.
-
-    Example config::
-
-        name: domainnet
-        args:
-          data_root: data/DomainNet
-          domains: [real, sketch]
-          split: train
-
-    Args:
-        yaml_path: Path to the YAML config file.
-
-    Raises:
-        ValueError: If the config is missing a ``name`` or ``data_root`` key.
-
-    Returns:
-        An instantiated ``ImageDataset`` subclass corresponding to ``name``.
-    """
+) -> dict[str, Any]:
     with Path(yaml_path).open() as f:
-        yaml_dict: object = safe_load(f)
-
-    if not isinstance(yaml_dict, dict):
-        err_msg = (
-            f"Expected YAML config to be a dictionary, got {type(yaml_dict)} instead"
-        )
-        raise ValueError(err_msg)
-
-    name = yaml_dict.get("name")
-    if name is None:
-        err_msg = "YAML config must contain a 'name' key specifying the dataset name"
-        raise ValueError(err_msg)
-
-    class_args: dict[str, Any] = yaml_dict.get("args") or {}
-
-    if "data_root" not in class_args:
-        err_msg = (
-            "YAML config must contain a 'data_root' key specifying the dataset"
-            " root directory within the 'args' section"
-        )
-        raise ValueError(err_msg)
-
-    dataset_name = str(name)
-    if dataset_name not in model_mapping:
-        supported_names = ", ".join(sorted(model_mapping))
-        err_msg = (
-            f"Unsupported dataset name '{dataset_name}'. "
-            f"Supported dataset names are: {supported_names}"
-        )
-        raise ValueError(err_msg)
-
-    model_mapping_cls = model_mapping[dataset_name]
-    return model_mapping_cls(**class_args)
+        dictionary: dict[str, Any] = safe_load(f)
+    return dictionary

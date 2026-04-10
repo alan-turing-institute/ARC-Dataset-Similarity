@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -8,8 +8,10 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
+from dataset_similarity.data.utils import load_yaml_from_path
 
-class ImageDataset(Dataset):  # type: ignore[misc]
+
+class ImageDataset(ABC, Dataset):  # type: ignore[misc]
     """
     Abstract base class for image datasets.
 
@@ -23,21 +25,25 @@ class ImageDataset(Dataset):  # type: ignore[misc]
             ``"label"`` (integer) columns, populated by the subclass.
     """
 
-    def __init__(self, data_root: Path | str, split: str, **kwargs: Any) -> None:
-        self.root = Path(data_root)
-        self._classes: list[str] = []
-        self.split: str = split
-        self.data: DataFrame = None  # to be populated by subclass
-
-    @property
-    def classes(self) -> list[str]:
-        return self._classes
-
-    def stratify_by_class(
+    def __init__(
         self,
-        size: float | int,
-        random_seed: int | None = None,
-    ) -> DataFrame:
+        data_root: Path | str,
+        target_classes: list[str] | None,
+        split: str,
+        size: float | int | None,
+        random_seed: int | None,
+    ) -> None:
+        super().__init__()
+        self.root = Path(data_root)
+        self.split = split
+        self.target_classes = target_classes
+        self.data = self._load_data()
+        self.size = size
+        self.random_seed = random_seed
+        if self.size is not None:
+            self.data = self.subsample_data()
+
+    def subsample_data(self) -> DataFrame:
         """
         Resample the dataset to a fixed size, stratified by class label.
 
@@ -56,12 +62,11 @@ class ImageDataset(Dataset):  # type: ignore[misc]
 
         _, new_data = train_test_split(
             self.data,
-            test_size=size,
+            test_size=self.size,
             stratify=self.data["label"],
-            random_state=random_seed,
-        )
-        self.data = new_data.reset_index(drop=True)
-        return self.data
+            random_state=self.random_seed,
+        ).reset_index(drop=True)
+        return new_data
 
     def _strip_single_classes_from_samples(self) -> None:
         """
@@ -101,7 +106,7 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         image_path = items["path"]
         label = items["label"]
         image_tensor = read_image(image_path, mode="RGB")
-        return image_tensor.float() / 255.0, int(label)
+        return image_tensor, int(label)
 
     @property
     def num_classes(self) -> int:
@@ -128,3 +133,53 @@ class ImageDataset(Dataset):  # type: ignore[misc]
         """
         err_msg = "Subclasses must implement _load_data() to load the dataset samples"
         raise NotImplementedError(err_msg)
+
+    @classmethod
+    def from_dict(cls, config_dict: dict[str, Any]) -> "ImageDataset":
+        """
+        Instantiate a dataset from a config dictionary. The config dict must contain a
+        `data_root` key specifying the dataset root  directory, and any other keys
+        required by the dataset constructor.
+
+        Example config dict:
+
+            {
+                "data_root": "data/DomainNet",
+                "domains": ["real", "sketch"],
+                "split": "train"
+            }
+
+        Args:
+            config_dict: Dictionary containing the dataset configuration. Must contain a
+                `data_root` key, and any other keys required by the dataset constructor.
+
+        Returns:
+            An instantiated ``ImageDataset`` subclass.
+        """
+        return cls(**config_dict)
+
+    @classmethod
+    def from_yaml(cls, yaml_path: str | Path) -> "ImageDataset":
+        """
+        Instantiate a dataset from a YAML config file.
+
+        The YAML file must contain an `args` key itself containing several keys which
+        correspond to the keyword arguments of the dataset constructor. This is passed
+        to `from_dict` after loading the YAML file. The YAML file may also contain a
+        `name` key, but this is ignored.
+
+        Example config::
+
+            name: domainnet
+            args:
+              data_root: data/DomainNet
+              domains: [real, sketch]
+              split: train
+
+        Args:
+            yaml_path: Path to the YAML config file.
+
+        Returns:
+            An instantiated ``ImageDataset`` subclass.
+        """
+        return cls.from_dict(load_yaml_from_path(yaml_path)["args"])
