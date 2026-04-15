@@ -1,0 +1,290 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+import torch
+from PIL import Image
+from safetensors.torch import load_file
+from torch.utils.data import Dataset
+
+from dataset_similarity.embedding import (
+    MODEL_NAMES,
+    Extractor,
+    _embedding_save_path,
+)
+
+_EMBED_DIM = 16
+_BATCH = 3
+_IMG_SIZE = 224
+
+
+class _DummyExtractor(Extractor):
+    """Concrete extractor returning deterministic tensors — no model loading."""
+
+    def __init__(self, model_name: str = "clip") -> None:
+        # Bypass parent __init__ to avoid actual model loading
+        self.model_name = model_name
+        self.device = torch.device("cpu")
+        self._processor = None
+        self._model = None
+
+    def preprocess(self, images: list[Image.Image]) -> torch.Tensor:
+        return torch.zeros(len(images), 3, 32, 32)
+
+    def encode(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        return torch.ones(pixel_values.shape[0], _EMBED_DIM)
+
+
+class _PathDataset(Dataset[tuple[Image.Image, str]]):
+    """Dataset whose items are ``(image, path_str)`` tuples."""
+
+    def __init__(self, images: list[Image.Image], paths: list[str]) -> None:
+        self._data = list(zip(images, paths, strict=True))
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __getitem__(self, idx: int) -> tuple[Image.Image, str]:
+        return self._data[idx]
+
+
+# ---------------------------------------------------------------------------
+# _embedding_save_path
+# ---------------------------------------------------------------------------
+
+
+def test_save_path_with_dataset_root(tmp_path: Path) -> None:
+    src = Path("/data/imagenet/train/n01234/img001.jpg")
+    root = Path("/data/imagenet")
+    result = _embedding_save_path(tmp_path, src, root, "clip")
+    assert result == tmp_path / "clip" / "train" / "n01234" / "img001.safetensors"
+
+
+def test_save_path_absolute_no_root(tmp_path: Path) -> None:
+    src = Path("/data/imagenet/train/n01234/img001.jpg")
+    result = _embedding_save_path(tmp_path, src, None, "clip")
+    assert result == tmp_path / "clip" / "img001.safetensors"
+
+
+def test_save_path_relative_no_root(tmp_path: Path) -> None:
+    src = Path("cats/img001.jpg")
+    result = _embedding_save_path(tmp_path, src, None, "clip")
+    assert result == tmp_path / "clip" / "cats" / "img001.safetensors"
+
+
+def test_save_path_replaces_suffix(tmp_path: Path) -> None:
+    src = Path("img.png")
+    result = _embedding_save_path(tmp_path, src, None, "clip")
+    assert result.suffix == ".safetensors"
+
+
+# ---------------------------------------------------------------------------
+# Extractor constructor
+# ---------------------------------------------------------------------------
+
+
+def test_model_names_contains_expected_keys() -> None:
+    assert set(MODEL_NAMES) == {"clip", "siglip", "dinov3"}
+
+
+def test_unknown_model_raises_value_error() -> None:
+    with (
+        pytest.raises(ValueError, match="Unknown model"),
+        patch(
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
+            return_value=MagicMock(),
+        ),
+    ):
+        Extractor("unknown")
+
+
+@pytest.mark.parametrize("model_name", ["clip", "siglip", "dinov3"])
+def test_constructor_sets_model_name(model_name: str) -> None:
+    with (
+        patch(
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
+            return_value=MagicMock(),
+        ),
+    ):
+        extractor = Extractor(model_name)
+    assert extractor.model_name == model_name
+
+
+def test_constructor_uses_default_hf_model_id() -> None:
+    with (
+        patch(
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
+            return_value=MagicMock(),
+        ) as proc_patch,
+        patch(
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
+            return_value=MagicMock(),
+        ) as model_patch,
+    ):
+        Extractor("clip")
+    proc_patch.assert_called_once_with(MODEL_NAMES["clip"])
+    model_patch.assert_called_once_with(MODEL_NAMES["clip"])
+
+
+def test_constructor_hf_model_id_override() -> None:
+    custom_id = "my-org/my-clip-model"
+    with (
+        patch(
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
+            return_value=MagicMock(),
+        ) as proc_patch,
+        patch(
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
+            return_value=MagicMock(),
+        ) as model_patch,
+    ):
+        Extractor("clip", hf_model_id=custom_id)
+    proc_patch.assert_called_once_with(custom_id)
+    model_patch.assert_called_once_with(custom_id)
+
+
+# ---------------------------------------------------------------------------
+# preprocess / encode
+# ---------------------------------------------------------------------------
+
+
+def _make_extractor(model_name: str) -> tuple[Extractor, MagicMock, MagicMock]:
+    mock_proc = MagicMock()
+    mock_model = MagicMock()
+    with (
+        patch(
+            "dataset_similarity.embedding.AutoProcessor.from_pretrained",
+            return_value=mock_proc,
+        ),
+        patch(
+            "dataset_similarity.embedding.AutoModel.from_pretrained",
+            return_value=mock_model,
+        ),
+    ):
+        extractor = Extractor(model_name)
+    return extractor, mock_proc, mock_model
+
+
+def test_preprocess_calls_processor_and_returns_pixel_values() -> None:
+    images = [Image.new("RGB", (32, 32)) for _ in range(_BATCH)]
+    pixel_values = torch.zeros(_BATCH, 3, _IMG_SIZE, _IMG_SIZE)
+    extractor, mock_proc, _ = _make_extractor("clip")
+    mock_proc.return_value = {"pixel_values": pixel_values}
+    result = extractor.preprocess(images)
+    mock_proc.assert_called_once_with(images=images, return_tensors="pt")
+    assert result.shape == (_BATCH, 3, _IMG_SIZE, _IMG_SIZE)
+
+
+def test_encode_clip_uses_vision_model() -> None:
+    extractor, _, mock_model = _make_extractor("clip")
+    output = MagicMock()
+    output.pooler_output = torch.zeros(_BATCH, 512)
+    mock_model.vision_model.return_value = output
+    pixel_values = torch.zeros(_BATCH, 3, _IMG_SIZE, _IMG_SIZE)
+    result = extractor.encode(pixel_values)
+    mock_model.vision_model.assert_called_once_with(pixel_values=pixel_values)
+    assert result.shape == (_BATCH, 512)
+
+
+def test_encode_siglip_uses_vision_model() -> None:
+    extractor, _, mock_model = _make_extractor("siglip")
+    output = MagicMock()
+    output.pooler_output = torch.zeros(_BATCH, 768)
+    mock_model.vision_model.return_value = output
+    pixel_values = torch.zeros(_BATCH, 3, _IMG_SIZE, _IMG_SIZE)
+    result = extractor.encode(pixel_values)
+    mock_model.vision_model.assert_called_once_with(pixel_values=pixel_values)
+    assert result.shape == (_BATCH, 768)
+
+
+def test_encode_dinov3_calls_model_directly() -> None:
+    extractor, _, mock_model = _make_extractor("dinov3")
+    output = MagicMock()
+    output.pooler_output = torch.zeros(_BATCH, 1024)
+    mock_model.return_value = output
+    pixel_values = torch.zeros(_BATCH, 3, _IMG_SIZE, _IMG_SIZE)
+    result = extractor.encode(pixel_values)
+    mock_model.assert_called_once_with(pixel_values=pixel_values)
+    assert result.shape == (_BATCH, 1024)
+
+
+# ---------------------------------------------------------------------------
+# extract_dataset — no saving
+# ---------------------------------------------------------------------------
+
+
+def test_extract_dataset_returns_none(image_dataset: Dataset[Any]) -> None:
+    extractor = _DummyExtractor()
+    result = extractor.extract_dataset(image_dataset, batch_size=2, num_workers=0)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# extract_dataset — file saving
+# ---------------------------------------------------------------------------
+
+
+def test_extract_dataset_saves_correct_number_of_files(
+    rgb_images: list[Image.Image], tmp_path: Path
+) -> None:
+    paths = [f"img_{i:04d}.png" for i in range(len(rgb_images))]
+    dataset = _PathDataset(rgb_images, paths)
+    extractor = _DummyExtractor()
+    extractor.extract_dataset(
+        dataset,
+        batch_size=2,
+        num_workers=0,
+        output_dir=tmp_path,
+    )
+    saved = list(tmp_path.rglob("*.safetensors"))
+    assert len(saved) == len(rgb_images)
+
+
+def test_extract_dataset_saved_tensor_shape(
+    rgb_images: list[Image.Image], tmp_path: Path
+) -> None:
+    paths = [f"img_{i:04d}.png" for i in range(len(rgb_images))]
+    dataset = _PathDataset(rgb_images, paths)
+    extractor = _DummyExtractor()
+    extractor.extract_dataset(
+        dataset,
+        batch_size=2,
+        num_workers=0,
+        output_dir=tmp_path,
+    )
+    data = load_file(tmp_path / "clip" / "img_0000.safetensors")
+    assert data["embedding"].shape == (1, _EMBED_DIM)
+
+
+def test_extract_dataset_mirrors_path_structure(
+    rgb_images: list[Image.Image], tmp_path: Path
+) -> None:
+    dataset_root = tmp_path / "dataset"
+    output_dir = tmp_path / "embeddings"
+    paths = [
+        str(dataset_root / "classA" / f"img_{i:04d}.jpg")
+        for i in range(len(rgb_images))
+    ]
+    dataset = _PathDataset(rgb_images, paths)
+    extractor = _DummyExtractor()
+    extractor.extract_dataset(
+        dataset,
+        batch_size=2,
+        num_workers=0,
+        output_dir=output_dir,
+        dataset_root=dataset_root,
+    )
+    for i in range(len(rgb_images)):
+        expected = output_dir / "clip" / "classA" / f"img_{i:04d}.safetensors"
+        assert expected.exists(), f"Missing: {expected}"
