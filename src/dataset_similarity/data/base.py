@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.data.utils import _get_embedding_path, load_yaml_from_path
 
 
 class ImageDataset(ABC, Dataset):  # type: ignore[misc]
@@ -18,11 +18,15 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
     Subclasses must implement ``_load_data`` to populate ``self.data`` with a
     DataFrame of ``(path, label)`` rows and set ``self._classes``.
 
-    Attributes:
-        root: Absolute path to the dataset root directory.
+    Args:
+        data_root: Absolute path to the dataset root directory.
+        target_classes: List of class names to include in the dataset.
         split: Dataset split identifier (e.g. ``"train"`` or ``"test"``).
-        data: DataFrame with at least ``"path"`` (absolute string) and
-            ``"label"`` (integer) columns, populated by the subclass.
+        size: If a float in ``(0, 1)``, the fraction of samples to retain.
+            If a positive integer, the exact number of samples to retain. If
+            ``None``, no subsampling is performed and the full dataset is used.
+        random_seed: Seed for the random number generator, for reproducibility. If
+            ``None``, the result is non-deterministic.
     """
 
     def __init__(
@@ -32,6 +36,8 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         split: str,
         size: float | int | None,
         random_seed: int | None,
+        embedding: None | str = None,
+        return_paths: bool = False,
     ) -> None:
         super().__init__()
         self.root = Path(data_root)
@@ -42,6 +48,8 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         self.random_seed = random_seed
         if self.size is not None:
             self.data = self.subsample_data()
+        self.embedding = embedding
+        self.return_paths = return_paths
 
     def subsample_data(self) -> DataFrame:
         """
@@ -94,19 +102,27 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         """
-        Get an image and its label by index.
+        Get a sample from the dataset. If ``self.embeddings`` is ``None``, the first
+        element of the returned tuple is an image tensor of shape (C x H x W).
 
         Args:
             idx: Index of the sample to retrieve.
 
         Returns:
-            A tuple containing the image tensor (C x H x W) and its label.
+            A tuple containing the output tensor (C x H x W) or (D,) depending on the
+            value of ``embeddings`` and either its label or file path depending on
+            the value of ``return_paths``.
         """
-        items = self.data.iloc[idx]
-        image_path = items["path"]
-        label = items["label"]
-        image_tensor = read_image(image_path, mode="RGB")
-        return image_tensor, int(label)
+        sample = self.data.iloc[idx]
+        image_path = sample["path"]
+        if self.embedding is None:
+            tensor = read_image(image_path, mode="RGB")
+        else:
+            embedding_path = _get_embedding_path(self.image_path, self.embedding)
+            tensor = torch.load(embedding_path)
+        if self.return_paths:
+            return tensor, image_path
+        return tensor, sample["label"]
 
     @property
     def num_classes(self) -> int:

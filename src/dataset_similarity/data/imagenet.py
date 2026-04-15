@@ -33,6 +33,8 @@ class ImageNetDataset(ImageDataset):
         split: Literal["train", "val"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
+        embedding: None | str = None,
+        return_paths: bool = False,
     ) -> None:
         # Synset = synonym set. Needs processing before calling super().__init__()
         # E.g. "n02119789" is a synset ID with name "kit_fox" and class_number 1.
@@ -71,7 +73,9 @@ class ImageNetDataset(ImageDataset):
                     raise ValueError(err_msg)
             target_classes = resolved
 
-        super().__init__(data_root, target_classes, split, size, random_seed)
+        super().__init__(
+            data_root, target_classes, split, size, random_seed, embedding, return_paths
+        )
 
     def _load_data(self) -> pd.DataFrame:
         """

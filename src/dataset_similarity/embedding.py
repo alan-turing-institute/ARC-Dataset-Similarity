@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +9,8 @@ from safetensors.torch import save_file
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
+
+from dataset_similarity.data.utils import _get_embedding_path
 
 MODEL_NAMES: dict[str, str] = {
     "clip": "openai/clip-vit-base-patch32",
@@ -29,22 +30,6 @@ def _collate(batch: list[Any]) -> tuple[list[Image.Image], list[Any]]:
     images = [item[0] for item in batch]
     label = [item[1] for item in batch]
     return images, label
-
-
-def _embedding_save_path(
-    output_dir: Path,
-    src_path: str | os.PathLike[str],
-    dataset_root: Path | None,
-    model_name: str,
-) -> Path:
-    p = Path(src_path)
-    if dataset_root is not None:
-        rel = p.relative_to(dataset_root)
-    elif p.is_absolute():
-        rel = Path(p.name)
-    else:
-        rel = p
-    return output_dir / model_name / rel.with_suffix(".safetensors")
 
 
 class Extractor:
@@ -106,8 +91,6 @@ class Extractor:
         dataset: Dataset[Any],
         batch_size: int = 64,
         num_workers: int = 4,
-        output_dir: Path | str | None = None,
-        dataset_root: Path | str | None = None,
     ) -> None:
         """Extract embeddings for every image in *dataset*.
 
@@ -115,14 +98,7 @@ class Extractor:
             dataset: PyTorch Dataset whose items are passed to *get_image*.
             batch_size: Images processed per forward pass.
             num_workers: Worker processes for the DataLoader.
-            output_dir: Root directory in which to save per-image embedding
-                files.  When *None* no files are written.
-            dataset_root: Root of the original dataset used to compute
-                relative paths for saved embeddings.  Only relevant if
-                *output_dir* is not *None*.
         """
-        out_root = Path(output_dir) if output_dir is not None else None
-        ds_root = Path(dataset_root) if dataset_root is not None else None
 
         loader: DataLoader[Any] = DataLoader(
             dataset,
@@ -136,16 +112,10 @@ class Extractor:
                 pixel_values = self.preprocess(images).to(self.device)
                 embeddings = self.encode(pixel_values).cpu()
 
-                if out_root is not None:
-                    for emb, src_path in zip(embeddings, paths, strict=True):
-                        if not isinstance(src_path, str | os.PathLike):
-                            msg = (
-                                "Expected path to be str or os.PathLike, "
-                                "got {type(src_path)}"
-                            )
-                            raise ValueError(msg)
-                        dst = _embedding_save_path(
-                            out_root, src_path, ds_root, self.model_name
-                        )
-                        dst.parent.mkdir(parents=True, exist_ok=True)
-                        save_file({"embedding": emb.unsqueeze(0)}, dst)
+                for emb, src_path in zip(embeddings, paths, strict=True):
+                    if not isinstance(src_path, str | Path):
+                        msg = "Expected path to be str or Path, " "got {type(src_path)}"
+                        raise ValueError(msg)
+                    dst = _get_embedding_path(src_path, self.model_name)
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    save_file({"embedding": emb.unsqueeze(0)}, dst)

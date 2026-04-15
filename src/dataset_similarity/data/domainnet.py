@@ -30,6 +30,8 @@ class DomainNetDataset(ImageDataset):
         split: Literal["train", "test"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
+        embedding: None | str = None,
+        return_paths: bool = False,
     ) -> None:
         # Domain needs to be processed before calling super().__init__()
         if domains is None:
@@ -70,7 +72,9 @@ class DomainNetDataset(ImageDataset):
                 self.class_to_label_map[cls] for cls in target_classes
             }
 
-        super().__init__(data_root, target_classes, split, size, random_seed)
+        super().__init__(
+            data_root, target_classes, split, size, random_seed, embedding, return_paths
+        )
 
     def _load_data(self) -> pd.DataFrame:
         return pd.concat(

@@ -1,0 +1,3 @@
+name: "domainnet"
+kwargs:
+  data_root: "data/DomainNet"

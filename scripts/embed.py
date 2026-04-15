@@ -2,27 +2,12 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
 
-import torch
-from torchvision.io import read_image
-
-from dataset_similarity.constants import DEFAULT_DATA_DIR
+from dataset_similarity.constants import DEFAULT_DATA_DIR, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
 from dataset_similarity.data.utils import load_yaml_from_path
 from dataset_similarity.embedding import Extractor
-
-
-def get_image_and_path(self: Any, idx: int) -> tuple[torch.Tensor, Path]:
-    """Temporary override before issue #9 is done to allow for embedding+label,
-    image+label and embedding+label loading. Overrides __getitem__ to return
-    (image, path) instead of (image, label).
-    WARNING: This breaks number of workers > 0 since the dataset is not picklable."""
-    items = self.data.iloc[idx]
-    image_path = items["path"]
-    image_tensor = read_image(str(image_path), mode="RGB")
-    return image_tensor, image_path
 
 
 def main(args: argparse.Namespace) -> None:
@@ -73,11 +58,7 @@ def main(args: argparse.Namespace) -> None:
                 "split": args.dataset_split,
                 "target_classes": args.target_classes,
             }
-
-    # Temporary override to return (image, path) instead of (image, label) until
-    # issue #9 is done
-    dataset_fn.__getitem__ = get_image_and_path
-    dataset = dataset_fn(**init_kwargs)
+    dataset = dataset_fn(**init_kwargs, embedding=None, return_paths=True)
 
     print(f"{len(dataset)} images ready.")
     print(f"Loading extractor '{args.extractor}' on device '{args.device}' …")
@@ -94,8 +75,6 @@ def main(args: argparse.Namespace) -> None:
         dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        output_dir=output_dir,
-        dataset_root=init_kwargs["data_root"],
     )
     print(f"Saved to: {output_dir}")
 
@@ -154,7 +133,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--output_dir",
-        default="../embeddings",
+        default=DEFAULT_EMBEDDING_DIR,
         help=(
             "Directory in which to save per-image .safetensors files"
             " (default: embeddings)."
