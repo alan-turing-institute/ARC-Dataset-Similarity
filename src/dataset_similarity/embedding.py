@@ -6,10 +6,11 @@ from typing import Any
 import torch
 from PIL import Image
 from safetensors.torch import save_file
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
+from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import _get_embedding_path
 
 MODEL_NAMES: dict[str, str] = {
@@ -88,7 +89,7 @@ class Extractor:
 
     def extract_dataset(
         self,
-        dataset: Dataset[Any],
+        dataset: ImageDataset,
         batch_size: int = 64,
         num_workers: int = 4,
     ) -> None:
