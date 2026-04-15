@@ -40,8 +40,20 @@ def _prepare_otdd_tensor_dataset(dataset: ImageDataset) -> TensorDataset:
     Returns:
         TensorDataset: The processed TensorDataset ready for use with OTDD.
     """
-    features = torch.stack([sample[0] for sample in dataset.samples])
-    labels = torch.tensor([sample[1] for sample in dataset.samples])
+    if dataset.return_paths:
+        err_msg = (
+            "OTDD computation does not support ImageDatasets with return_paths=True. "
+            "Please initialize the dataset with return_paths=False to compute OTDD."
+        )
+        raise ValueError(err_msg)
+    features = []
+    labels = []
+    for idx in range(len(dataset)):
+        sample = dataset[idx]
+        features.append(sample[0])
+        labels.append(sample[1])
+    features = torch.stack(features)
+    labels = torch.tensor(labels)
     targets = _prepare_tensor_dataset_targets(labels)
     tensor_dataset = TensorDataset(features, targets)
     tensor_dataset.classes = torch.sort(torch.unique(targets)).values
