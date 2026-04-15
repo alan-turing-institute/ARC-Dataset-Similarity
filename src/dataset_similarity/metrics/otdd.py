@@ -57,7 +57,8 @@ def otdd(
 ) -> float | tuple[float, torch.Tensor]:
     """
     Wrapper function around the `otdd.DatasetDistance` class which implements the
-    optimal transport dataset distance (OTDD).
+    optimal transport dataset distance (OTDD). Note that this while any device can be
+    passed via `device=<device>`, the underlying OT implementations can only use CUDA.
 
     Args:
         dataset1: The first dataset with which to compute the OTDD.
