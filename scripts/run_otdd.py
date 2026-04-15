@@ -27,6 +27,7 @@ def main() -> None:
         domains="clipart",
         size=2000,
         random_seed=42,
+        embedding="clip",
     )
     ds2 = DomainNetDataset(
         data_root=dnp,
@@ -34,6 +35,7 @@ def main() -> None:
         domains="real",
         size=2000,
         random_seed=42,
+        embedding="clip",
     )
 
     # Compute OTDD distance between the two datasets
