@@ -43,6 +43,7 @@ dependencies = [
     "pyaml>=26.2.1",
     "scikit-learn>=1.7.2",
     "pandas>=2.3.3",
+    "otdd",
 ]
 
 [project.urls]
@@ -126,3 +127,6 @@ unfixable = [
   "F841",   # Would remove unused variables
 ]
 flake8-unused-arguments.ignore-variadic-names = true  # allow unused *args/**kwargsisort.required-imports = ["from __future__ import annotations"]
+
+[tool.uv.sources]
+otdd = { git = "https://github.com/microsoft/otdd" }
