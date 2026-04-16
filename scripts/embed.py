@@ -15,15 +15,15 @@ def main(args: argparse.Namespace) -> None:
         Path(args.dataset_dir) if args.dataset_dir else DEFAULT_DATA_DIR / args.dataset
     )
 
-    if args.dataset == "domainnet":
+    if args.dataset == "DomainNet":
         if args.dataset_split == "val":
             err_msg = "DomainNet does not have a 'val' split. Choose 'train' or 'test'."
             raise ValueError(err_msg)
         if args.config_file is not None:
             data_cfg = load_yaml_from_path(args.config_file)
-            if data_cfg.pop("name") != "domainnet":
+            if data_cfg.pop("name") != "DomainNet":
                 err_msg = (
-                    f"Config file name mismatch: expected 'domainnet',"
+                    f"Config file name mismatch: expected 'v',"
                     f" got '{data_cfg.get('name')}'"
                 )
                 raise ValueError(err_msg)
@@ -37,15 +37,15 @@ def main(args: argparse.Namespace) -> None:
                 "domains": args.domains,
                 "target_classes": args.target_classes,
             }
-    elif args.dataset == "imagenet":
+    elif args.dataset == "ImageNet":
         if args.dataset_split == "test":
             err_msg = "ImageNet does not have a 'test' split. Choose 'train' or 'val'."
             raise ValueError(err_msg)
         if args.config_file is not None:
             data_cfg = load_yaml_from_path(args.config_file)
-            if data_cfg.pop("name") != "imagenet":
+            if data_cfg.pop("name") != "ImageNet":
                 err_msg = (
-                    f"Config file name mismatch: expected 'imagenet',"
+                    f"Config file name mismatch: expected 'ImageNet',"
                     f" got '{data_cfg.get('name')}'"
                 )
                 raise ValueError(err_msg)
@@ -91,9 +91,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset",
-        choices=["domainnet", "imagenet"],
-        default="domainnet",
-        help=("Dataset to embed. Supported: 'domainnet', 'imagenet'."),
+        choices=["DomainNet", "ImageNet"],
+        default="DomainNet",
+        help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet'."),
     )
     parser.add_argument(
         "--dataset_dir",
