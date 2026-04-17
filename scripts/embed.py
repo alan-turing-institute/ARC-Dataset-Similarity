@@ -39,7 +39,6 @@ all available flags.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from dataset_similarity.constants import DEFAULT_DATA_DIR, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data import DATASET_MAP
@@ -48,9 +47,6 @@ from dataset_similarity.embedding import Extractor
 
 
 def main(args: argparse.Namespace) -> None:
-    data_root = (
-        Path(args.dataset_dir) if args.dataset_dir else DEFAULT_DATA_DIR / args.dataset
-    )
     if args.config_file is not None:
         data_cfg = load_yaml_from_path(args.config_file)
         dataset_fn = DATASET_MAP[data_cfg["name"]]
@@ -64,7 +60,7 @@ def main(args: argparse.Namespace) -> None:
             raise ValueError(err_msg)
         dataset_fn = DATASET_MAP[args.dataset]
         init_kwargs = {
-            "data_root": data_root,
+            "data_root": DEFAULT_DATA_DIR / args.dataset,
             "target_classes": args.target_classes,
             "split": args.dataset_split,
             "size": args.size,
@@ -131,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument("--target-classes", nargs="+", type=str, default=None)
     parser.add_argument(
         "--size",
-        type=int | float,
+        type=float,  # Int okay alone, but argparse needs to know how to parse it
         default=None,
         help=(
             "If a float in (0, 1), the fraction of samples to retain. If a positive "
