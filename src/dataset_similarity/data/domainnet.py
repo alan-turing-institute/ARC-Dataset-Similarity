@@ -15,8 +15,8 @@ class DomainNetDataset(ImageDataset):
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
     Args:
-        data_root: Absolute path to the dataset root directory. Defaults to
-            `dataset_similarity.constants.DOMAINNET_DIR`.
+        dataset_dir: Absolute path to the dataset directory containing DomainNet images.
+            Defaults to `dataset_similarity.constants.DOMAINNET_DIR`.
         domains: If not `None`, either a single domain name as a string, or a list of
             domain names. Each domain name must be one of `"clipart"`, `"infograph"`,
             `"painting"`, `"quickdraw"`, `"real"`, or `"sketch"`. If `None`, all domains
@@ -24,7 +24,7 @@ class DomainNetDataset(ImageDataset):
         target_classes: List of class names to include in the dataset. If None, all
             classes are included. Elements must be valid class names as specified in the
             class mapping file at
-            `data_root.parent / "metadata/domainnet_class_mapping.yaml"`. Defaults to
+            `dataset_dir.parent / "metadata/domainnet_class_mapping.yaml"`. Defaults to
             `None`.
         split: Dataset split identifier. Must be `"train"` or `"test"`. Defaults to
             `"train"`.
@@ -50,7 +50,7 @@ class DomainNetDataset(ImageDataset):
 
     def __init__(
         self,
-        data_root: str | Path = DOMAINNET_DIR,
+        dataset_dir: str | Path = DOMAINNET_DIR,
         domains: str | list[str] | None = None,
         target_classes: list[str] | None = None,
         split: Literal["train", "test"] = "train",
@@ -80,7 +80,7 @@ class DomainNetDataset(ImageDataset):
 
         # Target classes also need to be processed before calling super().__init__()
         self.class_to_label_map: dict[str, int] = load_yaml_from_path(
-            Path(data_root).parent / "metadata" / "domainnet_class_mapping.yaml"
+            Path(dataset_dir).parent / "metadata" / "domainnet_class_mapping.yaml"
         )
         self.classnumber_to_name_map: dict[int, str] = {
             label: name for name, label in self.class_to_label_map.items()
@@ -90,7 +90,7 @@ class DomainNetDataset(ImageDataset):
                 if cls not in self.class_to_label_map:
                     err_msg = (
                         f"Unknown class {cls}. Check the class mapping at "
-                        f"{self.data_root.parent}"
+                        f"{self.dataset_dir.parent}"
                         "/metadata/domainnet_class_mapping.yaml for valid class "
                         "names."
                     )
@@ -100,7 +100,7 @@ class DomainNetDataset(ImageDataset):
             }
 
         super().__init__(
-            data_root=data_root,
+            dataset_dir=dataset_dir,
             target_classes=target_classes,
             split=split,
             size=size,
@@ -125,7 +125,7 @@ class DomainNetDataset(ImageDataset):
 
         Expects the standard directory layout::
 
-            data_root/
+            dataset_dir/
             ├── [domain]/
             │   ├── [class_name]/
             │   │   ├── images.jpg
@@ -143,14 +143,14 @@ class DomainNetDataset(ImageDataset):
             samples in the split.
         """
         df = pd.read_csv(
-            self.data_root / f"{domain}_{self.split}.txt",
+            self.dataset_dir / f"{domain}_{self.split}.txt",
             delimiter=" ",
             header=None,
             names=["path", "label"],
         )
         if self.target_classes is not None:
             df = df[df["label"].isin(self.target_label_ids)]
-        df["path"] = df["path"].apply(lambda rel_pth: self.data_root / rel_pth)
+        df["path"] = df["path"].apply(lambda rel_pth: self.dataset_dir / rel_pth)
         df["domain"] = self.DOMAINS.index(domain)
         return df
 

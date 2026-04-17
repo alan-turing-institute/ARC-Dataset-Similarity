@@ -8,7 +8,7 @@ from logging import Logger
 
 import torch
 
-from dataset_similarity.constants import DEFAULT_DATA_DIR
+from dataset_similarity.constants import DEFAULT_DATA_ROOT
 from dataset_similarity.data import DomainNetDataset
 from dataset_similarity.metrics import otdd
 
@@ -20,9 +20,9 @@ def main() -> None:
 
     # Load two datasets for demonstration purposes
     logger.info("Loading datasets")
-    dnp = DEFAULT_DATA_DIR / "DomainNet"
+    dnp = DEFAULT_DATA_ROOT / "DomainNet"
     ds1 = DomainNetDataset(
-        data_root=dnp,
+        dataset_dir=dnp,
         split="train",
         domains="clipart",
         size=2000,
@@ -30,7 +30,7 @@ def main() -> None:
         embedding="clip",
     )
     ds2 = DomainNetDataset(
-        data_root=dnp,
+        dataset_dir=dnp,
         split="train",
         domains="real",
         size=2000,

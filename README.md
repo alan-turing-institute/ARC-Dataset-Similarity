@@ -2,25 +2,16 @@
 
 Repo for ARC project on dataset similarity measures.
 
-## Installation
-
-```bash
-python -m pip install dataset_similarity
-```
-
-From source:
-```bash
-git clone https://github.com/alan-turing-institute/ARC-Dataset-Similarity
-cd ARC-Dataset-Similarity
-python -m pip install .
-```
-
-## Usage
-
-
 ## Developer
 
 ### Installation
+
+If you are running on a Linux HPC with CUDA GPUs, you will need to make sure you are
+using Python 3.10:
+
+```bash
+uv venv --python 3.10.20
+```
 
 Install the project and initialise the virtual environment:
 

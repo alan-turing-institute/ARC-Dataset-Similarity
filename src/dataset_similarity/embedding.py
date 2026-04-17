@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
-from dataset_similarity.constants import DEFAULT_DATA_DIR, DEFAULT_EMBEDDING_DIR
+from dataset_similarity.constants import DEFAULT_DATA_ROOT, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import get_embedding_path
 
@@ -55,7 +55,7 @@ class Extractor:
         model_name: str,
         hf_model_id: str | None = None,
         device: str | torch.device = "cpu",
-        dataset_dir: Path = DEFAULT_DATA_DIR,
+        data_root: Path = DEFAULT_DATA_ROOT,
         embedding_dir: Path = DEFAULT_EMBEDDING_DIR,
     ) -> None:
         if model_name not in MODEL_NAMES:
@@ -71,7 +71,7 @@ class Extractor:
         self._model.to(self.device)
         self._model.eval()
         self.output_dir = embedding_dir / self.model_name
-        self.dataset_root = dataset_dir
+        self.data_root = data_root
 
     def preprocess(self, images: list[Image.Image] | torch.Tensor) -> torch.Tensor:
         """Preprocess a list of PIL images into a batch pixel-values tensor."""
@@ -127,8 +127,8 @@ class Extractor:
                         raise ValueError(msg)
                     dst = get_embedding_path(
                         image_path=src_path,
-                        embedding_dir=self.output_dir / self.model_name,
-                        data_dir=self.dataset_root,
+                        embedding_dir=self.output_dir,
+                        data_root=self.data_root,
                     )
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     save_file({"embedding": emb}, dst)

@@ -22,7 +22,7 @@ dataset name and any kwargs needed to initialize the dataset. For example:
 ```yaml
 name: DomainNet
 kwargs:
-  data_root: /absolute/path/to/data/DomainNet
+  dataset_dir: /absolute/path/to/data/DomainNet
   split: train
   domains: [clipart, real]
   target_classes: [class1, class2, class3]
@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import argparse
 
-from dataset_similarity.constants import DEFAULT_DATA_DIR, DEFAULT_EMBEDDING_DIR
+from dataset_similarity.constants import DEFAULT_DATA_ROOT, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data import DATASET_MAP
 from dataset_similarity.data.utils import load_yaml_from_path
 from dataset_similarity.embedding import Extractor
@@ -60,7 +60,7 @@ def main(args: argparse.Namespace) -> None:
             raise ValueError(err_msg)
         dataset_fn = DATASET_MAP[args.dataset]
         init_kwargs = {
-            "data_root": DEFAULT_DATA_DIR / args.dataset,
+            "dataset_dir": args.data_root / args.dataset,
             "target_classes": args.target_classes,
             "split": args.dataset_split,
             "size": args.size,
@@ -78,6 +78,8 @@ def main(args: argparse.Namespace) -> None:
         hf_model_id=args.model_name,
         **({"hf_model_id": args.model_name} if args.model_name else {}),
         device=args.device,
+        data_root=args.data_root,
+        output_dir=args.output_dir,
     )
 
     extractor.extract_dataset(
@@ -105,8 +107,8 @@ if __name__ == "__main__":
         help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet'."),
     )
     parser.add_argument(
-        "--dataset_dir",
-        default=DEFAULT_DATA_DIR,
+        "--data_root",
+        default=DEFAULT_DATA_ROOT,
         help=(
             "Absolute path to root dataset directory. Images should be in "
             "<dataset_dir>/<dataset>/."

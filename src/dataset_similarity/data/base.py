@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-import safetensors
 import torch
 from pandas import DataFrame
+from safetensors.torch import load_file
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision.io import read_image
@@ -20,7 +20,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
     DataFrame of ``(path, label)`` rows and set ``self._classes``.
 
     Args:
-        data_root: Absolute path to the dataset root directory.
+        dataset_dir: Absolute path to the directory containing the dataset images.
         target_classes: List of class names to include in the dataset. If None, all
             classes are included.
         split: Dataset split identifier (e.g. ``"train"`` or ``"test"``).
@@ -40,7 +40,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
 
     def __init__(
         self,
-        data_root: str | Path,
+        dataset_dir: str | Path,
         target_classes: list[str] | None,
         split: str,
         size: float | int | None,
@@ -50,9 +50,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         return_paths: bool,
     ) -> None:
         super().__init__()
-        if not isinstance(data_root, Path):
-            data_root = Path(data_root)
-        self.data_root = data_root
+        if not isinstance(dataset_dir, Path):
+            dataset_dir = Path(dataset_dir)
+        self.dataset_dir = dataset_dir
         self.split = split
         self.target_classes = target_classes
         self.data = self._load_data()
@@ -140,14 +140,13 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             tensor = read_image(image_path, mode="RGB")
         else:
             image_embedding_path = get_embedding_path(
-                image_path,
-                self.embedding_path,
-                self.data_root.parent,  # dataset_dir is the parent of data_root
+                image_path=image_path,
+                embedding_dir=self.embedding_path,
+                data_root=self.dataset_dir.parent,
             )
-            with safetensors.safe_open(
-                image_embedding_path, framework="pt", device="cpu"
-            ) as f:
-                tensor = f.get_tensor("embedding")
+            tensor = load_file(image_embedding_path, framework="pt", device="cpu")[
+                "embedding"
+            ]
         if self.return_paths:
             return tensor, image_path
         return tensor, sample["label"]

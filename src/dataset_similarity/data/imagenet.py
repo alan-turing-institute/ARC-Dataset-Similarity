@@ -20,12 +20,12 @@ class ImageNetDataset(ImageDataset):
     PyTorch dataset for `ImageNet ILSVRC <https://image-net.org/>`_.
 
     Args:
-        data_root: Absolute path to the dataset root directory. Defaults to
-            `dataset_similarity.constants.IMAGENET_DIR`.
+        dataset_dir: Absolute path to the dataset directory containing ImageNet images.
+            Defaults to `dataset_similarity.constants.IMAGENET_DIR`.
         target_classes: List of class names to include in the dataset. If None, all
             classes are included. Elements must be valid class names as specified in the
             class mapping file at
-            `data_root.parent / "metadata/imagenet_class_mapping.yaml"`. Defaults to
+            `dataset_dir.parent / "metadata/imagenet_class_mapping.yaml"`. Defaults to
             `None`.
         split: Dataset split identifier. Must be `"train"` or `"val"`. Defaults to
             `"train"`.
@@ -49,7 +49,7 @@ class ImageNetDataset(ImageDataset):
 
     def __init__(
         self,
-        data_root: str | Path = IMAGENET_DIR,
+        dataset_dir: str | Path = IMAGENET_DIR,
         target_classes: list[str] | None = None,
         split: Literal["train", "val"] = "train",
         size: float | int | None = None,
@@ -61,7 +61,7 @@ class ImageNetDataset(ImageDataset):
         # Synset = synonym set. Needs processing before calling super().__init__()
         # E.g. "n02119789" is a synset ID with name "kit_fox" and class_number 1.
         self.synset_map: dict[str, SynsetInfo] = load_yaml_from_path(
-            Path(data_root).parent / "metadata" / "imagenet_class_mapping.yaml"
+            Path(dataset_dir).parent / "metadata" / "imagenet_class_mapping.yaml"
         )
 
         # synset_id -> class_number
@@ -96,7 +96,7 @@ class ImageNetDataset(ImageDataset):
             target_classes = resolved
 
         super().__init__(
-            data_root=data_root,
+            dataset_dir=dataset_dir,
             target_classes=target_classes,
             split=split,
             size=size,
@@ -110,7 +110,7 @@ class ImageNetDataset(ImageDataset):
         """
         Expects the standard directory layout::
 
-            data_root/
+            dataset_dir/
             ├── train/
             │   ├── n01440764/
             │   │   ├── n01440764_10026.JPEG
@@ -133,7 +133,7 @@ class ImageNetDataset(ImageDataset):
             classes = self.target_classes
         for class_name in classes:  # class_name is always a synset ID
             label = self.synsetid_to_classnumber_map[class_name]
-            class_dir = self.data_root / self.split / class_name
+            class_dir = self.dataset_dir / self.split / class_name
             images = sorted(
                 p
                 for p in class_dir.iterdir()
