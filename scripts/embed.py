@@ -32,8 +32,8 @@ kwargs:
 
 By default, the script looks for datasets in the `data/` directory and saves embeddings
 to the `embeddings/` directory, but these can be overridden with the `--dataset_dir` and
-`--output_dir` flags, respectively. See `python scripts/embed.py --help` for details on
-all available flags.
+`--embedding_dir` flags, respectively. See `python scripts/embed.py --help` for details
+on all available flags.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ def main(args: argparse.Namespace) -> None:
         **({"hf_model_id": args.model_name} if args.model_name else {}),
         device=args.device,
         data_root=args.data_root,
-        output_dir=args.output_dir,
+        embedding_dir=args.embedding_dir,
     )
 
     extractor.extract_dataset(
@@ -164,7 +164,7 @@ if __name__ == "__main__":
         help="Number of worker processes for data loading (default: 0).",
     )
     parser.add_argument(
-        "--output_dir",
+        "--embedding_dir",
         default=DEFAULT_EMBEDDING_DIR,
         help=(
             "Absolute path to directory in which to save per-image .safetensors files"
