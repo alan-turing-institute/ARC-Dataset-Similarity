@@ -1,7 +1,7 @@
 """
 Simple script for checking the OTDD runs on Isambard without error. Long-term this will
 be deleted and the functionality will be re-implemented in a broader script for running
-all metrics with args for controling which metrics to run, which datasets to use, etc.
+all metrics with args for controlling which metrics to run, which datasets to use, etc.
 """
 
 from logging import Logger
@@ -39,7 +39,7 @@ def main() -> None:
     )
 
     # Compute OTDD distance between the two datasets
-    logger.info("Compting the OTDD")
+    logger.info("Computing the OTDD")
     device = "cpu"
     if torch.cuda.is_available():
         logger.info("CUDA is available. Using GPU for OTDD computation.")

@@ -10,8 +10,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
+from dataset_similarity.constants import DEFAULT_DATA_DIR, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import _get_embedding_path
+from dataset_similarity.data.utils import get_embedding_path
 
 MODEL_NAMES: dict[str, str] = {
     "clip": "openai/clip-vit-base-patch32",
@@ -54,6 +55,8 @@ class Extractor:
         model_name: str,
         hf_model_id: str | None = None,
         device: str | torch.device = "cpu",
+        dataset_dir: Path = DEFAULT_DATA_DIR,
+        embedding_dir: Path = DEFAULT_EMBEDDING_DIR,
     ) -> None:
         if model_name not in MODEL_NAMES:
             msg = f"Unknown model '{model_name}'. Available: {sorted(MODEL_NAMES)}"
@@ -67,6 +70,8 @@ class Extractor:
         self._model = AutoModel.from_pretrained(_hf_model_id)
         self._model.to(self.device)
         self._model.eval()
+        self.output_dir = embedding_dir / self.model_name
+        self.dataset_root = dataset_dir
 
     def preprocess(self, images: list[Image.Image] | torch.Tensor) -> torch.Tensor:
         """Preprocess a list of PIL images into a batch pixel-values tensor."""
@@ -100,6 +105,9 @@ class Extractor:
             batch_size: Images processed per forward pass.
             num_workers: Worker processes for the DataLoader.
         """
+        if dataset.return_paths is False:
+            msg = "Dataset must have `return_paths=True` to extract embeddings"
+            raise ValueError(msg)
 
         loader: DataLoader[Any] = DataLoader(
             dataset,
@@ -114,9 +122,13 @@ class Extractor:
                 embeddings = self.encode(pixel_values).cpu()
 
                 for emb, src_path in zip(embeddings, paths, strict=True):
-                    if not isinstance(src_path, str | Path):
-                        msg = "Expected path to be str or Path, " "got {type(src_path)}"
+                    if not isinstance(src_path, Path):
+                        msg = "Expected path to be Path, " "got {type(src_path)}"
                         raise ValueError(msg)
-                    dst = _get_embedding_path(src_path, self.model_name)
+                    dst = get_embedding_path(
+                        image_path=src_path,
+                        embedding_dir=self.output_dir / self.model_name,
+                        data_dir=self.dataset_root,
+                    )
                     dst.parent.mkdir(parents=True, exist_ok=True)
-                    save_file({"embedding": emb.unsqueeze(0)}, dst)
+                    save_file({"embedding": emb}, dst)

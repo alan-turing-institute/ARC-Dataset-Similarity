@@ -2,13 +2,14 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+import safetensors
 import torch
 from pandas import DataFrame
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
-from dataset_similarity.data.utils import _get_embedding_path, load_yaml_from_path
+from dataset_similarity.data.utils import get_embedding_path, load_yaml_from_path
 
 
 class ImageDataset(ABC, Dataset):  # type: ignore[misc]
@@ -20,27 +21,38 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
 
     Args:
         data_root: Absolute path to the dataset root directory.
-        target_classes: List of class names to include in the dataset.
+        target_classes: List of class names to include in the dataset. If None, all
+            classes are included.
         split: Dataset split identifier (e.g. ``"train"`` or ``"test"``).
         size: If a float in ``(0, 1)``, the fraction of samples to retain.
             If a positive integer, the exact number of samples to retain. If
             ``None``, no subsampling is performed and the full dataset is used.
         random_seed: Seed for the random number generator, for reproducibility. If
             ``None``, the result is non-deterministic.
+        embedding: If not ``None``, the name of the embedding model to use for this
+            dataset. If ``None``, raw images are returned by ``__getitem__``.
+        embedding_dir: The absolute path to the directory where the embeddings are
+            stored. This is used to compute the path to the embedding for each image.
+            Must be provided if `embedding` is not None.
+        return_paths: If ``True``, ``__getitem__`` returns a tuple of (tensor, path)
+            instead of (tensor, label). The path is returned as a ``Path`` object.
     """
 
     def __init__(
         self,
-        data_root: Path | str,
+        data_root: str | Path,
         target_classes: list[str] | None,
         split: str,
         size: float | int | None,
         random_seed: int | None,
-        embedding: None | str = None,
-        return_paths: bool = False,
+        embedding: None | str,
+        embedding_dir: None | Path | str,
+        return_paths: bool,
     ) -> None:
         super().__init__()
-        self.root = Path(data_root)
+        if not isinstance(data_root, Path):
+            data_root = Path(data_root)
+        self.data_root = data_root
         self.split = split
         self.target_classes = target_classes
         self.data = self._load_data()
@@ -48,7 +60,16 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         self.random_seed = random_seed
         if self.size is not None:
             self.data = self.subsample_data()
-        self.embedding = embedding
+        if embedding is not None:
+            if embedding_dir is None:
+                msg = "`embedding_dir` must be provided if `embedding` is not None"
+                raise ValueError(msg)
+            if not isinstance(embedding_dir, Path):
+                embedding_dir = Path(embedding_dir)
+            embedding_path = embedding_dir / embedding
+        else:
+            embedding_path = None
+        self.embedding_path = embedding_path
         self.return_paths = return_paths
 
     def subsample_data(self) -> DataFrame:
@@ -100,9 +121,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         """
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int | str | Path]:
         """
-        Get a sample from the dataset. If ``self.embeddings`` is ``None``, the first
+        Get a sample from the dataset. If ``self.embedding`` is ``None``, the first
         element of the returned tuple is an image tensor of shape (C x H x W).
 
         Args:
@@ -110,16 +131,23 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
 
         Returns:
             A tuple containing the output tensor (C x H x W) or (D,) depending on the
-            value of ``embeddings`` and either its label or file path depending on
+            value of ``self.embedding`` and either its label or file path depending on
             the value of ``return_paths``.
         """
         sample = self.data.iloc[idx]
         image_path = sample["path"]
-        if self.embedding is None:
+        if self.embedding_path is None:
             tensor = read_image(image_path, mode="RGB")
         else:
-            embedding_path = _get_embedding_path(self.image_path, self.embedding)
-            tensor = torch.load(embedding_path)
+            image_embedding_path = get_embedding_path(
+                image_path,
+                self.embedding_path,
+                self.data_root.parent,  # dataset_dir is the parent of data_root
+            )
+            with safetensors.safe_open(
+                image_embedding_path, framework="pt", device="cpu"
+            ) as f:
+                tensor = f.get_tensor("embedding")
         if self.return_paths:
             return tensor, image_path
         return tensor, sample["label"]
@@ -198,4 +226,4 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         Returns:
             An instantiated ``ImageDataset`` subclass.
         """
-        return cls.from_dict(load_yaml_from_path(yaml_path)["args"])
+        return cls.from_dict(load_yaml_from_path(yaml_path)["kwargs"])

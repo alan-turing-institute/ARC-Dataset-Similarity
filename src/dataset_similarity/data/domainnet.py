@@ -5,6 +5,7 @@ from typing import Literal
 
 import pandas as pd
 
+from dataset_similarity.constants import DEFAULT_EMBEDDING_DIR, DOMAINNET_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import load_yaml_from_path
 
@@ -14,23 +15,49 @@ class DomainNetDataset(ImageDataset):
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
     Args:
-        data_root: Path to the root DomainNet directory.
-        domain: One of ``"clipart"``, ``"infograph"``, ``"painting"``,
-            ``"quickdraw"``, ``"real"``, or ``"sketch"``.
-        split: ``"train"`` or ``"test"``. Defaults to ``"train"``.
+        data_root: Absolute path to the dataset root directory. Defaults to
+            `dataset_similarity.constants.DOMAINNET_DIR`.
+        domains: If not `None`, either a single domain name as a string, or a list of
+            domain names. Each domain name must be one of `"clipart"`, `"infograph"`,
+            `"painting"`, `"quickdraw"`, `"real"`, or `"sketch"`. If `None`, all domains
+            are included.
+        target_classes: List of class names to include in the dataset. If None, all
+            classes are included. Elements must be valid class names as specified in the
+            class mapping file at
+            `data_root.parent / "metadata/domainnet_class_mapping.yaml"`. Defaults to
+            `None`.
+        split: Dataset split identifier. Must be `"train"` or `"test"`. Defaults to
+            `"train"`.
+        size: If a float in `(0, 1)`, the fraction of samples to retain.
+            If a positive integer, the exact number of samples to retain. If
+            `None`, no subsampling is performed and the full dataset is used. Defaults
+            to `None`.
+        random_seed: Seed for the random number generator, for reproducibility. If
+            `None`, the result is non-deterministic. Defaults to `None`.
+        embedding: If not `None`, the name of the embedding model to use for this
+            dataset. If `None`, raw images are returned by `__getitem__`. Defaults to
+            `None`.
+        embedding_dir: The absolute path to the directory where the embeddings are
+            stored. This is used to compute the path to the embedding for each image.
+            Must be provided if `embedding` is not None. Defaults to
+            `dataset_similarity.constants.DEFAULT_EMBEDDING_DIR`.
+        return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
+            instead of (tensor, label). The path is returned as a `Path` object.
+            Defaults to `False`.
     """
 
     DOMAINS = ("clipart", "infograph", "painting", "quickdraw", "real", "sketch")
 
     def __init__(
         self,
-        data_root: str | Path,
+        data_root: str | Path = DOMAINNET_DIR,
         domains: str | list[str] | None = None,
         target_classes: list[str] | None = None,
         split: Literal["train", "test"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
         embedding: None | str = None,
+        embedding_dir: None | Path | str = DEFAULT_EMBEDDING_DIR,
         return_paths: bool = False,
     ) -> None:
         # Domain needs to be processed before calling super().__init__()
@@ -63,7 +90,7 @@ class DomainNetDataset(ImageDataset):
                 if cls not in self.class_to_label_map:
                     err_msg = (
                         f"Unknown class {cls}. Check the class mapping at "
-                        f"{self.root.parent}"
+                        f"{self.data_root.parent}"
                         "/metadata/domainnet_class_mapping.yaml for valid class "
                         "names."
                     )
@@ -73,7 +100,14 @@ class DomainNetDataset(ImageDataset):
             }
 
         super().__init__(
-            data_root, target_classes, split, size, random_seed, embedding, return_paths
+            data_root=data_root,
+            target_classes=target_classes,
+            split=split,
+            size=size,
+            random_seed=random_seed,
+            embedding=embedding,
+            embedding_dir=embedding_dir,
+            return_paths=return_paths,
         )
 
     def _load_data(self) -> pd.DataFrame:
@@ -101,22 +135,22 @@ class DomainNetDataset(ImageDataset):
             │── ...
 
         Args:
-            domain: DomainNet domain name (e.g. ``"clipart"``). Must be one of the
-                values in ``self.DOMAINS``.
+            domain: DomainNet domain name (e.g. `"clipart"`). Must be one of the
+                values in `self.DOMAINS`.
 
         Returns:
             df: DataFrame with columns ["path", "label", "domain"] containing the
             samples in the split.
         """
         df = pd.read_csv(
-            self.root / f"{domain}_{self.split}.txt",
+            self.data_root / f"{domain}_{self.split}.txt",
             delimiter=" ",
             header=None,
             names=["path", "label"],
         )
         if self.target_classes is not None:
             df = df[df["label"].isin(self.target_label_ids)]
-        df["path"] = df["path"].apply(lambda rel_pth: str(self.root / rel_pth))
+        df["path"] = df["path"].apply(lambda rel_pth: self.data_root / rel_pth)
         df["domain"] = self.DOMAINS.index(domain)
         return df
 
