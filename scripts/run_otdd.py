@@ -46,7 +46,9 @@ def main() -> None:
         device = "cuda"
     else:
         logger.info("CUDA is not available. Using CPU for OTDD computation.")
-    distance = otdd(ds1, ds2, device=device)
+    distance = otdd(
+        ds1, ds2, inner_ot_method="exact", inner_ot_debiased=True, device=device
+    )
     msg = (
         "OTDD computation completed. distance between clipart and real domains: "
         f"{distance:.4f}"
