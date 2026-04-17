@@ -123,7 +123,7 @@ class Extractor:
 
                 for emb, src_path in zip(embeddings, paths, strict=True):
                     if not isinstance(src_path, Path):
-                        msg = "Expected path to be Path, " "got {type(src_path)}"
+                        msg = f"Expected path to be Path, got {type(src_path)}"
                         raise ValueError(msg)
                     dst = get_embedding_path(
                         image_path=src_path,
