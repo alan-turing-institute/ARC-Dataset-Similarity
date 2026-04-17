@@ -145,9 +145,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
                 embedding_dir=self.embedding_path,
                 data_root=self.dataset_dir.parent,
             )
-            tensor = load_file(image_embedding_path, framework="pt", device="cpu")[
-                "embedding"
-            ]
+            tensor = load_file(image_embedding_path)["embedding"]
         if self.return_paths:
             return tensor, image_path
         return tensor, sample["label"]
