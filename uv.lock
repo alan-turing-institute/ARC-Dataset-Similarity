@@ -505,20 +505,25 @@ dependencies = [
     { name = "otdd" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pre-commit" },
     { name = "pyaml" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
     { name = "pyyaml" },
     { name = "safetensors" },
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scikit-learn", version = "1.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
     { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
-    { name = "torchtext" },
+    { name = "torchtext", version = "0.15.1", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
+    { name = "torchtext", version = "0.18.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
     { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
     { name = "torchvision", version = "0.25.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
     { name = "transformers" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
 ]
 
 [package.metadata]
@@ -528,19 +533,24 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "otdd", git = "https://github.com/microsoft/otdd" },
     { name = "pandas", specifier = ">=2.3.3" },
-    { name = "pre-commit" },
     { name = "pyaml", specifier = ">=26.2.1" },
-    { name = "pytest", specifier = ">=6" },
-    { name = "pytest-cov", specifier = ">=3" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "safetensors", specifier = ">=0.4.0" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "torch", marker = "platform_machine != 'aarch64'", specifier = "==2.10.*", index = "https://pypi.org/simple" },
     { name = "torch", marker = "platform_machine == 'aarch64'", specifier = "==2.10.*", index = "https://download.pytorch.org/whl/cu126" },
-    { name = "torchtext", specifier = "==0.18.0", index = "https://pypi.org/simple" },
+    { name = "torchtext", marker = "platform_machine != 'aarch64'", specifier = ">0.14.1,<=0.18.0", index = "https://pypi.org/simple" },
+    { name = "torchtext", marker = "platform_machine == 'aarch64'", specifier = ">0.14.1,<=0.18.0", index = "https://download.pytorch.org/whl/cu126" },
     { name = "torchvision", marker = "platform_machine != 'aarch64'", index = "https://pypi.org/simple" },
     { name = "torchvision", marker = "platform_machine == 'aarch64'", index = "https://download.pytorch.org/whl/cu126" },
     { name = "transformers", specifier = ">=5.4.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pre-commit" },
+    { name = "pytest", specifier = ">=6" },
+    { name = "pytest-cov", specifier = ">=3" },
 ]
 
 [[package]]
@@ -2076,7 +2086,8 @@ dependencies = [
     { name = "seaborn" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
     { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
-    { name = "torchtext" },
+    { name = "torchtext", version = "0.15.1", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
+    { name = "torchtext", version = "0.18.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
     { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
     { name = "torchvision", version = "0.25.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
     { name = "tqdm" },
@@ -3265,16 +3276,63 @@ wheels = [
 ]
 
 [[package]]
+name = "torchdata"
+version = "0.10.0"
+source = { registry = "https://download.pytorch.org/whl/cu126" }
+dependencies = [
+    { name = "requests", marker = "platform_machine == 'aarch64'" },
+    { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
+    { name = "urllib3", marker = "platform_machine == 'aarch64'" },
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/torchdata-0.10.0-py3-none-any.whl", hash = "sha256:81c2299d150e8c1abdfe202b8af19a1668c8a8cb679c0540d284dacb727ead49" },
+]
+
+[[package]]
+name = "torchtext"
+version = "0.15.1"
+source = { registry = "https://download.pytorch.org/whl/cu126" }
+resolution-markers = [
+    "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'emscripten'",
+    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine == 'aarch64'",
+]
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version < '3.11' and platform_machine == 'aarch64'" },
+    { name = "numpy", version = "2.4.3", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version >= '3.11' and platform_machine == 'aarch64'" },
+    { name = "requests", marker = "platform_machine == 'aarch64'" },
+    { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
+    { name = "torchdata", marker = "platform_machine == 'aarch64'" },
+    { name = "tqdm", marker = "platform_machine == 'aarch64'" },
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/torchtext-0.15.1-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:da7443085d41ee3a87ae00950ee821dd80e56a604e575355a778cc95504ca701" },
+    { url = "https://download.pytorch.org/whl/torchtext-0.15.1-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:3b75aff32b0f7913c2111ba658d4c2b6f6ef71eba6d80e30aba6db76e1bdb21c" },
+]
+
+[[package]]
 name = "torchtext"
 version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'emscripten'",
+    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine != 'aarch64'",
+]
 dependencies = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.3", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version >= '3.11'" },
-    { name = "requests" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version < '3.11' and platform_machine != 'aarch64'" },
+    { name = "numpy", version = "2.4.3", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version >= '3.11' and platform_machine != 'aarch64'" },
+    { name = "requests", marker = "platform_machine != 'aarch64'" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
-    { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
-    { name = "tqdm" },
+    { name = "tqdm", marker = "platform_machine != 'aarch64'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/94/1e805ef3ec6541de75e8a86c32e00be471d98cdcef5035ad26457bc388cf/torchtext-0.18.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:5826d5bbfe84a3c533e7e97659f72dbff73e1614c00c06709607d17c8446e09c", size = 2137942, upload-time = "2024-04-24T15:49:45.385Z" },
