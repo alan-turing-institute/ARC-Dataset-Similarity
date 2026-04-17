@@ -38,7 +38,7 @@ class _DummyExtractor(Extractor):
 
 
 class _PathDataset(Dataset[tuple[Image.Image, Path]]):
-    """Dataset whose items are ``(image, path_str)`` tuples."""
+    """Dataset whose items are ``(image, Path)`` tuples."""
 
     def __init__(self, images: list[Image.Image], paths: list[Path]) -> None:
         self._data = list(zip(images, paths, strict=True))
@@ -47,7 +47,7 @@ class _PathDataset(Dataset[tuple[Image.Image, Path]]):
     def __len__(self) -> int:
         return len(self._data)
 
-    def __getitem__(self, idx: int) -> tuple[Image.Image, str]:
+    def __getitem__(self, idx: int) -> tuple[Image.Image, Path]:
         return self._data[idx]
 
 

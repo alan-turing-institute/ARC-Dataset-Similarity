@@ -18,7 +18,7 @@ def get_embedding_path(
     Args:
         image_path: An absolute path to an image file in the original dataset directory.
         embedding_dir: An absolute path to the directory where embeddings for the
-            dataset are stored, e.g. `.cosntants.DEFAULT_EMBEDDING_DIR / "clip"`.
+            dataset are stored, e.g. `.constants.DEFAULT_EMBEDDING_DIR / "clip"`.
         data_root: An absolute path to the root directory of the original dataset. This
             is used to compute the relative path of the image within the dataset, which
             is then used to determine the embedding path. By default, this is set to

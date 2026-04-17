@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 from pandas import DataFrame
 from safetensors.torch import load_file
@@ -121,7 +122,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         """
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int | str | Path]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, np.int64 | str | Path]:
         """
         Get a sample from the dataset. If ``self.embedding`` is ``None``, the first
         element of the returned tuple is an image tensor of shape (C x H x W).

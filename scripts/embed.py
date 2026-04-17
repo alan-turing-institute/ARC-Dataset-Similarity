@@ -1,7 +1,7 @@
 """
 This script embeds images from a specified dataset and saves the embeddings as per-image
 .safetensors files. It supports all datasets implemented in dataset_similarity.data, and
-all extractors implemented by dataset_similarity.emedding.Extractor.
+all extractors implemented by dataset_similarity.embedding.Extractor.
 
 To run, specify the dataset and extractor. The dataset can be specified either by name
 and kwargs, or by a config file containing both. For example:
@@ -31,7 +31,7 @@ kwargs:
 ```
 
 By default, the script looks for datasets in the `data/` directory and saves embeddings
-to the `embeddings/` directory, but these can be overridden with the `--dataset_dir` and
+to the `embeddings/` directory, but these can be overridden with the `--data_root` and
 `--embedding_dir` flags, respectively. See `python scripts/embed.py --help` for details
 on all available flags.
 """
@@ -39,6 +39,7 @@ on all available flags.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from dataset_similarity.constants import DEFAULT_DATA_ROOT, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data import DATASET_MAP
@@ -87,7 +88,7 @@ def main(args: argparse.Namespace) -> None:
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
-    print(f"Saved to: {DEFAULT_EMBEDDING_DIR}")
+    print(f"Saved to: {extractor.output_dir}")
 
 
 if __name__ == "__main__":
@@ -109,6 +110,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data_root",
         default=DEFAULT_DATA_ROOT,
+        type=Path,
         help=(
             "Absolute path to root dataset directory. Images should be in "
             "<dataset_dir>/<dataset>/."

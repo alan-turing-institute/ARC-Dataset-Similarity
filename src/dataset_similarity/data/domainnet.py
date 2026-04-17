@@ -90,7 +90,7 @@ class DomainNetDataset(ImageDataset):
                 if cls not in self.class_to_label_map:
                     err_msg = (
                         f"Unknown class {cls}. Check the class mapping at "
-                        f"{self.dataset_dir.parent}"
+                        f"{Path(dataset_dir).parent}"
                         "/metadata/domainnet_class_mapping.yaml for valid class "
                         "names."
                     )

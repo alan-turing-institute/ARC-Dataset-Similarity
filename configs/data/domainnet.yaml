@@ -1,3 +1,2 @@
-name: "domainnet"
-kwargs:
-  data_root: "data/DomainNet"
+name: "DomainNet"
+kwargs: {}
