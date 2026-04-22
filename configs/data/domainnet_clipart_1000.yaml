@@ -1,0 +1,4 @@
+name: "DomainNet"
+kwargs:
+  domains: "clipart"
+  num_samples: 1000

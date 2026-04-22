@@ -1,0 +1,4 @@
+name: "DomainNet"
+kwargs:
+  domains: "real"
+  num_samples: 1000
