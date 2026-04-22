@@ -3,3 +3,4 @@ kwargs:
   domains: "clipart"
   size: 1000
   random_seed: 42
+  embedding: "clip"
