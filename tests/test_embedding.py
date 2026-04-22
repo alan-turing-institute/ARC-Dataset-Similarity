@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,11 +9,7 @@ from PIL import Image
 from safetensors.torch import load_file
 from torch.utils.data import Dataset
 
-from dataset_similarity.embedding import (
-    MODEL_NAMES,
-    Extractor,
-    _embedding_save_path,
-)
+from dataset_similarity.embedding import MODEL_NAMES, Extractor
 
 _EMBED_DIM = 16
 _BATCH = 3
@@ -24,12 +19,16 @@ _IMG_SIZE = 224
 class _DummyExtractor(Extractor):
     """Concrete extractor returning deterministic tensors — no model loading."""
 
-    def __init__(self, model_name: str = "clip") -> None:
+    def __init__(
+        self, data_root: Path, embedding_dir: Path, model_name: str = "clip"
+    ) -> None:
         # Bypass parent __init__ to avoid actual model loading
         self.model_name = model_name
         self.device = torch.device("cpu")
         self._processor = None
         self._model = None
+        self.data_root = data_root
+        self.output_dir = embedding_dir / self.model_name
 
     def preprocess(self, images: list[Image.Image]) -> torch.Tensor:
         return torch.zeros(len(images), 3, 32, 32)
@@ -38,47 +37,18 @@ class _DummyExtractor(Extractor):
         return torch.ones(pixel_values.shape[0], _EMBED_DIM)
 
 
-class _PathDataset(Dataset[tuple[Image.Image, str]]):
-    """Dataset whose items are ``(image, path_str)`` tuples."""
+class _PathDataset(Dataset[tuple[Image.Image, Path]]):
+    """Dataset whose items are ``(image, Path)`` tuples."""
 
-    def __init__(self, images: list[Image.Image], paths: list[str]) -> None:
+    def __init__(self, images: list[Image.Image], paths: list[Path]) -> None:
         self._data = list(zip(images, paths, strict=True))
+        self.return_paths = True
 
     def __len__(self) -> int:
         return len(self._data)
 
-    def __getitem__(self, idx: int) -> tuple[Image.Image, str]:
+    def __getitem__(self, idx: int) -> tuple[Image.Image, Path]:
         return self._data[idx]
-
-
-# ---------------------------------------------------------------------------
-# _embedding_save_path
-# ---------------------------------------------------------------------------
-
-
-def test_save_path_with_dataset_root(tmp_path: Path) -> None:
-    src = Path("/data/imagenet/train/n01234/img001.jpg")
-    root = Path("/data/imagenet")
-    result = _embedding_save_path(tmp_path, src, root, "clip")
-    assert result == tmp_path / "clip" / "train" / "n01234" / "img001.safetensors"
-
-
-def test_save_path_absolute_no_root(tmp_path: Path) -> None:
-    src = Path("/data/imagenet/train/n01234/img001.jpg")
-    result = _embedding_save_path(tmp_path, src, None, "clip")
-    assert result == tmp_path / "clip" / "img001.safetensors"
-
-
-def test_save_path_relative_no_root(tmp_path: Path) -> None:
-    src = Path("cats/img001.jpg")
-    result = _embedding_save_path(tmp_path, src, None, "clip")
-    assert result == tmp_path / "clip" / "cats" / "img001.safetensors"
-
-
-def test_save_path_replaces_suffix(tmp_path: Path) -> None:
-    src = Path("img.png")
-    result = _embedding_save_path(tmp_path, src, None, "clip")
-    assert result.suffix == ".safetensors"
 
 
 # ---------------------------------------------------------------------------
@@ -220,17 +190,6 @@ def test_encode_dinov3_calls_model_directly() -> None:
 
 
 # ---------------------------------------------------------------------------
-# extract_dataset — no saving
-# ---------------------------------------------------------------------------
-
-
-def test_extract_dataset_returns_none(image_dataset: Dataset[Any]) -> None:
-    extractor = _DummyExtractor()
-    result = extractor.extract_dataset(image_dataset, batch_size=2, num_workers=0)
-    assert result is None
-
-
-# ---------------------------------------------------------------------------
 # extract_dataset — file saving
 # ---------------------------------------------------------------------------
 
@@ -238,53 +197,50 @@ def test_extract_dataset_returns_none(image_dataset: Dataset[Any]) -> None:
 def test_extract_dataset_saves_correct_number_of_files(
     rgb_images: list[Image.Image], tmp_path: Path
 ) -> None:
-    paths = [f"img_{i:04d}.png" for i in range(len(rgb_images))]
+    dataset_dir = tmp_path / "dataset"
+    embedding_dir = tmp_path / "embeddings"
+    paths = [dataset_dir / f"img_{i:04d}.png" for i in range(len(rgb_images))]
     dataset = _PathDataset(rgb_images, paths)
-    extractor = _DummyExtractor()
+    extractor = _DummyExtractor(data_root=tmp_path, embedding_dir=embedding_dir)
     extractor.extract_dataset(
         dataset,
         batch_size=2,
         num_workers=0,
-        output_dir=tmp_path,
     )
-    saved = list(tmp_path.rglob("*.safetensors"))
+    saved = list(embedding_dir.rglob("*.safetensors"))
     assert len(saved) == len(rgb_images)
 
 
 def test_extract_dataset_saved_tensor_shape(
     rgb_images: list[Image.Image], tmp_path: Path
 ) -> None:
-    paths = [f"img_{i:04d}.png" for i in range(len(rgb_images))]
+    dataset_dir = tmp_path / "dataset"
+    embedding_dir = tmp_path / "embeddings"
+    paths = [dataset_dir / f"img_{i:04d}.png" for i in range(len(rgb_images))]
     dataset = _PathDataset(rgb_images, paths)
-    extractor = _DummyExtractor()
+    extractor = _DummyExtractor(data_root=tmp_path, embedding_dir=embedding_dir)
     extractor.extract_dataset(
         dataset,
         batch_size=2,
         num_workers=0,
-        output_dir=tmp_path,
     )
-    data = load_file(tmp_path / "clip" / "img_0000.safetensors")
-    assert data["embedding"].shape == (1, _EMBED_DIM)
+    data = load_file(embedding_dir / "clip" / "dataset" / "img_0000.safetensors")
+    assert data["embedding"].shape == (_EMBED_DIM,)
 
 
 def test_extract_dataset_mirrors_path_structure(
     rgb_images: list[Image.Image], tmp_path: Path
 ) -> None:
-    dataset_root = tmp_path / "dataset"
-    output_dir = tmp_path / "embeddings"
-    paths = [
-        str(dataset_root / "classA" / f"img_{i:04d}.jpg")
-        for i in range(len(rgb_images))
-    ]
+    dataset_dir = tmp_path / "dataset"
+    embedding_dir = tmp_path / "embeddings"
+    paths = [dataset_dir / f"classA/img_{i:04d}.jpg" for i in range(len(rgb_images))]
     dataset = _PathDataset(rgb_images, paths)
-    extractor = _DummyExtractor()
+    extractor = _DummyExtractor(data_root=tmp_path, embedding_dir=embedding_dir)
     extractor.extract_dataset(
         dataset,
         batch_size=2,
         num_workers=0,
-        output_dir=output_dir,
-        dataset_root=dataset_root,
     )
     for i in range(len(rgb_images)):
-        expected = output_dir / "clip" / "classA" / f"img_{i:04d}.safetensors"
+        expected = embedding_dir / f"clip/dataset/classA/img_{i:04d}.safetensors"
         assert expected.exists(), f"Missing: {expected}"

@@ -5,6 +5,7 @@ from typing import Literal, TypedDict
 
 import pandas as pd
 
+from dataset_similarity.constants import DEFAULT_EMBEDDING_DIR, IMAGENET_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import load_yaml_from_path
 
@@ -19,25 +20,48 @@ class ImageNetDataset(ImageDataset):
     PyTorch dataset for `ImageNet ILSVRC <https://image-net.org/>`_.
 
     Args:
-        data_root: Path to the root ImageNet directory (contains ``train/`` and
-            ``val/`` sub-directories).
-        split: ``"train"`` or ``"val"``. Defaults to ``"train"``.
-        target_classes: Optional list of class sub-directory names to include. If
-            None, all classes present in the split directory will be included.
+        dataset_dir: Absolute path to the dataset directory containing ImageNet images.
+            Defaults to `dataset_similarity.constants.IMAGENET_DIR`.
+        target_classes: List of class names to include in the dataset. If None, all
+            classes are included. Elements must be valid class names as specified in the
+            class mapping file at
+            `dataset_dir.parent / "metadata/imagenet_class_mapping.yaml"`. Defaults to
+            `None`.
+        split: Dataset split identifier. Must be `"train"` or `"val"`. Defaults to
+            `"train"`.
+        size: If a float in `(0, 1)`, the fraction of samples to retain.
+            If a positive integer, the exact number of samples to retain. If
+            `None`, no subsampling is performed and the full dataset is used. Defaults
+            to `None`.
+        random_seed: Seed for the random number generator, for reproducibility. If
+            `None`, the result is non-deterministic. Defaults to `None`.
+        embedding: If not `None`, the name of the embedding model to use for this
+            dataset. If `None`, raw images are returned by `__getitem__`. Defaults to
+            `None`.
+        embedding_dir: The absolute path to the directory where the embeddings are
+            stored. This is used to compute the path to the embedding for each image.
+            Must be provided if `embedding` is not None. Defaults to
+            `dataset_similarity.constants.DEFAULT_EMBEDDING_DIR`.
+        return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
+            instead of (tensor, label). The path is returned as a `Path` object.
+            Defaults to `False`.
     """
 
     def __init__(
         self,
-        data_root: str | Path,
+        dataset_dir: str | Path = IMAGENET_DIR,
         target_classes: list[str] | None = None,
         split: Literal["train", "val"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
+        embedding: None | str = None,
+        embedding_dir: None | Path | str = DEFAULT_EMBEDDING_DIR,
+        return_paths: bool = False,
     ) -> None:
         # Synset = synonym set. Needs processing before calling super().__init__()
         # E.g. "n02119789" is a synset ID with name "kit_fox" and class_number 1.
         self.synset_map: dict[str, SynsetInfo] = load_yaml_from_path(
-            Path(data_root).parent / "metadata" / "imagenet_class_mapping.yaml"
+            Path(dataset_dir).parent / "metadata" / "imagenet_class_mapping.yaml"
         )
 
         # synset_id -> class_number
@@ -71,13 +95,22 @@ class ImageNetDataset(ImageDataset):
                     raise ValueError(err_msg)
             target_classes = resolved
 
-        super().__init__(data_root, target_classes, split, size, random_seed)
+        super().__init__(
+            dataset_dir=dataset_dir,
+            target_classes=target_classes,
+            split=split,
+            size=size,
+            random_seed=random_seed,
+            embedding=embedding,
+            embedding_dir=embedding_dir,
+            return_paths=return_paths,
+        )
 
     def _load_data(self) -> pd.DataFrame:
         """
         Expects the standard directory layout::
 
-            data_root/
+            dataset_dir/
             ├── train/
             │   ├── n01440764/
             │   │   ├── n01440764_10026.JPEG
@@ -93,20 +126,18 @@ class ImageNetDataset(ImageDataset):
             Returns:
                 DataFrame with columns ["path", "label"]. Paths are absolute strings.
         """
-        rows: list[dict[str, str | int]] = []
+        rows: list[dict[str, Path | int]] = []
         if self.target_classes is None:
             classes = list(self.synset_map.keys())
         else:
             classes = self.target_classes
         for class_name in classes:  # class_name is always a synset ID
             label = self.synsetid_to_classnumber_map[class_name]
-            class_dir = self.root / self.split / class_name
+            class_dir = self.dataset_dir / self.split / class_name
             images = sorted(
                 p
                 for p in class_dir.iterdir()
                 if p.suffix.lower() in {".jpeg", ".jpg", ".png"}
             )
-            rows.extend(
-                {"path": str(image_path), "label": label} for image_path in images
-            )
+            rows.extend({"path": image_path, "label": label} for image_path in images)
         return pd.DataFrame(rows, columns=["path", "label"])

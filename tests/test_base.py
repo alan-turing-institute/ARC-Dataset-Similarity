@@ -11,17 +11,30 @@ from dataset_similarity.data.base import ImageDataset
 class FakeDataset(ImageDataset):
     def __init__(
         self,
-        data_root: Path | str,
+        dataset_dir: Path | str,
+        target_classes: list[str] | None = None,
         split: str = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
         n_classes: int = 3,
         samples_per_class: int = 4,
+        embedding=None,
+        embedding_dir=None,
+        return_paths=False,
     ) -> None:
         self.n_classes = [f"class{cls}" for cls in range(n_classes)]
-        self.tmp_pth = Path(data_root)
+        self.tmp_pth = Path(dataset_dir)
         self.samples_per_class = samples_per_class
-        super().__init__(data_root, None, split, size, random_seed)
+        super().__init__(
+            dataset_dir=dataset_dir,
+            target_classes=target_classes,
+            split=split,
+            size=size,
+            random_seed=random_seed,
+            embedding=embedding,
+            embedding_dir=embedding_dir,
+            return_paths=return_paths,
+        )
 
     def _load_data(self) -> DataFrame:
         return DataFrame(
@@ -42,7 +55,7 @@ def _make_fake_dataset(
 ) -> FakeDataset:
     """Return a FakeDataset with synthetic samples."""
     return FakeDataset(
-        data_root=tmp_path,
+        dataset_dir=tmp_path,
         split="train",
         size=size,
         random_seed=random_seed,
@@ -134,7 +147,7 @@ class TestSubsampleData:
 class TestFromDict:
     def test_creates_dataset_from_dict(self, tmp_path: Path) -> None:
         config_dict = {
-            "data_root": tmp_path,
+            "dataset_dir": tmp_path,
             "split": "train",
             "size": None,
             "random_seed": None,
@@ -145,20 +158,20 @@ class TestFromDict:
         ds = FakeDataset.from_dict(config_dict)
 
         assert isinstance(ds, FakeDataset)
-        assert ds.root == tmp_path
+        assert ds.dataset_dir == tmp_path
         assert ds.split == "train"
         assert len(ds.data) == 12  # 3 classes * 4 samples
 
-    def test_data_root_is_set_correctly(self, tmp_path: Path) -> None:
-        config_dict = {"data_root": tmp_path}
+    def test_dataset_dir_is_set_correctly(self, tmp_path: Path) -> None:
+        config_dict = {"dataset_dir": tmp_path}
 
         ds = FakeDataset.from_dict(config_dict)
 
-        assert ds.root == tmp_path
+        assert ds.dataset_dir == tmp_path
 
     def test_kwargs_are_forwarded(self, tmp_path: Path) -> None:
         config_dict = {
-            "data_root": tmp_path,
+            "dataset_dir": tmp_path,
             "split": "val",
             "n_classes": 5,
             "samples_per_class": 2,
@@ -171,7 +184,7 @@ class TestFromDict:
 
     def test_with_subsampling(self, tmp_path: Path) -> None:
         config_dict = {
-            "data_root": tmp_path,
+            "dataset_dir": tmp_path,
             "split": "train",
             "size": 0.5,
             "random_seed": 42,
@@ -189,8 +202,8 @@ class TestFromYaml:
         yaml_path = tmp_path / "config.yaml"
         yaml_path.write_text(
             f"name: fake\n"
-            f"args:\n"
-            f"  data_root: {tmp_path}\n"
+            f"kwargs:\n"
+            f"  dataset_dir: {tmp_path}\n"
             f"  split: train\n"
             f"  n_classes: 3\n"
             f"  samples_per_class: 4\n"
@@ -199,23 +212,23 @@ class TestFromYaml:
         ds = FakeDataset.from_yaml(yaml_path)
 
         assert isinstance(ds, FakeDataset)
-        assert ds.root == tmp_path
+        assert ds.dataset_dir == tmp_path
         assert len(ds.data) == 12
 
-    def test_data_root_is_set_correctly(self, tmp_path: Path) -> None:
+    def test_dataset_dir_is_set_correctly(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text(f"args:\n  data_root: {tmp_path}\n")
+        yaml_path.write_text(f"kwargs:\n  dataset_dir: {tmp_path}\n")
 
         ds = FakeDataset.from_yaml(yaml_path)
 
-        assert ds.root == tmp_path
+        assert ds.dataset_dir == tmp_path
 
     def test_kwargs_are_forwarded(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
         yaml_path.write_text(
             f"name: fake\n"
-            f"args:\n"
-            f"  data_root: {tmp_path}\n"
+            f"kwargs:\n"
+            f"  dataset_dir: {tmp_path}\n"
             f"  split: val\n"
             f"  n_classes: 5\n"
         )
@@ -228,16 +241,16 @@ class TestFromYaml:
         # The 'name' key can exist in YAML but is ignored by from_yaml
         yaml_path = tmp_path / "config.yaml"
         yaml_path.write_text(
-            f"name: some_other_name\n" f"args:\n" f"  data_root: {tmp_path}\n"
+            f"name: some_other_name\n" f"kwargs:\n" f"  dataset_dir: {tmp_path}\n"
         )
 
         ds = FakeDataset.from_yaml(yaml_path)
 
         assert isinstance(ds, FakeDataset)
 
-    def test_missing_args_key_raises(self, tmp_path: Path) -> None:
+    def test_missing_kwargs_key_raises(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text(f"name: fake\ndata_root: {tmp_path}\n")
+        yaml_path.write_text(f"name: fake\ndataset_dir: {tmp_path}\n")
 
         with pytest.raises(KeyError):
             FakeDataset.from_yaml(yaml_path)
@@ -246,8 +259,8 @@ class TestFromYaml:
         yaml_path = tmp_path / "config.yaml"
         yaml_path.write_text(
             f"name: fake\n"
-            f"args:\n"
-            f"  data_root: {tmp_path}\n"
+            f"kwargs:\n"
+            f"  dataset_dir: {tmp_path}\n"
             f"  split: train\n"
             f"  size: 0.5\n"
             f"  random_seed: 42\n"
@@ -261,10 +274,10 @@ class TestFromYaml:
 
     def test_accepts_string_path(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "config.yaml"
-        yaml_path.write_text(f"args:\n  data_root: {tmp_path}\n")
+        yaml_path.write_text(f"kwargs:\n  dataset_dir: {tmp_path}\n")
 
         # Pass as string instead of Path
         ds = FakeDataset.from_yaml(str(yaml_path))
 
         assert isinstance(ds, FakeDataset)
-        assert ds.root == tmp_path
+        assert ds.dataset_dir == tmp_path

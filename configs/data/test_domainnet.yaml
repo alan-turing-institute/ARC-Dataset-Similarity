@@ -1,4 +1,4 @@
-name: "domainnet"
-data_root: "data/DomainNet"
-domains: ["infograph", "painting", "quickdraw", "sketch"]
-target_classes: ['crocodile', 'apple', 'banana', 'rabbit', 'violin']
+name: "DomainNet"
+kwargs:
+  domains: ["infograph", "painting", "quickdraw", "sketch"]
+  target_classes: ['crocodile', 'apple', 'banana', 'rabbit', 'violin']

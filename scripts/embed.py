@@ -1,83 +1,75 @@
+"""
+This script embeds images from a specified dataset and saves the embeddings as per-image
+.safetensors files. It supports all datasets implemented in dataset_similarity.data, and
+all extractors implemented by dataset_similarity.embedding.Extractor.
+
+To run, specify the dataset and extractor. The dataset can be specified either by name
+and kwargs, or by a config file containing both. For example:
+
+```bash
+python scripts/embed.py --dataset DomainNet --dataset_split train --extractor clip
+```
+
+to embed the DomainNet training split with the CLIP extractor, or
+
+```bash
+python scripts/embed.py --config-file /absolute/path/to/config.yaml --extractor clip
+```
+
+to embed using a config file. The config file should be a YAML file containing the
+dataset name and any kwargs needed to initialize the dataset. For example:
+
+```yaml
+name: DomainNet
+kwargs:
+  dataset_dir: /absolute/path/to/data/DomainNet
+  split: train
+  domains: [clipart, real]
+  target_classes: [class1, class2, class3]
+  size: 1000
+  random_seed: 42
+```
+
+By default, the script looks for datasets in the `data/` directory and saves embeddings
+to the `embeddings/` directory, but these can be overridden with the `--data_root` and
+`--embedding_dir` flags, respectively. See `python scripts/embed.py --help` for details
+on all available flags.
+"""
+
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
 
-import torch
-from torchvision.io import read_image
-
-from dataset_similarity.constants import DEFAULT_DATA_DIR
-from dataset_similarity.data.domainnet import DomainNetDataset
-from dataset_similarity.data.imagenet import ImageNetDataset
+from dataset_similarity.constants import DEFAULT_DATA_ROOT, DEFAULT_EMBEDDING_DIR
+from dataset_similarity.data import DATASET_MAP
 from dataset_similarity.data.utils import load_yaml_from_path
 from dataset_similarity.embedding import Extractor
 
 
-def get_image_and_path(self: Any, idx: int) -> tuple[torch.Tensor, Path]:
-    """Temporary override before issue #9 is done to allow for embedding+label,
-    image+label and embedding+label loading. Overrides __getitem__ to return
-    (image, path) instead of (image, label).
-    WARNING: This breaks number of workers > 0 since the dataset is not picklable."""
-    items = self.data.iloc[idx]
-    image_path = items["path"]
-    image_tensor = read_image(str(image_path), mode="RGB")
-    return image_tensor, image_path
-
-
 def main(args: argparse.Namespace) -> None:
-    data_root = (
-        Path(args.dataset_dir) if args.dataset_dir else DEFAULT_DATA_DIR / args.dataset
-    )
-
-    if args.dataset == "domainnet":
-        if args.dataset_split == "val":
-            err_msg = "DomainNet does not have a 'val' split. Choose 'train' or 'test'."
-            raise ValueError(err_msg)
-        if args.config_file is not None:
-            data_cfg = load_yaml_from_path(args.config_file)
-            if data_cfg.pop("name") != "domainnet":
-                err_msg = (
-                    f"Config file name mismatch: expected 'domainnet',"
-                    f" got '{data_cfg.get('name')}'"
-                )
-                raise ValueError(err_msg)
-            dataset_fn = DomainNetDataset
-            init_kwargs = data_cfg
-        else:
-            dataset_fn = DomainNetDataset
-            init_kwargs = {
-                "data_root": data_root,
-                "split": args.dataset_split,
-                "domains": args.domains,
-                "target_classes": args.target_classes,
-            }
-    elif args.dataset == "imagenet":
-        if args.dataset_split == "test":
+    if args.config_file is not None:
+        data_cfg = load_yaml_from_path(args.config_file)
+        dataset_fn = DATASET_MAP[data_cfg["name"]]
+        init_kwargs = data_cfg["kwargs"]
+    else:
+        if args.dataset_split == "test" and args.dataset == "ImageNet":
             err_msg = "ImageNet does not have a 'test' split. Choose 'train' or 'val'."
             raise ValueError(err_msg)
-        if args.config_file is not None:
-            data_cfg = load_yaml_from_path(args.config_file)
-            if data_cfg.pop("name") != "imagenet":
-                err_msg = (
-                    f"Config file name mismatch: expected 'imagenet',"
-                    f" got '{data_cfg.get('name')}'"
-                )
-                raise ValueError(err_msg)
-            dataset_fn = ImageNetDataset
-            init_kwargs = data_cfg
-        else:
-            dataset_fn = ImageNetDataset
-            init_kwargs = {
-                "data_root": data_root,
-                "split": args.dataset_split,
-                "target_classes": args.target_classes,
-            }
-
-    # Temporary override to return (image, path) instead of (image, label) until
-    # issue #9 is done
-    dataset_fn.__getitem__ = get_image_and_path
-    dataset = dataset_fn(**init_kwargs)
+        if args.dataset_split == "val" and args.dataset == "DomainNet":
+            err_msg = "DomainNet does not have a 'val' split. Choose 'train' or 'test'."
+            raise ValueError(err_msg)
+        dataset_fn = DATASET_MAP[args.dataset]
+        init_kwargs = {
+            "dataset_dir": args.data_root / args.dataset,
+            "target_classes": args.target_classes,
+            "split": args.dataset_split,
+            "size": args.size,
+            "random_seed": args.random_seed,
+        }
+        if args.dataset == "DomainNet":
+            init_kwargs["domains"] = args.domains
+    dataset = dataset_fn(**init_kwargs, embedding=None, return_paths=True)
 
     print(f"{len(dataset)} images ready.")
     print(f"Loading extractor '{args.extractor}' on device '{args.device}' …")
@@ -87,17 +79,16 @@ def main(args: argparse.Namespace) -> None:
         hf_model_id=args.model_name,
         **({"hf_model_id": args.model_name} if args.model_name else {}),
         device=args.device,
+        data_root=args.data_root,
+        embedding_dir=args.embedding_dir,
     )
 
-    output_dir = Path(args.output_dir)
     extractor.extract_dataset(
         dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        output_dir=output_dir,
-        dataset_root=init_kwargs["data_root"],
     )
-    print(f"Saved to: {output_dir}")
+    print(f"Saved to: {extractor.output_dir}")
 
 
 if __name__ == "__main__":
@@ -112,14 +103,18 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset",
-        choices=["domainnet", "imagenet"],
-        default="domainnet",
-        help=("Dataset to embed. Supported: 'domainnet', 'imagenet'."),
+        choices=["DomainNet", "ImageNet"],
+        default="DomainNet",
+        help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet'."),
     )
     parser.add_argument(
-        "--dataset_dir",
-        default=None,
-        help="Root directory of images to embed.",
+        "--data_root",
+        default=DEFAULT_DATA_ROOT,
+        type=Path,
+        help=(
+            "Absolute path to root dataset directory. Images should be in "
+            "<dataset_dir>/<dataset>/."
+        ),
     )
     parser.add_argument(
         "--dataset_split",
@@ -134,6 +129,24 @@ if __name__ == "__main__":
     )
     parser.add_argument("--domains", nargs="+", type=str, default=None)
     parser.add_argument("--target-classes", nargs="+", type=str, default=None)
+    parser.add_argument(
+        "--size",
+        type=float,  # Int okay alone, but argparse needs to know how to parse it
+        default=None,
+        help=(
+            "If a float in (0, 1), the fraction of samples to retain. If a positive "
+            "integer, the number of samples to retain."
+        ),
+    )
+    parser.add_argument(
+        "--random_seed",
+        type=int,
+        default=None,
+        help=(
+            "Random seed for dataset subsampling (default: None, "
+            "i.e. non-deterministic)."
+        ),
+    )
     parser.add_argument("--config-file", type=str, default=None)
     parser.add_argument(
         "--extractor",
@@ -153,10 +166,10 @@ if __name__ == "__main__":
         help="Number of worker processes for data loading (default: 0).",
     )
     parser.add_argument(
-        "--output_dir",
-        default="../embeddings",
+        "--embedding_dir",
+        default=DEFAULT_EMBEDDING_DIR,
         help=(
-            "Directory in which to save per-image .safetensors files"
+            "Absolute path to directory in which to save per-image .safetensors files"
             " (default: embeddings)."
         ),
     )

@@ -2,13 +2,15 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 from pandas import DataFrame
+from safetensors.torch import load_file
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.data.utils import get_embedding_path, load_yaml_from_path
 
 
 class ImageDataset(ABC, Dataset):  # type: ignore[misc]
@@ -18,23 +20,40 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
     Subclasses must implement ``_load_data`` to populate ``self.data`` with a
     DataFrame of ``(path, label)`` rows and set ``self._classes``.
 
-    Attributes:
-        root: Absolute path to the dataset root directory.
+    Args:
+        dataset_dir: Absolute path to the directory containing the dataset images.
+        target_classes: List of class names to include in the dataset. If None, all
+            classes are included.
         split: Dataset split identifier (e.g. ``"train"`` or ``"test"``).
-        data: DataFrame with at least ``"path"`` (absolute string) and
-            ``"label"`` (integer) columns, populated by the subclass.
+        size: If a float in ``(0, 1)``, the fraction of samples to retain.
+            If a positive integer, the exact number of samples to retain. If
+            ``None``, no subsampling is performed and the full dataset is used.
+        random_seed: Seed for the random number generator, for reproducibility. If
+            ``None``, the result is non-deterministic.
+        embedding: If not ``None``, the name of the embedding model to use for this
+            dataset. If ``None``, raw images are returned by ``__getitem__``.
+        embedding_dir: The absolute path to the directory where the embeddings are
+            stored. This is used to compute the path to the embedding for each image.
+            Must be provided if `embedding` is not None.
+        return_paths: If ``True``, ``__getitem__`` returns a tuple of (tensor, path)
+            instead of (tensor, label). The path is returned as a ``Path`` object.
     """
 
     def __init__(
         self,
-        data_root: Path | str,
+        dataset_dir: str | Path,
         target_classes: list[str] | None,
         split: str,
         size: float | int | None,
         random_seed: int | None,
+        embedding: None | str,
+        embedding_dir: None | Path | str,
+        return_paths: bool,
     ) -> None:
         super().__init__()
-        self.root = Path(data_root)
+        if not isinstance(dataset_dir, Path):
+            dataset_dir = Path(dataset_dir)
+        self.dataset_dir = dataset_dir
         self.split = split
         self.target_classes = target_classes
         self.data = self._load_data()
@@ -42,6 +61,17 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         self.random_seed = random_seed
         if self.size is not None:
             self.data = self.subsample_data()
+        if embedding is not None:
+            if embedding_dir is None:
+                msg = "`embedding_dir` must be provided if `embedding` is not None"
+                raise ValueError(msg)
+            if not isinstance(embedding_dir, Path):
+                embedding_dir = Path(embedding_dir)
+            embedding_path = embedding_dir / embedding
+        else:
+            embedding_path = None
+        self.embedding_path = embedding_path
+        self.return_paths = return_paths
 
     def subsample_data(self) -> DataFrame:
         """
@@ -92,21 +122,36 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         """
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, np.int64 | str | Path]:
         """
-        Get an image and its label by index.
+        Get a sample from the dataset. If ``self.embedding`` is ``None``, the first
+        element of the returned tuple is an image tensor of shape (C x H x W).
+        Otherwise, the first element is an embedding tensor of shape (D,). The second
+        element is either the label or the file path, depending on the value of
+        ``self.return_paths``.
 
         Args:
             idx: Index of the sample to retrieve.
 
         Returns:
-            A tuple containing the image tensor (C x H x W) and its label.
+            A tuple containing the output tensor (C x H x W) or (D,) depending on the
+            value of ``self.embedding`` and either its label or file path depending on
+            the value of ``return_paths``.
         """
-        items = self.data.iloc[idx]
-        image_path = items["path"]
-        label = items["label"]
-        image_tensor = read_image(image_path, mode="RGB")
-        return image_tensor, int(label)
+        sample = self.data.iloc[idx]
+        image_path = sample["path"]
+        if self.embedding_path is None:
+            tensor = read_image(image_path, mode="RGB")
+        else:
+            image_embedding_path = get_embedding_path(
+                image_path=image_path,
+                embedding_dir=self.embedding_path,
+                data_root=self.dataset_dir.parent,
+            )
+            tensor = load_file(image_embedding_path)["embedding"]
+        if self.return_paths:
+            return tensor, image_path
+        return tensor, sample["label"]
 
     @property
     def num_classes(self) -> int:
@@ -144,7 +189,6 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         Example config dict:
 
             {
-                "data_root": "data/DomainNet",
                 "domains": ["real", "sketch"],
                 "split": "train"
             }
@@ -171,8 +215,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         Example config::
 
             name: domainnet
-            args:
-              data_root: data/DomainNet
+            kwargs:
               domains: [real, sketch]
               split: train
 
@@ -182,4 +225,4 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         Returns:
             An instantiated ``ImageDataset`` subclass.
         """
-        return cls.from_dict(load_yaml_from_path(yaml_path)["args"])
+        return cls.from_dict(load_yaml_from_path(yaml_path)["kwargs"])
