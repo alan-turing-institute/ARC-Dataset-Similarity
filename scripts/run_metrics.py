@@ -99,10 +99,10 @@ if __name__ == "__main__":
         CONFIG_DIR / "experiments" / f"{args.config}.yaml"
     )
     dataset_1_cfg = load_yaml_from_path(
-        CONFIG_DIR / "datasets" / f"{experiment_cfg['dataset1']}.yaml"
+        CONFIG_DIR / "data" / f"{experiment_cfg['dataset1']}.yaml"
     )
     dataset_2_cfg = load_yaml_from_path(
-        CONFIG_DIR / "datasets" / f"{experiment_cfg['dataset2']}.yaml"
+        CONFIG_DIR / "data" / f"{experiment_cfg['dataset2']}.yaml"
     )
     metrics = experiment_cfg["metrics"]
     main(args.config, dataset_1_cfg, dataset_2_cfg, metrics)
