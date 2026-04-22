@@ -55,7 +55,12 @@ def apply_metric(
 
 
 def main(
-    cfg_path: Path, dataset1_cfg: Path, dataset2_cfg: Path, metrics_list: list[str]
+    cfg_path: Path,
+    dataset1_cfg: dict,
+    dataset2_cfg: dict,
+    metrics_list: list[str],
+    dataset1_name: str,
+    dataset2_name: str,
 ) -> None:
     # Setup logger
     logger = logging.getLogger("otdd_test_logger")
@@ -77,8 +82,8 @@ def main(
 
     logger.info("Preparing to save results.")
     results = {
-        "dataset1": args.dataset1,
-        "dataset2": args.dataset2,
+        "dataset1": dataset1_name,
+        "dataset2": dataset2_name,
         **metrics_results,
     }
     METRICS_RESULT_DIR.mkdir(parents=True, exist_ok=True)
@@ -105,4 +110,11 @@ if __name__ == "__main__":
         CONFIG_DIR / "data" / f"{experiment_cfg['dataset2']}.yaml"
     )
     metrics_list = experiment_cfg["metrics"]
-    main(args.config, dataset_1_cfg, dataset_2_cfg, metrics_list)
+    main(
+        cfg_path=args.config,
+        dataset1_cfg=dataset_1_cfg,
+        dataset2_cfg=dataset_2_cfg,
+        metrics_list=metrics_list,
+        dataset1_name=experiment_cfg["dataset1"],
+        dataset2_name=experiment_cfg["dataset2"],
+    )
