@@ -42,11 +42,11 @@ def apply_metric(
     logger: logging.Logger,
 ) -> float:
     metric_cfg = load_yaml_from_path(METRIC_CONFIG_DIR / f"{metric_name}.yaml")
-    if hasattr(metrics, metric_cfg["name"]):
-        metric_fn = getattr(metrics, metric_cfg["name"])
+    if hasattr(metrics, metric_cfg["metric"]):
+        metric_fn = getattr(metrics, metric_cfg["metric"])
     else:
         msg = (
-            f"Metric function {metric_cfg['name']} not found in "
+            f"Metric function {metric_cfg['metric']} not found in "
             "`dataset_similarity.metrics`."
         )
         raise ValueError(msg)
