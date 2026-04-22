@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from scipy.stats import quantile
 from torch.utils.data import Dataset
 
 from dataset_similarity.constants import CONFIG_DIR
@@ -42,10 +41,10 @@ class DatasetMix(Dataset):  # type: ignore[misc]
         ld1 = len(dataset1)
         ld2 = len(dataset2)
         n1 = np.ceil(
-            quantile(list(range(ld1)), alpha), casting="unsafe", dtype=np.int64
+            np.quantile(list(range(ld1)), alpha), casting="unsafe", dtype=np.int64
         )
         n2 = np.ceil(
-            quantile(list(range(ld2)), 1 - alpha), casting="unsafe", dtype=np.int64
+            np.quantile(list(range(ld2)), 1 - alpha), casting="unsafe", dtype=np.int64
         )
         return pd.DataFrame(
             {
