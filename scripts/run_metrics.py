@@ -13,7 +13,6 @@ python scripts/run_metrics.py --metrics otdd_exact mmd
 import argparse
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 import dataset_similarity.metrics as metrics
@@ -55,7 +54,7 @@ def apply_metric(
 
 
 def main(
-    cfg_path: Path,
+    cfg_name: str,
     dataset1_cfg: dict,
     dataset2_cfg: dict,
     metrics_list: list[str],
@@ -87,7 +86,7 @@ def main(
         **metrics_results,
     }
     METRICS_RESULT_DIR.mkdir(parents=True, exist_ok=True)
-    result_path = METRICS_RESULT_DIR / cfg_path.name.with_suffix(".json")
+    result_path = METRICS_RESULT_DIR / f"{cfg_name}.json"
     with open(result_path, "w") as f:
         json.dump(results, f, indent=4)
     logger.info("Results saved to %s", result_path)
@@ -111,7 +110,7 @@ if __name__ == "__main__":
     )
     metrics_list = experiment_cfg["metrics"]
     main(
-        cfg_path=args.config,
+        cfg_name=args.config,
         dataset1_cfg=dataset_1_cfg,
         dataset2_cfg=dataset_2_cfg,
         metrics_list=metrics_list,
