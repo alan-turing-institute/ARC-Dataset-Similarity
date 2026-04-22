@@ -30,9 +30,9 @@ METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
 def load_dataset_from_config(cfg: dict[str, Any]) -> ImageDataset:
     name = cfg["name"]
     if name == "DatasetMix":
-        return DatasetMix.from_yaml(cfg)
+        return DatasetMix.from_dict(cfg)
     dataset_cls = DATASET_MAP[cfg["name"]]
-    return dataset_cls.from_yaml(cfg)
+    return dataset_cls.from_dict(cfg)
 
 
 def apply_metric(

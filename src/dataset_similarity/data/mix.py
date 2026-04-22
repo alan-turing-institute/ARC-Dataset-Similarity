@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -54,14 +55,20 @@ class DatasetMix(Dataset):  # type: ignore[misc]
         )
 
     @classmethod
+    def from_dict(
+        cls,
+        cfg: dict[str, Any],
+    ) -> "DatasetMix":
+        dataset1 = _get_dataset(cfg["dataset1"])
+        dataset2 = _get_dataset(cfg["dataset2"])
+        return cls(dataset1, dataset2, cfg["alpha"])
+
+    @classmethod
     def from_yaml(
         cls,
         yaml_path: str | Path,
     ) -> "DatasetMix":
-        config = load_yaml_from_path(yaml_path)["kwargs"]
-        dataset1 = _get_dataset(config["dataset1"])
-        dataset2 = _get_dataset(config["dataset2"])
-        return cls(dataset1, dataset2, config["alpha"])
+        return cls.from_dict(load_yaml_from_path(yaml_path)["kwargs"])
 
 
 def _get_dataset(dataset_cfg_name: str) -> ImageDataset:
