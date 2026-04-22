@@ -126,6 +126,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         """
         Get a sample from the dataset. If ``self.embedding`` is ``None``, the first
         element of the returned tuple is an image tensor of shape (C x H x W).
+        Otherwise, the first element is an embedding tensor of shape (D,). The second
+        element is either the label or the file path, depending on the value of
+        ``self.return_paths``.
 
         Args:
             idx: Index of the sample to retrieve.
@@ -186,7 +189,6 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         Example config dict:
 
             {
-                "data_root": "data/DomainNet",
                 "domains": ["real", "sketch"],
                 "split": "train"
             }
@@ -213,8 +215,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         Example config::
 
             name: domainnet
-            args:
-              data_root: data/DomainNet
+            kwargs:
               domains: [real, sketch]
               split: train
 
