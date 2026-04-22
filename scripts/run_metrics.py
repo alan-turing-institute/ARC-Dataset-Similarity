@@ -55,7 +55,7 @@ def apply_metric(
 
 
 def main(
-    cfg_path: Path, dataset1_cfg_path: Path, dataset2_cfg_path: Path, metrics: list[str]
+    cfg_path: Path, dataset1_cfg: Path, dataset2_cfg: Path, metrics: list[str]
 ) -> None:
     # Setup logger
     logger = logging.getLogger("otdd_test_logger")
@@ -63,8 +63,8 @@ def main(
 
     # Instantiate datasets
     logger.info("Loading datasets")
-    ds1 = load_dataset_from_config(dataset1_cfg_path)
-    ds2 = load_dataset_from_config(dataset2_cfg_path)
+    ds1 = load_dataset_from_config(dataset1_cfg)
+    ds2 = load_dataset_from_config(dataset2_cfg)
     logger.info("Datasets loaded successfully")
 
     # Compute metrics between datasets
@@ -98,7 +98,11 @@ if __name__ == "__main__":
     experiment_cfg = load_yaml_from_path(
         CONFIG_DIR / "experiments" / f"{args.config}.yaml"
     )
-    dataset_1_cfg_path = CONFIG_DIR / "datasets" / f"{experiment_cfg['dataset1']}.yaml"
-    dataset_2_cfg_path = CONFIG_DIR / "datasets" / f"{experiment_cfg['dataset2']}.yaml"
+    dataset_1_cfg = load_yaml_from_path(
+        CONFIG_DIR / "datasets" / f"{experiment_cfg['dataset1']}.yaml"
+    )
+    dataset_2_cfg = load_yaml_from_path(
+        CONFIG_DIR / "datasets" / f"{experiment_cfg['dataset2']}.yaml"
+    )
     metrics = experiment_cfg["metrics"]
-    main(args.config, dataset_1_cfg_path, dataset_2_cfg_path, metrics)
+    main(args.config, dataset_1_cfg, dataset_2_cfg, metrics)
