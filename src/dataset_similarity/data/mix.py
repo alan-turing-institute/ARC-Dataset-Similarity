@@ -59,7 +59,7 @@ class DatasetMix(Dataset):  # type: ignore[misc]
         cls,
         yaml_path: str | Path,
     ) -> "DatasetMix":
-        config = load_yaml_from_path(yaml_path)
+        config = load_yaml_from_path(yaml_path)["kwargs"]
         dataset1 = _get_dataset(config["dataset1"])
         dataset2 = _get_dataset(config["dataset2"])
         return cls(dataset1, dataset2, config["alpha"])
