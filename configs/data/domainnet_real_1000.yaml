@@ -1,6 +1,14 @@
-name: "DomainNet"
+name: DomainNet
 kwargs:
-  domains: "real"
+  split: train
+  domains: real
   size: 1000
   random_seed: 42
-  embedding: "clip"
+  embedding: clip
+  target_classes:
+    - swan
+    - stairs
+    - dumbbell
+    - suitcase
+    - coffee_cup
+    - strawberry
