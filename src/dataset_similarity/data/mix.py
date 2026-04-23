@@ -21,7 +21,7 @@ class DatasetMix(Dataset):  # type: ignore[misc]
     ):
         self.datasets: tuple[ImageDataset, ImageDataset] = (dataset1, dataset2)
         self.alpha = alpha
-        self.data = self._mix_datasets(dataset1, dataset2, alpha)
+        self.data = self._mix_datasets(dataset1, dataset2, self.alpha)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -49,8 +49,8 @@ class DatasetMix(Dataset):  # type: ignore[misc]
         )
         return pd.DataFrame(
             {
-                "dataset": [0] * n1 + [1] * (ld2 - n2),
-                "idx": list(range(n1)) + list(range(n2, ld2)),
+                "dataset": [0] * n1 + [1] * (n2),
+                "idx": list(range(n1)) + list(range(n2)),
             }
         )
 
