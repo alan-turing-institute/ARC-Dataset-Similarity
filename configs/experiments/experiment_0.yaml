@@ -6,3 +6,4 @@ datasets:
   - experiment_0_alpha_0.75
 metrics:
   - otdd_exact
+  - mmd
