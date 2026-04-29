@@ -35,13 +35,14 @@ dependencies = [
     "safetensors>=0.4.0",
     "torch==2.10.*",
     "torchvision",
-    "markupsafe==3.0.*",  # This is needed for torch to work
+    "markupsafe==3.0.*", # This is needed for torch to work
     "transformers>=5.4.0",
     "pyaml>=26.2.1",
     "scikit-learn>=1.7.2",
     "pandas>=2.3.3",
     "otdd",
     "torchtext>0.14.1,<=0.18.0", # not actually required by us but by OTDD. Our torch setup leads to the wrong version being installed if we do not control version + source here
+    "geomloss>=0.2.6",
 ]
 
 [dependency-groups]

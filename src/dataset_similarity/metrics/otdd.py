@@ -66,7 +66,7 @@ def otdd(
     return_coupling: bool = False,
     maxsamples: int = 10000,
     **kwargs: Any,
-) -> float | tuple[float, torch.Tensor]:
+) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
     """
     Wrapper function around the `otdd.DatasetDistance` class which implements the
     optimal transport dataset distance (OTDD). Note that while any device can be
@@ -87,7 +87,8 @@ def otdd(
             constructor. See the OTDD documentation for details on available parameters.
 
     Returns:
-        float | tuple[float, torch.Tensor]: The OTDD distance between the two datasets,
+        torch.Tensor | tuple[torch.Tensor, torch.Tensor]: The OTDD distance between the
+        two datasets,
             as computed by the `otdd.DatasetDistance`. If `return_coupling` is True,
             also returns the optimal transport coupling matrix.
     """
@@ -98,7 +99,7 @@ def otdd(
         D2=tds2,
         **kwargs,
     )
-    distance: float | tuple[float, torch.Tensor] = otdd_distance.distance(
+    distance: torch.Tensor | tuple[torch.Tensor, torch.Tensor] = otdd_distance.distance(
         return_coupling=return_coupling, maxsamples=maxsamples
     )
     return distance
