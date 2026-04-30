@@ -5,3 +5,8 @@ __all__ = [
     "DomainNetDataset",
     "ImageNetDataset",
 ]
+
+DATASET_MAP = {
+    "DomainNet": DomainNetDataset,
+    "ImageNet": ImageNetDataset,
+}

@@ -12,7 +12,7 @@ authors = [
 ]
 description = "Repo for ARC project on dataset similarity measures."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Science/Research",
@@ -22,7 +22,6 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -32,18 +31,48 @@ classifiers = [
 dependencies = [
     "jupyter>=1.1.1",
     "matplotlib>=3.10.8",
-    "pre-commit",
     "pyyaml>=6.0",
-    "pytest >=6",
-    "pytest-cov >=3",
     "safetensors>=0.4.0",
-    "torch>=2.11.0",
-    "torchvision>=0.26.0",
+    "torch==2.10.*",
+    "torchvision",
+    "markupsafe==3.0.*",  # This is needed for torch to work
     "transformers>=5.4.0",
     "pyaml>=26.2.1",
     "scikit-learn>=1.7.2",
     "pandas>=2.3.3",
+    "otdd",
+    "torchtext>0.14.1,<=0.18.0", # not actually required by us but by OTDD. Our torch setup leads to the wrong version being installed if we do not control version + source here
 ]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
+    "pytest>=6",
+    "pytest-cov>=3",
+]
+
+[tool.uv.sources]
+otdd = { git = "https://github.com/microsoft/otdd" }
+torch = [
+  { index = "pypi", marker = "platform_machine != 'aarch64'"},
+  { index = "pytorch-cu126", marker = "platform_machine == 'aarch64'"},
+]
+torchvision = [
+  { index = "pypi", marker = "platform_machine != 'aarch64'"},
+  { index = "pytorch-cu126", marker = "platform_machine == 'aarch64'"},
+]
+torchtext = [
+  { index = "pypi", marker = "platform_machine != 'aarch64'"},
+  { index = "pytorch-cu126", marker = "platform_machine == 'aarch64'"},
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
 
 [project.urls]
 Homepage = "https://github.com/alan-turing-institute/ARC-Dataset-Similarity"
