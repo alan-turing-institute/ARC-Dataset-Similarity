@@ -23,9 +23,10 @@ def _sinkhorn_loss(
     reach: float | None,
     weights1: torch.Tensor | None,
     weights2: torch.Tensor | None,
+    p: int = 2,
+    return_transport_plan: bool = False,
     **loss_kwargs: Any,
 ) -> torch.Tensor:
-    loss = loss_cls("sinkhorn", blur=blur, scaling=scaling, reach=reach, **loss_kwargs)
     args: list[torch.Tensor] = []
     if weights1 is not None:
         args.append(weights1)
@@ -33,6 +34,33 @@ def _sinkhorn_loss(
     if weights2 is not None:
         args.append(weights2)
     args.append(data2)
+
+    if return_transport_plan:
+        loss = loss_cls(
+            "sinkhorn",
+            p=p,
+            blur=blur,
+            scaling=scaling,
+            reach=reach,
+            debias=False,
+            potentials=True,
+            **loss_kwargs,
+        )
+        F, G = loss(*args)
+        N, M = data1.shape[0], data2.shape[0]
+        a = weights1 if weights1 is not None else data1.new_full((N,), 1.0 / N)
+        b = weights2 if weights2 is not None else data2.new_full((M,), 1.0 / M)
+        x_i = data1.unsqueeze(1)  # (N, 1, D)
+        y_j = data2.unsqueeze(0)  # (1, M, D)
+        C_ij = (1 / p) * ((x_i - y_j) ** p).sum(-1)  # (N, M)
+        eps = blur**p
+        return ((F.unsqueeze(1) + G.unsqueeze(0) - C_ij) / eps).exp() * (
+            a.unsqueeze(1) * b.unsqueeze(0)
+        )
+
+    loss = loss_cls(
+        "sinkhorn", p=p, blur=blur, scaling=scaling, reach=reach, **loss_kwargs
+    )
     return loss(*args)
 
 
@@ -44,23 +72,29 @@ def sinkhorn_ot(
     reach: float | None = None,
     weights1: torch.Tensor | None = None,
     weights2: torch.Tensor | None = None,
+    p: int = 2,
+    return_transport_plan: bool = False,
     **loss_kwargs: Any,
 ) -> torch.Tensor:
     """
     Sinkhorn Optimal Transport distance between two datasets.
 
     Args:
-        data1:    (N, D) tensor of source samples
-        data2:    (M, D) tensor of target samples
-        blur:     regularization (epsilon = blur²); smaller = sharper/slower
-        scaling:  multiscale ratio in (0,1); higher = more accurate/slower
-        reach:    if set, uses unbalanced OT (partial mass transport)
-        weights1: (N,) tensor of source weights (uniform if None)
-        weights2: (M,) tensor of target weights (uniform if None)
-        **loss_kwargs: passed through to SamplesLoss
+        data1:                  (N, D) tensor of source samples
+        data2:                  (M, D) tensor of target samples
+        blur:                   regularization (epsilon = blur^p);
+                                smaller = sharper/slower
+        scaling:                multiscale ratio in (0,1); higher = more accurate/slower
+        reach:                  if set, uses unbalanced OT (partial mass transport)
+        weights1:               (N,) tensor of source weights (uniform if None)
+        weights2:               (M,) tensor of target weights (uniform if None)
+        p:                      cost exponent (default 2 for squared Euclidean)
+        return_transport_plan:  if True, return the (N, M) transport plan instead of
+                                the scalar cost; uses debias=False internally
+        **loss_kwargs:          passed through to SamplesLoss
 
     Returns:
-        Scalar tensor with the OT cost
+        Scalar OT cost, or (N, M) transport plan tensor if return_transport_plan=True
     """
     return _sinkhorn_loss(
         SamplesLoss,
@@ -71,6 +105,8 @@ def sinkhorn_ot(
         reach,
         weights1,
         weights2,
+        p=p,
+        return_transport_plan=return_transport_plan,
         **loss_kwargs,
     )
 
@@ -83,6 +119,8 @@ def flash_sinkhorn_ot(
     reach: float | None = None,
     weights1: torch.Tensor | None = None,
     weights2: torch.Tensor | None = None,
+    p: int = 2,
+    return_transport_plan: bool = False,
     **loss_kwargs: Any,
 ) -> torch.Tensor:
     """
@@ -91,17 +129,22 @@ def flash_sinkhorn_ot(
     Requires the flash-sinkhorn package (Linux + CUDA only).
 
     Args:
-        data1:    (N, D) tensor of source samples
-        data2:    (M, D) tensor of target samples
-        blur:     regularization (epsilon = blur²); smaller = sharper/slower
-        scaling:  epsilon annealing factor in (0,1); higher = more accurate/slower
-        reach:    if set, uses unbalanced OT (partial mass transport)
-        weights1: (N,) tensor of source weights (uniform if None)
-        weights2: (M,) tensor of target weights (uniform if None)
-        **loss_kwargs: passed through to FlashSamplesLoss
+        data1:                  (N, D) tensor of source samples
+        data2:                  (M, D) tensor of target samples
+        blur:                   regularization (epsilon = blur^p);
+                                smaller = sharper/slower
+        scaling:                epsilon annealing factor in (0,1);
+                                higher = more accurate/slower
+        reach:                  if set, uses unbalanced OT (partial mass transport)
+        weights1:               (N,) tensor of source weights (uniform if None)
+        weights2:               (M,) tensor of target weights (uniform if None)
+        p:                      cost exponent (default 2 for squared Euclidean)
+        return_transport_plan:  if True, return the (N, M) transport plan instead of
+                                the scalar cost; uses debias=False internally
+        **loss_kwargs:          passed through to FlashSamplesLoss
 
     Returns:
-        Scalar tensor with the OT cost
+        Scalar OT cost, or (N, M) transport plan tensor if return_transport_plan=True
     """
     if not _FLASH_SINKHORN_AVAILABLE:
         err_msg = (
@@ -118,6 +161,8 @@ def flash_sinkhorn_ot(
         reach,
         weights1,
         weights2,
+        p=p,
+        return_transport_plan=return_transport_plan,
         **loss_kwargs,
     )
 
