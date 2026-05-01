@@ -47,6 +47,8 @@ def _sinkhorn_loss(
             **loss_kwargs,
         )
         F, G = loss(*args)
+        # geomloss prepends a batch dim when inputs are unbatched; remove it
+        F, G = F.squeeze(0), G.squeeze(0)
         N, M = data1.shape[0], data2.shape[0]
         a = weights1 if weights1 is not None else data1.new_full((N,), 1.0 / N)
         b = weights2 if weights2 is not None else data2.new_full((M,), 1.0 / M)
