@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import geomloss
 import pytest
 import torch
 from pandas import DataFrame
@@ -9,6 +10,11 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 from dataset_similarity.data.base import ImageDataset
+
+# otdd calls geomloss.utils.squared_distances, removed in geomloss>=0.2.6.
+# The function still exists in geomloss._legacy.utils — just re-expose it.
+if not hasattr(geomloss, "utils"):
+    geomloss.utils = geomloss._legacy.utils  # type: ignore[attr-defined]
 
 
 class _TensorImageDataset(ImageDataset):

@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
+import ot
 import torch
 from geomloss import SamplesLoss
 
@@ -24,7 +25,7 @@ def _sinkhorn_loss(
     weights1: torch.Tensor | None,
     weights2: torch.Tensor | None,
     p: int = 2,
-    return_transport_plan: bool = False,
+    return_coupling: bool = False,
     **loss_kwargs: Any,
 ) -> torch.Tensor:
     args: list[torch.Tensor] = []
@@ -35,7 +36,7 @@ def _sinkhorn_loss(
         args.append(weights2)
     args.append(data2)
 
-    if return_transport_plan:
+    if return_coupling:
         loss = loss_cls(
             "sinkhorn",
             p=p,
@@ -75,7 +76,7 @@ def sinkhorn_ot(
     weights1: torch.Tensor | None = None,
     weights2: torch.Tensor | None = None,
     p: int = 2,
-    return_transport_plan: bool = False,
+    return_coupling: bool = False,
     **loss_kwargs: Any,
 ) -> torch.Tensor:
     """
@@ -91,12 +92,12 @@ def sinkhorn_ot(
         weights1:               (N,) tensor of source weights (uniform if None)
         weights2:               (M,) tensor of target weights (uniform if None)
         p:                      cost exponent (default 2 for squared Euclidean)
-        return_transport_plan:  if True, return the (N, M) transport plan instead of
+        return_coupling:       if True, return the (N, M) coupling instead of
                                 the scalar cost; uses debias=False internally
         **loss_kwargs:          passed through to SamplesLoss
 
     Returns:
-        Scalar OT cost, or (N, M) transport plan tensor if return_transport_plan=True
+        Scalar OT cost, or (N, M) coupling tensor if return_coupling=True
     """
     return _sinkhorn_loss(
         SamplesLoss,
@@ -108,7 +109,7 @@ def sinkhorn_ot(
         weights1,
         weights2,
         p=p,
-        return_transport_plan=return_transport_plan,
+        return_coupling=return_coupling,
         **loss_kwargs,
     )
 
@@ -122,7 +123,7 @@ def flash_sinkhorn_ot(
     weights1: torch.Tensor | None = None,
     weights2: torch.Tensor | None = None,
     p: int = 2,
-    return_transport_plan: bool = False,
+    return_coupling: bool = False,
     **loss_kwargs: Any,
 ) -> torch.Tensor:
     """
@@ -141,12 +142,12 @@ def flash_sinkhorn_ot(
         weights1:               (N,) tensor of source weights (uniform if None)
         weights2:               (M,) tensor of target weights (uniform if None)
         p:                      cost exponent (default 2 for squared Euclidean)
-        return_transport_plan:  if True, return the (N, M) transport plan instead of
+        return_coupling:       if True, return the (N, M) coupling instead of
                                 the scalar cost; uses debias=False internally
         **loss_kwargs:          passed through to FlashSamplesLoss
 
     Returns:
-        Scalar OT cost, or (N, M) transport plan tensor if return_transport_plan=True
+        Scalar OT cost, or (N, M) coupling tensor if return_coupling=True
     """
     if not _FLASH_SINKHORN_AVAILABLE:
         err_msg = (
@@ -164,14 +165,43 @@ def flash_sinkhorn_ot(
         weights1,
         weights2,
         p=p,
-        return_transport_plan=return_transport_plan,
+        return_coupling=return_coupling,
         **loss_kwargs,
     )
+
+
+def python_ot(
+    data1: torch.Tensor,
+    data2: torch.Tensor,
+    weights1: torch.Tensor | None = None,
+    weights2: torch.Tensor | None = None,
+    p: int = 2,
+    return_coupling: bool = False,
+    **loss_kwargs: Any,
+) -> torch.Tensor:
+    x1 = data1.cpu().numpy()
+    x2 = data2.cpu().numpy()
+
+    N, M = x1.shape[0], x2.shape[0]
+    a = weights1.cpu().numpy() if weights1 is not None else ot.unif(N)
+    b = weights2.cpu().numpy() if weights2 is not None else ot.unif(M)
+
+    C = (
+        torch.cdist(data1, data2, p=p).pow(p).cpu().numpy()
+    )  # (N, M) cost matrix, ||x-y||_p^p  # (N, M) cost matrix
+
+    if return_coupling:
+        P = ot.emd(a, b, C, **loss_kwargs)
+        return torch.from_numpy(P).to(data1.device)
+
+    loss = ot.emd2(a, b, C, **loss_kwargs)
+    return torch.tensor(loss, dtype=data1.dtype, device=data1.device)
 
 
 method_map: dict[str, Callable[..., torch.Tensor]] = {
     "sinkhorn": sinkhorn_ot,
     "flash_sinkhorn": flash_sinkhorn_ot,
+    "python_ot": python_ot,
 }
 
 
