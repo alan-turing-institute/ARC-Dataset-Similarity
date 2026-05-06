@@ -42,7 +42,7 @@ dependencies = [
     "pandas>=2.3.3",
     "otdd",
     "torchtext>0.14.1,<=0.18.0", # not actually required by us but by OTDD. Our torch setup leads to the wrong version being installed if we do not control version + source here
-    "geomloss>=0.2.6",
+    "geomloss>=0.3.1",
     "pot>=0.9.6.post1",
 ]
 
