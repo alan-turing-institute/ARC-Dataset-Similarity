@@ -1,0 +1,98 @@
+"""Tests for dataset_similarity.metrics.otce."""
+
+import pytest
+import torch
+
+from dataset_similarity.metrics.otce import (
+    _conditional_entropy,
+    otce_score,
+    otce_score_from_tensors,
+)
+
+torch.manual_seed(0)
+_SRC = torch.randn(20, 8)
+_TGT = torch.randn(20, 8) + 1.0
+_SRC_LABELS = torch.tensor([i % 3 for i in range(20)], dtype=torch.long)
+_TGT_LABELS = torch.tensor([i % 3 for i in range(20)], dtype=torch.long)
+
+_EXPECTED_KEYS = {"otce", "wasserstein", "conditional_entropy", "coupling"}
+
+
+class TestConditionalEntropy:
+    def test_returns_scalar(self):
+        coupling = torch.full((4, 4), 1.0 / 16)
+        src_labels = torch.tensor([0, 0, 1, 1])
+        tgt_labels = torch.tensor([0, 0, 1, 1])
+        assert _conditional_entropy(coupling, src_labels, tgt_labels).ndim == 0
+
+    def test_non_negative(self):
+        coupling = torch.full((4, 4), 1.0 / 16)
+        src_labels = torch.tensor([0, 0, 1, 1])
+        tgt_labels = torch.tensor([0, 0, 1, 1])
+        assert _conditional_entropy(coupling, src_labels, tgt_labels).item() >= 0
+
+    def test_perfect_block_diagonal_is_zero(self):
+        # Coupling fully within matching classes → H(Y_t | Y_s) = 0
+        src_labels = torch.tensor([0, 0, 1, 1])
+        tgt_labels = torch.tensor([0, 0, 1, 1])
+        coupling = torch.zeros(4, 4)
+        coupling[0:2, 0:2] = 0.25
+        coupling[2:4, 2:4] = 0.25
+        coupling /= coupling.sum()
+        assert _conditional_entropy(coupling, src_labels, tgt_labels).item() < 1e-5
+
+    def test_uniform_coupling_equals_log_num_classes(self):
+        # Uniform coupling over 2 balanced classes → H = log(2)
+        coupling = torch.full((4, 4), 1.0 / 16)
+        src_labels = torch.tensor([0, 0, 1, 1])
+        tgt_labels = torch.tensor([0, 0, 1, 1])
+        result = _conditional_entropy(coupling, src_labels, tgt_labels)
+        assert torch.isclose(result, torch.log(torch.tensor(2.0)), atol=1e-5)
+
+
+class TestOTCEScoreFromTensors:
+    def test_returns_expected_keys(self):
+        result = otce_score_from_tensors(_SRC, _SRC_LABELS, _TGT, _TGT_LABELS)
+        assert result.keys() == _EXPECTED_KEYS
+
+    def test_scalar_outputs(self):
+        result = otce_score_from_tensors(_SRC, _SRC_LABELS, _TGT, _TGT_LABELS)
+        for key in ("otce", "wasserstein", "conditional_entropy"):
+            assert result[key].ndim == 0, f"{key} should be scalar"
+
+    def test_coupling_shape(self):
+        result = otce_score_from_tensors(_SRC, _SRC_LABELS, _TGT, _TGT_LABELS)
+        assert result["coupling"].shape == (len(_SRC), len(_TGT))
+
+    def test_otce_identity(self):
+        result = otce_score_from_tensors(_SRC, _SRC_LABELS, _TGT, _TGT_LABELS)
+        expected = -result["wasserstein"] - result["conditional_entropy"]
+        assert torch.isclose(result["otce"], expected)
+
+    def test_unsupported_method_raises(self):
+        with pytest.raises(ValueError, match="Unsupported OT method"):
+            otce_score_from_tensors(
+                _SRC, _SRC_LABELS, _TGT, _TGT_LABELS, ot_method="bogus"
+            )
+
+
+class TestOTCEScore:
+    def test_returns_expected_keys(self, tensor_image_dataset):
+        result = otce_score(tensor_image_dataset, tensor_image_dataset)
+        assert result.keys() == _EXPECTED_KEYS
+
+    def test_scalar_outputs(self, tensor_image_dataset):
+        result = otce_score(tensor_image_dataset, tensor_image_dataset)
+        for key in ("otce", "wasserstein", "conditional_entropy"):
+            assert result[key].ndim == 0, f"{key} should be scalar"
+
+    def test_coupling_shape(self, tensor_image_dataset):
+        result = otce_score(tensor_image_dataset, tensor_image_dataset)
+        N = len(tensor_image_dataset)
+        assert result["coupling"].shape == (N, N)
+
+    def test_raises_for_return_paths(
+        self, tensor_image_dataset, tensor_image_dataset_with_paths
+    ):
+        with pytest.raises(ValueError, match="return_paths"):
+            otce_score(tensor_image_dataset_with_paths, tensor_image_dataset)

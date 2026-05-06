@@ -5,6 +5,7 @@ from otdd.pytorch.distance import DatasetDistance
 from torch.utils.data import TensorDataset
 
 from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.metrics.utils import prepare_tensor_dataset
 
 
 def _prepare_tensor_dataset_targets(labels: torch.Tensor) -> torch.Tensor:
@@ -40,20 +41,7 @@ def _prepare_otdd_tensor_dataset(dataset: ImageDataset) -> TensorDataset:
     Returns:
         TensorDataset: The processed TensorDataset ready for use with OTDD.
     """
-    if dataset.return_paths:
-        err_msg = (
-            "OTDD computation does not support ImageDatasets with return_paths=True. "
-            "Please initialize the dataset with return_paths=False to compute OTDD."
-        )
-        raise ValueError(err_msg)
-    features = []
-    labels = []
-    for idx in range(len(dataset)):
-        sample = dataset[idx]
-        features.append(sample[0])
-        labels.append(sample[1])
-    features = torch.stack(features)
-    labels = torch.tensor(labels)
+    features, labels = prepare_tensor_dataset(dataset, return_labels=True)
     targets = _prepare_tensor_dataset_targets(labels)
     tensor_dataset = TensorDataset(features, targets)
     tensor_dataset.classes = torch.sort(torch.unique(targets)).values
