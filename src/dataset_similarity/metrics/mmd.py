@@ -4,6 +4,9 @@ from typing import Literal
 
 import torch
 
+from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.mix import DatasetMix
+
 from .utils import array_to_matrix
 
 DistMethod = Literal["cdist", "matmul", "chunked"]
@@ -133,3 +136,37 @@ def compute(
         - 2 * kernel_AB_sum / (N_A * N_B)
     )
     return mmd
+
+
+def mmd(
+    dataset_a: ImageDataset | DatasetMix,
+    dataset_b: ImageDataset | DatasetMix,
+    use_float64: bool = False,
+    method: DistMethod = "matmul",
+    device: str | torch.device | None = None,
+) -> float:
+    """
+    Compute MMD between two datasets.
+
+    Args:
+        dataset_a (ImageDataset | DatasetMix): First dataset.
+        dataset_b (ImageDataset | DatasetMix): Second dataset.
+        use_float64 (bool): Cast inputs to float64 before computing.
+        method (str): Distance computation method — one of "cdist", "matmul",
+            or "chunked". "chunked" avoids materializing the full NxM matrix.
+        device (str | torch.device | None): Device to move tensors to before
+            computing (e.g. "cuda", "cpu"). If None, tensors stay on their
+            current device.
+
+    Returns:
+        float: The computed MMD^2 value between the two datasets.
+    """
+    tensors_a = torch.stack([dataset_a[idx][0] for idx in range(len(dataset_a))])
+    tensors_b = torch.stack([dataset_b[idx][0] for idx in range(len(dataset_b))])
+    return compute(
+        tensors_a=tensors_a,
+        tensors_b=tensors_b,
+        use_float64=use_float64,
+        method=method,
+        device=device,
+    )

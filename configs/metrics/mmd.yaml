@@ -1,0 +1,5 @@
+metric: mmd
+kwargs:
+    use_float64: False
+    method: matmul
+    device: cuda

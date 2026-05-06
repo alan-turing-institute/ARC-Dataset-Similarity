@@ -1,0 +1,14 @@
+name: DomainNet
+kwargs:
+  split: train
+  domains: clipart
+  size: 1000
+  random_seed: 42
+  embedding: clip
+  target_classes:
+    - swan
+    - stairs
+    - dumbbell
+    - suitcase
+    - coffee_cup
+    - strawberry

@@ -1,0 +1,9 @@
+datasets:
+  - domainnet_real_1000
+  - domainnet_clipart_1000
+  - experiment_0_alpha_0.25
+  - experiment_0_alpha_0.5
+  - experiment_0_alpha_0.75
+metrics:
+  - otdd_exact
+  - mmd
