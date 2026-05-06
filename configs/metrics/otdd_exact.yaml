@@ -1,0 +1,49 @@
+metric: otdd
+kwargs:
+    # Arguments used here are defaults unless otherwise specified. Please
+    # see the source code for a description of what each parameter is:
+    # https://github.com/alan-turing-institute/arc-otdd/blob/main/otdd/pytorch/distance.py#L67
+    # general arguments
+    method: precomputed_labeldist
+    symmetric_tasks: False
+    feature_cost: euclidean
+    src_embedding: null
+    tgt_embedding: null
+    ignore_source_labels: False
+    ignore_target_labels: False
+
+    # Outer OT (dataset to dataset) problem arguments
+    loss: sinkhorn
+    debiased_loss: True
+    p: 2
+    entreg: 0.1
+    λ_x: 1.0
+    λ_y: 1.0
+
+    ## Inner OT (label to label) problem arguments
+    inner_ot_method: exact #changed from gaussian_approx
+    inner_ot_loss: sinkhorn
+    inner_ot_debiased: True #changed from False
+    inner_ot_p: 2
+    inner_ot_entreg: 0.1
+
+    # Gaussian Approximation Args
+    diagonal_cov: False
+    min_labelcount: 2
+    online_stats: True
+    sqrt_method: spectral
+    sqrt_niters: 20
+    sqrt_pref: 0
+    nworkers_stats: 0
+
+    # Misc
+    coupling_method: geomloss
+    nworkers_dists: 0
+    eigen_correction: False
+    device: cuda #changed from CPU
+    precision: single
+    verbose: 1
+
+    # dist.distance() args
+    # https://github.com/alan-turing-institute/arc-otdd/blob/main/otdd/pytorch/distance.py#L622
+    maxsamples: 10000

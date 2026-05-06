@@ -37,3 +37,8 @@ repos:
         additional_dependencies:
           - pytest
           - types-PyYAML
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout

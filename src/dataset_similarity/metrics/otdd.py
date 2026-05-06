@@ -5,6 +5,7 @@ from otdd.pytorch.distance import DatasetDistance
 from torch.utils.data import TensorDataset
 
 from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.mix import DatasetMix
 from dataset_similarity.metrics.utils import prepare_tensor_dataset
 
 
@@ -29,7 +30,7 @@ def _prepare_tensor_dataset_targets(labels: torch.Tensor) -> torch.Tensor:
     return torch.tensor([dataset1_label_class_map[label.item()] for label in labels])
 
 
-def _prepare_otdd_tensor_dataset(dataset: ImageDataset) -> TensorDataset:
+def _prepare_otdd_tensor_dataset(dataset: ImageDataset | DatasetMix) -> TensorDataset:
     """
     Function which, given an ImageDataset, prepares a TensorDataset suitable for use
     with OTDD by organising the features and labels into tensors, and mapping the labels
@@ -49,8 +50,8 @@ def _prepare_otdd_tensor_dataset(dataset: ImageDataset) -> TensorDataset:
 
 
 def otdd(
-    dataset1: ImageDataset,
-    dataset2: ImageDataset,
+    dataset1: ImageDataset | DatasetMix,
+    dataset2: ImageDataset | DatasetMix,
     return_coupling: bool = False,
     maxsamples: int = 10000,
     **kwargs: Any,
@@ -90,4 +91,4 @@ def otdd(
     distance: torch.Tensor | tuple[torch.Tensor, torch.Tensor] = otdd_distance.distance(
         return_coupling=return_coupling, maxsamples=maxsamples
     )
-    return distance
+    return distance.item() if isinstance(distance, torch.Tensor) else distance

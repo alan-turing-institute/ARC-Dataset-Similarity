@@ -1,6 +1,8 @@
 # Project stuff — ignore root-level data folder but not src/
 /data/
 embeddings/
+plots/
+results/
 
 # ignore temporary files
 .temp/

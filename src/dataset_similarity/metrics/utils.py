@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 from dataset_similarity.data.base import ImageDataset
@@ -19,3 +20,7 @@ def prepare_tensor_dataset(
         labels = torch.tensor([s[1] for s in samples])
         return features, labels
     return features
+
+
+def array_to_matrix(array: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
+    return array.reshape(array.shape[0], -1)

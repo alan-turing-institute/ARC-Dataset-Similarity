@@ -1,0 +1,5 @@
+name: "DatasetMix"
+kwargs:
+  dataset1: "domainnet_real_1000"
+  dataset2: "domainnet_clipart_1000"
+  alpha: 0.25
