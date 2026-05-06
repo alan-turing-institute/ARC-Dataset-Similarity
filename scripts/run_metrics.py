@@ -26,7 +26,7 @@ METRIC_CONFIG_DIR = CONFIG_DIR / "metrics"
 METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
 
 
-def load_dataset_from_config(cfg: dict[str, Any]) -> ImageDataset:
+def load_dataset_from_config(cfg: dict[str, Any]) -> ImageDataset | DatasetMix:
     name = cfg["name"]
     if name == "DatasetMix":
         return DatasetMix.from_dict(cfg["kwargs"])
@@ -96,6 +96,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script for running metrics.")
     parser.add_argument(
         "--config",
+        required=True,
         help="Name of config file inside configs/datasets/.",
     )
     args = parser.parse_args()

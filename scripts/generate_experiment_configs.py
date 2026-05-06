@@ -34,7 +34,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Simple script for generating combinations of experimetn congis."
+        description="Simple script for generating combinations of experiment configs."
     )
     parser.add_argument(
         "--config_name",

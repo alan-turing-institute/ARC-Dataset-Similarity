@@ -41,12 +41,8 @@ class DatasetMix(Dataset):  # type: ignore[misc]
     ) -> pd.DataFrame:
         ld1 = len(dataset1)
         ld2 = len(dataset2)
-        n1 = np.ceil(
-            np.quantile(list(range(ld1)), alpha), casting="unsafe", dtype=np.int64
-        )
-        n2 = np.ceil(
-            np.quantile(list(range(ld2)), 1 - alpha), casting="unsafe", dtype=np.int64
-        )
+        n1 = int(np.ceil(alpha * (ld1 - 1)))
+        n2 = int(np.ceil((1 - alpha) * (ld2 - 1)))
         return pd.DataFrame(
             {
                 "dataset": [0] * n1 + [1] * (n2),
