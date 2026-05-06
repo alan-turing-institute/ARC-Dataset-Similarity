@@ -91,4 +91,4 @@ def otdd(
     distance: torch.Tensor | tuple[torch.Tensor, torch.Tensor] = otdd_distance.distance(
         return_coupling=return_coupling, maxsamples=maxsamples
     )
-    return distance.item() if isinstance(distance, torch.Tensor) else distance
+    return distance
