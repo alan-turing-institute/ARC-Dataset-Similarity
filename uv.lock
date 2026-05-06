@@ -530,7 +530,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "geomloss", specifier = ">=0.2.6" },
+    { name = "geomloss", specifier = ">=0.3.1" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "markupsafe", specifier = "==3.0.*" },
     { name = "matplotlib", specifier = ">=3.10.8" },
@@ -697,15 +697,20 @@ wheels = [
 
 [[package]]
 name = "geomloss"
-version = "0.2.6"
+version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.3", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64'" },
     { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "platform_machine == 'aarch64'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a1/f4/f888e6a2f59da7e743b93532aa90a8b02bc7f828273263014b8e7bb3e1c1/geomloss-0.2.6.tar.gz", hash = "sha256:491c47085c5001b2cb6128ea541fd2d0a8808ae50e88a0798c7853c9d995faeb", size = 26752, upload-time = "2023-04-28T17:25:34.545Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/be/a8/c7635702d96693895bc4831ad909423b57ec93183a2d92d9066369eb7cbf/geomloss-0.3.1.tar.gz", hash = "sha256:8d8bee2a57c9393642866c329e0dd069f6270b06a721683b0f164cadc4902505", size = 67281, upload-time = "2026-05-05T11:40:08.047Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/7e/37f7b8b7d78ca5b62062c804264914696faf12850040930f12c5e75fb094/geomloss-0.3.1-py3-none-any.whl", hash = "sha256:3ecb9ed72a7122d1ff60f0975edd759d2d1ac1b2397eaea7af6c7523ee117d4b", size = 82962, upload-time = "2026-05-05T11:40:06.525Z" },
+]
 
 [[package]]
 name = "h11"
