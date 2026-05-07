@@ -18,6 +18,9 @@ except ImportError:
     _FLASH_SINKHORN_AVAILABLE = False
 
 
+_PYTHON_OT_METRICS = ("euclidean", "sqeuclidean")
+
+
 def _resolve_weights(
     data1: torch.Tensor,
     data2: torch.Tensor,
@@ -106,7 +109,8 @@ def sinkhorn_ot(
         **loss_kwargs:          passed through to SamplesLoss
 
     Returns:
-        Scalar OT cost, or (N, M) coupling tensor if return_coupling=True
+        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
+        if return_coupling=True, else None.
     """
     return _sinkhorn_loss(
         SamplesLoss,
@@ -156,7 +160,8 @@ def flash_sinkhorn_ot(
         **loss_kwargs:          passed through to FlashSamplesLoss
 
     Returns:
-        Scalar OT cost, or (N, M) coupling tensor if return_coupling=True
+        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
+        if return_coupling=True, else None.
     """
     if not _FLASH_SINKHORN_AVAILABLE:
         err_msg = (
@@ -184,7 +189,7 @@ def python_ot(
     data2: torch.Tensor,
     weights1: torch.Tensor | None = None,
     weights2: torch.Tensor | None = None,
-    p: int = 2,
+    metric: str = "sqeuclidean",
     return_coupling: bool = False,
     **solve_kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
@@ -205,23 +210,28 @@ def python_ot(
         data2:           (M, D) tensor of target samples
         weights1:        (N,) source weights (uniform if None)
         weights2:        (M,) target weights (uniform if None)
-        p:               cost exponent (default 2 for squared Euclidean)
+        metric:          distance metric passed to ``ot.solve_sample``; one of
+                         ``"euclidean"`` (L1 cost) or ``"sqeuclidean"``
+                         (squared-L2 cost, default)
         return_coupling: if True, return the (N, M) coupling instead of
                          the scalar cost
         **solve_kwargs:  passed through to ``ot.solve_sample``
                          (e.g. ``reg``, ``method``)
 
     Returns:
-        Scalar OT cost, or (N, M) coupling tensor if return_coupling=True
+        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
+        if return_coupling=True, else None.
     """
+    if metric not in _PYTHON_OT_METRICS:
+        err_msg = f"python_ot metric must be one of {_PYTHON_OT_METRICS}, got {metric}."
+        raise ValueError(err_msg)
     a, b = _resolve_weights(data1, data2, weights1, weights2)
-    # ot.solve_sample uses `metric` for the cost; p=1 → L1, p=2 → squared L2
-    metric = {1: "euclidean", 2: "sqeuclidean"}.get(p, "sqeuclidean")
     sol = ot.solve_sample(data1, data2, a, b, metric=metric, **solve_kwargs)
 
     if return_coupling:
         plan = sol.plan
         if not isinstance(plan, torch.Tensor):
+            # use to_dense() if it's a sparse tensor, else return as-is
             plan = plan.to_dense() if hasattr(plan, "to_dense") else plan[:]
         return sol.value, plan
 
@@ -251,7 +261,8 @@ def optimal_transport_distance(
         **method_kwargs: Passed through to the chosen method function
 
     Returns:
-        Scalar OT cost, or (N, M) coupling tensor if return_coupling=True
+        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
+        if return_coupling=True, else None.
     """
     data1 = prepare_tensor_dataset(dataset1)
     data2 = prepare_tensor_dataset(dataset2)

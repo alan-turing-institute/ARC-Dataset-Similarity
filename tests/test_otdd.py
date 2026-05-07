@@ -59,8 +59,7 @@ _OTDD_KWARGS = {"diagonal_cov": True}
 class TestOTDD:
     def test_returns_scalar_tensor(self, tensor_image_dataset):
         result = otdd(tensor_image_dataset, tensor_image_dataset, **_OTDD_KWARGS)
-        assert isinstance(result, torch.Tensor)
-        assert result.ndim == 0
+        assert isinstance(result, float)
 
     def test_return_coupling_type(self, tensor_image_dataset):
         dist, coupling = otdd(
@@ -69,5 +68,5 @@ class TestOTDD:
             return_coupling=True,
             **_OTDD_KWARGS,
         )
-        assert isinstance(dist, torch.Tensor)
+        assert isinstance(dist, float)
         assert isinstance(coupling, torch.Tensor)

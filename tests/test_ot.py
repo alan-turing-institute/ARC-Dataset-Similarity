@@ -96,6 +96,14 @@ class TestPythonOT:
         cost, _ = python_ot(_X, _Y_NEAR, weights1=w, weights2=w)
         assert cost.ndim == 0
 
+    def test_euclidean_metric(self):
+        cost, _ = python_ot(_X, _Y_NEAR, metric="euclidean")
+        assert cost.ndim == 0
+
+    def test_invalid_metric_raises(self):
+        with pytest.raises(ValueError, match="metric must be one of"):
+            python_ot(_X, _Y_NEAR, metric="cosine")
+
 
 class TestPythonOTTransportPlan:
     def test_returns_2d_tensor(self):
