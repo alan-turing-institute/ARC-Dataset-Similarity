@@ -52,14 +52,15 @@ def _conditional_entropy(
     # Normalise to a proper joint distribution
     joint = joint / joint.sum().clamp(min=1e-10)
 
-    # Marginal P(Y_s)
+    # Marginal P(Y_s); clamp only to avoid 0/0 in division, xlogy handles the others
     p_src = joint.sum(dim=1, keepdim=True).clamp(min=1e-10)  # (|S|, 1)
 
     # Conditional P(Y_t | Y_s) = P(Y_s, Y_t) / P(Y_s)
-    cond = (joint / p_src).clamp(min=1e-10)  # (|S|, |T|)
+    cond = joint / p_src  # (|S|, |T|)
 
     # H(Y_t | Y_s) = - Σ P(s,t) log P(t|s)
-    return -1 * (joint * cond.log()).sum()
+    # torch.xlogy(x, y) = x * log(y), with xlogy(0, 0) = 0
+    return -torch.xlogy(joint, cond).sum()
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ def otce_score_from_tensors(
         src_labels:     (N,)   integer class labels for source samples.
         tgt_features:   (M, D) target feature matrix.
         tgt_labels:     (M,)   integer class labels for target samples.
-        ot_method:      OT solver — "sinkhorn" | "flash_sinkhorn" | "python_ot".
+        ot_method:      OT solver - "sinkhorn" | "flash_sinkhorn" | "python_ot".
         weights_src:    Optional (N,) source sample weights (uniform if None).
         weights_tgt:    Optional (M,) target sample weights (uniform if None).
         **ot_kwargs:    Forwarded to the chosen OT method function.
@@ -137,8 +138,9 @@ def otce_score(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
     ot_method: str = "sinkhorn",
+    return_coupling: bool = False,
     **ot_kwargs: Any,
-) -> dict[str, torch.Tensor]:
+) -> float | tuple[float, torch.Tensor]:
     """
     Compute OTCE between two ImageDatasets.
 
@@ -146,22 +148,23 @@ def otce_score(
     (i.e. ``return_paths=False``). Labels must be integer class indices.
 
     Args:
-        dataset1:    Source ImageDataset.
-        dataset2:    Target ImageDataset.
-        ot_method:   OT solver — "sinkhorn" | "flash_sinkhorn" | "python_ot".
-        **ot_kwargs: Forwarded to the chosen OT method.
+        dataset1:        Source ImageDataset.
+        dataset2:        Target ImageDataset.
+        ot_method:       OT solver - "sinkhorn" | "flash_sinkhorn" | "python_ot".
+        return_coupling: If True, also return the (N, M) OT coupling matrix.
+        **ot_kwargs:     Forwarded to the chosen OT method.
 
     Returns:
-        Same dict as :func:`otce_score_from_tensors`.
+        float OTCE score, or tuple of (float OTCE score, (N, M) coupling tensor)
+        if return_coupling=True.
     """
-
     src_features = prepare_tensor_dataset(dataset1)
     tgt_features = prepare_tensor_dataset(dataset2)
 
     src_labels = torch.tensor([int(label) for _, label in dataset1], dtype=torch.long)
     tgt_labels = torch.tensor([int(label) for _, label in dataset2], dtype=torch.long)
 
-    return otce_score_from_tensors(
+    result = otce_score_from_tensors(
         src_features,
         src_labels,
         tgt_features,
@@ -169,3 +172,7 @@ def otce_score(
         ot_method=ot_method,
         **ot_kwargs,
     )
+
+    if return_coupling:
+        return float(result["otce"].item()), result["coupling"]
+    return float(result["otce"].item())

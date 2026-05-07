@@ -1,0 +1,9 @@
+metric: ot
+kwargs:
+    method: python_ot
+
+    # Cost metric: "sqeuclidean" (squared L2) or "euclidean" (L1)
+    metric: sqeuclidean
+    # Pass reg + method to ot.solve_sample to switch from exact EMD to Sinkhorn:
+    #   reg: 0.1
+    #   method: sinkhorn

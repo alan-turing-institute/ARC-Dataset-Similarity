@@ -136,16 +136,29 @@ class TestPythonOTTransportPlan:
 
 class TestOptimalTransportDistance:
     def test_sinkhorn_method(self, tensor_image_dataset):
-        cost, _ = optimal_transport_distance(
+        cost = optimal_transport_distance(
             tensor_image_dataset, tensor_image_dataset, method="sinkhorn"
         )
-        assert cost.ndim == 0
+        assert isinstance(cost, float)
 
     def test_python_ot_method(self, tensor_image_dataset):
-        cost, _ = optimal_transport_distance(
+        cost = optimal_transport_distance(
             tensor_image_dataset, tensor_image_dataset, method="python_ot"
         )
-        assert cost.ndim == 0
+        assert isinstance(cost, float)
+
+    def test_return_coupling(self, tensor_image_dataset):
+        result = optimal_transport_distance(
+            tensor_image_dataset,
+            tensor_image_dataset,
+            method="sinkhorn",
+            return_coupling=True,
+        )
+        assert isinstance(result, tuple)
+        cost, coupling = result
+        assert isinstance(cost, float)
+        N = len(tensor_image_dataset)
+        assert coupling.shape == (N, N)
 
     def test_unsupported_method_raises(self, tensor_image_dataset):
         with pytest.raises(ValueError, match="Unsupported OT method"):

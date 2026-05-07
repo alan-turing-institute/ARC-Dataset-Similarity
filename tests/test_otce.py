@@ -77,19 +77,19 @@ class TestOTCEScoreFromTensors:
 
 
 class TestOTCEScore:
-    def test_returns_expected_keys(self, tensor_image_dataset):
+    def test_returns_float(self, tensor_image_dataset):
         result = otce_score(tensor_image_dataset, tensor_image_dataset)
-        assert result.keys() == _EXPECTED_KEYS
+        assert isinstance(result, float)
 
-    def test_scalar_outputs(self, tensor_image_dataset):
-        result = otce_score(tensor_image_dataset, tensor_image_dataset)
-        for key in ("otce", "wasserstein", "conditional_entropy"):
-            assert result[key].ndim == 0, f"{key} should be scalar"
-
-    def test_coupling_shape(self, tensor_image_dataset):
-        result = otce_score(tensor_image_dataset, tensor_image_dataset)
+    def test_return_coupling(self, tensor_image_dataset):
+        result = otce_score(
+            tensor_image_dataset, tensor_image_dataset, return_coupling=True
+        )
+        assert isinstance(result, tuple)
+        score, coupling = result
+        assert isinstance(score, float)
         N = len(tensor_image_dataset)
-        assert result["coupling"].shape == (N, N)
+        assert coupling.shape == (N, N)
 
     def test_raises_for_return_paths(
         self, tensor_image_dataset, tensor_image_dataset_with_paths

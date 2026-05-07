@@ -250,27 +250,31 @@ def optimal_transport_distance(
     dataset2: ImageDataset,
     method: str = "sinkhorn",
     **method_kwargs: Any,
-) -> tuple[torch.Tensor, torch.Tensor | None]:
+) -> float | tuple[float, torch.Tensor]:
     """
     Optimal Transport distance between two datasets.
 
     Args:
         dataset1:       Source ImageDataset (must have return_paths=False)
         dataset2:       Target ImageDataset (must have return_paths=False)
-        method:         OT method — one of "sinkhorn", "flash_sinkhorn", "python_ot"
+        method:         OT method - one of "sinkhorn", "flash_sinkhorn", "python_ot"
         **method_kwargs: Passed through to the chosen method function
 
     Returns:
-        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
-        if return_coupling=True, else None.
+        float OT cost, or tuple of (float OT cost, (N, M) coupling tensor)
+        if return_coupling=True.
     """
     data1 = prepare_tensor_dataset(dataset1)
     data2 = prepare_tensor_dataset(dataset2)
 
-    if method in method_map:
-        return method_map[method](data1, data2, **method_kwargs)
+    if method not in method_map:
+        err_msg = (
+            f"Unsupported OT method: {method}. "
+            f"Supported methods: {list(method_map.keys())}"
+        )
+        raise ValueError(err_msg)
 
-    err_msg = (
-        f"Unsupported OT method: {method}. Supported methods: {list(method_map.keys())}"
-    )
-    raise ValueError(err_msg)
+    cost, coupling = method_map[method](data1, data2, **method_kwargs)
+    if coupling is not None:
+        return float(cost.item()), coupling
+    return float(cost.item())

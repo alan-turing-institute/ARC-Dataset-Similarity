@@ -97,7 +97,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         required=True,
-        help="Name of config file inside configs/datasets/.",
+        help="Name of config file inside configs/experiments/.",
     )
     args = parser.parse_args()
     experiment_cfg = load_yaml_from_path(

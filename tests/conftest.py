@@ -12,13 +12,13 @@ from torch.utils.data import Dataset
 from dataset_similarity.data.base import ImageDataset
 
 # otdd calls geomloss.utils.squared_distances, removed in geomloss>=0.2.6.
-# The function still exists in geomloss._legacy.utils — just re-expose it.
+# The function still exists in geomloss._legacy.utils - just re-expose it.
 if not hasattr(geomloss, "utils"):
     geomloss.utils = geomloss._legacy.utils  # type: ignore[attr-defined]
 
 
 class _TensorImageDataset(ImageDataset):
-    """ImageDataset that serves pre-built in-memory tensors — no disk I/O."""
+    """ImageDataset that serves pre-built in-memory tensors - no disk I/O."""
 
     def __init__(
         self,

@@ -65,7 +65,7 @@ class TestDomainNetDataset:
             DomainNetDataset(dataset_dir="data/DomainNet", domains="real", split="val")
 
     def test_missing_split_file(self, tmp_path: Path) -> None:
-        # No metadata dir or split file — expects FileNotFoundError
+        # No metadata dir or split file - expects FileNotFoundError
         (tmp_path / "metadata").mkdir()
         (tmp_path / "metadata" / "domainnet_class_mapping.yaml").write_text("cat: 0\n")
         dataset_dir = tmp_path / "DomainNet"
