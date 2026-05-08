@@ -5,7 +5,7 @@ import torch
 
 from dataset_similarity.metrics.otce import (
     _conditional_entropy,
-    otce,
+    otce_distance,
     otce_score_from_tensors,
 )
 
@@ -76,13 +76,15 @@ class TestOTCEScoreFromTensors:
             )
 
 
-class TestOTCEScore:
+class TestOTCEDistance:
     def test_returns_float(self, tensor_image_dataset):
-        result = otce(tensor_image_dataset, tensor_image_dataset)
+        result = otce_distance(tensor_image_dataset, tensor_image_dataset)
         assert isinstance(result, float)
 
     def test_return_coupling(self, tensor_image_dataset):
-        result = otce(tensor_image_dataset, tensor_image_dataset, return_coupling=True)
+        result = otce_distance(
+            tensor_image_dataset, tensor_image_dataset, return_coupling=True
+        )
         assert isinstance(result, tuple)
         score, coupling = result
         assert isinstance(score, float)
@@ -93,4 +95,4 @@ class TestOTCEScore:
         self, tensor_image_dataset, tensor_image_dataset_with_paths
     ):
         with pytest.raises(ValueError, match="return_paths"):
-            otce(tensor_image_dataset_with_paths, tensor_image_dataset)
+            otce_distance(tensor_image_dataset_with_paths, tensor_image_dataset)

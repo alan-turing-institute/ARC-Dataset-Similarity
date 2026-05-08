@@ -1,4 +1,4 @@
-metric: ot
+metric: ot_distance
 kwargs:
     method: python_ot
 

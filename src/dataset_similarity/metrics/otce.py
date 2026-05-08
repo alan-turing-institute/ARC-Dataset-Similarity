@@ -136,7 +136,7 @@ def otce_score_from_tensors(
     }
 
 
-def otce(
+def otce_distance(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
     ot_method: str = "sinkhorn",
@@ -144,10 +144,15 @@ def otce(
     **ot_kwargs: Any,
 ) -> float | tuple[float, torch.Tensor]:
     """
-    Compute OTCE between two ImageDatasets.
+    Compute OTCE distance between two ImageDatasets.
 
     Expects each dataset to yield ``(feature_tensor, label)`` pairs
     (i.e. ``return_paths=False``). Labels must be integer class indices.
+
+    Returns a positive distance score (lower = better transfer). This is the
+    negation of the true OTCE score (-W - H) as defined in Yang et al. 2021,
+    where higher = better transfer. Use ``otce_score_from_tensors`` directly
+    to access the raw signed score.
 
     Args:
         dataset1:        Source ImageDataset.
@@ -157,7 +162,7 @@ def otce(
         **ot_kwargs:     Forwarded to the chosen OT method.
 
     Returns:
-        float OTCE score, or tuple of (float OTCE score, (N, M) coupling tensor)
+        float OTCE distance, or tuple of (float OTCE distance, (N, M) coupling tensor)
         if return_coupling=True.
     """
     src_features, src_labels = prepare_tensor_dataset(dataset1, return_labels=True)
@@ -172,6 +177,9 @@ def otce(
         **ot_kwargs,
     )
 
+    # Negate the true OTCE (-W - H) to give a positive distance score (lower = better).
+    otce_score = -float(result["otce"].item())
+
     if return_coupling:
-        return float(result["otce"].item()), result["coupling"]
-    return float(result["otce"].item())
+        return otce_score, result["coupling"]
+    return otce_score

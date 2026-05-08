@@ -1,4 +1,4 @@
-metric: otce
+metric: otce_distance
 kwargs:
     ot_method: sinkhorn
 

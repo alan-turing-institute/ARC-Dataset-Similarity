@@ -1,4 +1,4 @@
-metric: ot
+metric: ot_distance
 kwargs:
     method: sinkhorn
 
@@ -7,6 +7,6 @@ kwargs:
     # Multiscale annealing ratio in (0, 1); higher = more accurate but slower
     scaling: 0.9
     # Cost exponent: p=2 gives squared-Euclidean cost
-    p: 2
+    metric: sqeuclidean
     # Set to a positive float to use unbalanced (partial) OT; null = balanced OT
     reach: null

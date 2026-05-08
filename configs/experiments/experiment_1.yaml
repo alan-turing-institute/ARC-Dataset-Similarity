@@ -7,5 +7,6 @@ datasets:
 metrics:
   - mmd
   - otce_sinkhorn
+  - otce_exact
   - ot_exact
   - ot_sinkhorn

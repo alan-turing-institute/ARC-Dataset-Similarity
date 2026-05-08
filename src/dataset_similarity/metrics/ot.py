@@ -253,7 +253,7 @@ method_map: dict[str, Callable[..., tuple[torch.Tensor, torch.Tensor | None]]] =
 }
 
 
-def ot(
+def ot_distance(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
     method: str = "sinkhorn",

@@ -1,0 +1,6 @@
+metric: otce_distance
+kwargs:
+    ot_method: python_ot
+    metric: sqeuclidean
+    # Set to a positive float to use unbalanced (partial) OT; null = balanced OT
+    reach: null
