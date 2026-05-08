@@ -38,16 +38,18 @@ def _conditional_entropy(
     Returns:
         Scalar conditional entropy H(Y_t | Y_s).
     """
-    src_classes = src_labels.unique()
-    tgt_classes = tgt_labels.unique()
+    src_classes: torch.Tensor = src_labels.unique()
+    tgt_classes: torch.Tensor = tgt_labels.unique()
 
-    # Build joint probability table P(Y_s, Y_t)
-    joint = coupling.new_zeros(len(src_classes), len(tgt_classes))
-    for i, s in enumerate(src_classes):
-        src_mask = src_labels == s
-        for j, t in enumerate(tgt_classes):
-            tgt_mask = tgt_labels == t
-            joint[i, j] = coupling[src_mask][:, tgt_mask].sum()
+    # One-hot class indicators: src_oh[i, k] = 1 if sample i belongs to source class k
+    src_oh = (src_labels.unsqueeze(1) == src_classes.unsqueeze(0)).float()  # (N, |S|)
+    tgt_oh = (tgt_labels.unsqueeze(1) == tgt_classes.unsqueeze(0)).float()  # (M, |T|)
+
+    # joint[k, l] = sum of T[i, j] for all i in class k, j in class l
+    # src_oh.T @ coupling aggregates coupling rows by source class -> (|S|, M)
+    # then @ tgt_oh aggregates columns by target class -> (|S|, |T|)
+    # joint[k, l] is the total mass transported from source class k to target class l
+    joint = src_oh.T @ coupling @ tgt_oh  # (|S|, |T|)
 
     # Normalise to a proper joint distribution
     joint = joint / joint.sum().clamp(min=1e-10)
@@ -134,7 +136,7 @@ def otce_score_from_tensors(
     }
 
 
-def otce_score(
+def otce(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
     ot_method: str = "sinkhorn",
@@ -158,11 +160,8 @@ def otce_score(
         float OTCE score, or tuple of (float OTCE score, (N, M) coupling tensor)
         if return_coupling=True.
     """
-    src_features = prepare_tensor_dataset(dataset1)
-    tgt_features = prepare_tensor_dataset(dataset2)
-
-    src_labels = torch.tensor([int(label) for _, label in dataset1], dtype=torch.long)
-    tgt_labels = torch.tensor([int(label) for _, label in dataset2], dtype=torch.long)
+    src_features, src_labels = prepare_tensor_dataset(dataset1, return_labels=True)
+    tgt_features, tgt_labels = prepare_tensor_dataset(dataset2, return_labels=True)
 
     result = otce_score_from_tensors(
         src_features,

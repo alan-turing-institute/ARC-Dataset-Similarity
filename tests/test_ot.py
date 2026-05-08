@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from dataset_similarity.metrics.ot import (
-    optimal_transport_distance,
+    ot,
     python_ot,
     sinkhorn_ot,
 )
@@ -136,19 +136,15 @@ class TestPythonOTTransportPlan:
 
 class TestOptimalTransportDistance:
     def test_sinkhorn_method(self, tensor_image_dataset):
-        cost = optimal_transport_distance(
-            tensor_image_dataset, tensor_image_dataset, method="sinkhorn"
-        )
+        cost = ot(tensor_image_dataset, tensor_image_dataset, method="sinkhorn")
         assert isinstance(cost, float)
 
     def test_python_ot_method(self, tensor_image_dataset):
-        cost = optimal_transport_distance(
-            tensor_image_dataset, tensor_image_dataset, method="python_ot"
-        )
+        cost = ot(tensor_image_dataset, tensor_image_dataset, method="python_ot")
         assert isinstance(cost, float)
 
     def test_return_coupling(self, tensor_image_dataset):
-        result = optimal_transport_distance(
+        result = ot(
             tensor_image_dataset,
             tensor_image_dataset,
             method="sinkhorn",
@@ -162,6 +158,4 @@ class TestOptimalTransportDistance:
 
     def test_unsupported_method_raises(self, tensor_image_dataset):
         with pytest.raises(ValueError, match="Unsupported OT method"):
-            optimal_transport_distance(
-                tensor_image_dataset, tensor_image_dataset, method="bogus"
-            )
+            ot(tensor_image_dataset, tensor_image_dataset, method="bogus")

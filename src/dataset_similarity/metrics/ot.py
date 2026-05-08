@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-import ot
+import ot as pot
 import torch
 from geomloss import SamplesLoss
 
@@ -49,10 +49,6 @@ def _sinkhorn_loss(
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     a, b = _resolve_weights(data1, data2, weights1, weights2)
 
-    loss = loss_cls(
-        "sinkhorn", p=p, blur=blur, scaling=scaling, reach=reach, **loss_kwargs
-    )
-
     if return_coupling:
         potentials_loss = loss_cls(
             "sinkhorn",
@@ -64,18 +60,30 @@ def _sinkhorn_loss(
             potentials=True,
             **loss_kwargs,
         )
+        loss = loss_cls(
+            "sinkhorn",
+            p=p,
+            blur=blur,
+            scaling=scaling,
+            reach=reach,
+            debias=False,
+            **loss_kwargs,
+        )
         F, G = potentials_loss(a, data1, b, data2)
         # geomloss prepends a batch dim when inputs are unbatched; remove it
         F, G = F.squeeze(0), G.squeeze(0)
         x_i = data1.unsqueeze(1)  # (N, 1, D)
         y_j = data2.unsqueeze(0)  # (1, M, D)
-        C_ij = (1 / p) * ((x_i - y_j) ** p).sum(-1)  # (N, M)
+        C_ij = (1 / p) * (x_i - y_j).abs().pow(p).sum(-1)  # (N, M)
         eps = blur**p
         plan = ((F.unsqueeze(1) + G.unsqueeze(0) - C_ij) / eps).exp() * (
             a.unsqueeze(1) * b.unsqueeze(0)
         )
         return loss(a, data1, b, data2), plan
 
+    loss = loss_cls(
+        "sinkhorn", p=p, blur=blur, scaling=scaling, reach=reach, **loss_kwargs
+    )
     return loss(a, data1, b, data2), None
 
 
@@ -226,7 +234,7 @@ def python_ot(
         err_msg = f"python_ot metric must be one of {_PYTHON_OT_METRICS}, got {metric}."
         raise ValueError(err_msg)
     a, b = _resolve_weights(data1, data2, weights1, weights2)
-    sol = ot.solve_sample(data1, data2, a, b, metric=metric, **solve_kwargs)
+    sol = pot.solve_sample(data1, data2, a, b, metric=metric, **solve_kwargs)
 
     if return_coupling:
         plan = sol.plan
@@ -245,7 +253,7 @@ method_map: dict[str, Callable[..., tuple[torch.Tensor, torch.Tensor | None]]] =
 }
 
 
-def optimal_transport_distance(
+def ot(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
     method: str = "sinkhorn",
