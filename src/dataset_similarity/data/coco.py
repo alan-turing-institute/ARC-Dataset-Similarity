@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 import pandas as pd
+from pycocotools.coco import COCO
 
 from dataset_similarity.constants import COCO_DIR, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.base import ImageDataset
@@ -96,18 +97,19 @@ class COCODataset(ImageDataset):
         )
 
     def _load_data(self) -> pd.DataFrame:
-        rows: list[dict[str, Path | int]] = []
+        ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
+        coco = COCO(str(ann_file))
+
         if self.target_classes is None:
-            classes = list(self.name_to_label_map.keys())
+            cat_ids = coco.getCatIds()
         else:
-            classes = self.target_classes
-        for class_name in classes:
-            label = self.name_to_label_map[class_name]
-            class_dir = self.dataset_dir / self.split / class_name
-            images = sorted(
-                p
-                for p in class_dir.iterdir()
-                if p.suffix.lower() in {".jpeg", ".jpg", ".png"}
-            )
-            rows.extend({"path": image_path, "label": label} for image_path in images)
+            cat_ids = coco.getCatIds(catNms=self.target_classes)
+
+        rows: list[dict[str, Path | int]] = []
+        for cat_id in cat_ids:
+            img_ids = coco.getImgIds(catIds=[cat_id])
+            for img_info in coco.loadImgs(img_ids):
+                img_path = self.dataset_dir / self.split / img_info["file_name"]
+                rows.append({"path": img_path, "label": cat_id})
+
         return pd.DataFrame(rows, columns=["path", "label"])

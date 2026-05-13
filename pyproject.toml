@@ -43,6 +43,7 @@ dependencies = [
     "otdd",
     "torchtext>0.14.1,<=0.18.0", # not actually required by us but by OTDD. Our torch setup leads to the wrong version being installed if we do not control version + source here
     "plotnine>=0.15.3",
+    "pycocotools>=2.0.11",
 ]
 
 [dependency-groups]
