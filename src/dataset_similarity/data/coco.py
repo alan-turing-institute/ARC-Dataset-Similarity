@@ -23,6 +23,10 @@ class COCODataset(ImageDataset):
             class mapping file at
             `dataset_dir.parent / "metadata/coco_class_mapping.yaml"`. Defaults to
             `None`.
+        target_superclasses: List of supercategory names whose member classes are all
+            included. Expands to the corresponding class names before filtering, and is
+            merged with `target_classes` when both are provided. If None, no
+            supercategory filtering is applied. Defaults to `None`.
         split: Dataset split identifier. Must be `"train2017"` or `"val2017"`.
             Defaults to `"train2017"`.
         size: If a float in `(0, 1)`, the fraction of samples to retain.
@@ -47,6 +51,7 @@ class COCODataset(ImageDataset):
         self,
         dataset_dir: str | Path = COCO_DIR,
         target_classes: list[str] | None = None,
+        target_superclasses: list[str] | None = None,
         split: Literal["train2017", "val2017"] = "train2017",
         size: float | int | None = None,
         random_seed: int | None = None,
@@ -75,13 +80,28 @@ class COCODataset(ImageDataset):
             label: meta["name"] for label, meta in self.label_to_meta_map.items()
         }
 
+        if target_superclasses is not None:
+            for sc in target_superclasses:
+                if sc not in self.supercategory_to_classnumber_map:
+                    err_msg = f"Unknown supercategory '{sc}'"
+                    raise ValueError(err_msg)
+            expanded = [
+                self.classnumber_to_name_map[label]
+                for sc in target_superclasses
+                for label in self.supercategory_to_classnumber_map[sc]
+            ]
+            if target_classes is None:
+                target_classes = expanded
+            else:
+                target_classes = list(dict.fromkeys(target_classes + expanded))
+
         if target_classes is not None:
             resolved: list[str] = []
             for cls in target_classes:
                 if cls in self.name_to_label_map:
                     resolved.append(cls)
                 else:
-                    err_msg = f"Unknown class {cls}: use a class name or supercategory"
+                    err_msg = f"Unknown class '{cls}'"
                     raise ValueError(err_msg)
             target_classes = resolved
 
