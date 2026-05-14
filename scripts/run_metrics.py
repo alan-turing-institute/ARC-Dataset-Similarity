@@ -15,8 +15,10 @@ import json
 import logging
 from typing import Any
 
+from torch.utils.tensorboard import SummaryWriter
+
 import dataset_similarity.metrics as metrics
-from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
+from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR, TENSORBOARD_LOG_DIR
 from dataset_similarity.data import DATASET_MAP
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
@@ -60,6 +62,7 @@ def main(
     metrics_list: list[str],
     dataset1_name: str,
     dataset2_name: str,
+    writer: SummaryWriter,
 ) -> None:
     # Setup logger
     logger = logging.getLogger("otdd_test_logger")
@@ -91,6 +94,13 @@ def main(
         json.dump(results, f, indent=4)
     logger.info("Results saved to %s", result_path)
 
+    writer.add_hparams(
+        hparam_dict={"dataset1": dataset1_name, "dataset2": dataset2_name},
+        metric_dict=metrics_results,
+        run_name=".",
+    )
+    logger.info("TensorBoard logs written to %s", writer.log_dir)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script for running metrics.")
@@ -110,6 +120,8 @@ if __name__ == "__main__":
         CONFIG_DIR / "data" / f"{experiment_cfg['dataset2']}.yaml"
     )
     metrics_list = experiment_cfg["metrics"]
+    log_dir = TENSORBOARD_LOG_DIR / args.config
+    writer = SummaryWriter(log_dir=str(log_dir))
     main(
         cfg_name=args.config,
         dataset1_cfg=dataset_1_cfg,
@@ -117,4 +129,6 @@ if __name__ == "__main__":
         metrics_list=metrics_list,
         dataset1_name=experiment_cfg["dataset1"],
         dataset2_name=experiment_cfg["dataset2"],
+        writer=writer,
     )
+    writer.close()

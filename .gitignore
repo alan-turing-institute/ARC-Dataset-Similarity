@@ -4,6 +4,9 @@ embeddings/
 plots/
 results/
 
+# tensorboard logs
+runs/
+
 # ignore temporary files
 .temp/
 
