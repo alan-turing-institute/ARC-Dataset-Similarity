@@ -135,22 +135,22 @@ class TestPythonOTTransportPlan:
 
 
 class TestOptimalTransportDistance:
-    def test_sinkhorn_method(self, tensor_image_dataset):
+    def test_sinkhorn_method(self, tensor_image_dataset, tensor_image_dataset_2):
         cost = ot_distance(
-            tensor_image_dataset, tensor_image_dataset, method="sinkhorn"
+            tensor_image_dataset, tensor_image_dataset_2, method="sinkhorn"
         )
         assert isinstance(cost, float)
 
-    def test_python_ot_method(self, tensor_image_dataset):
+    def test_python_ot_method(self, tensor_image_dataset, tensor_image_dataset_2):
         cost = ot_distance(
-            tensor_image_dataset, tensor_image_dataset, method="python_ot"
+            tensor_image_dataset, tensor_image_dataset_2, method="python_ot"
         )
         assert isinstance(cost, float)
 
-    def test_return_coupling(self, tensor_image_dataset):
+    def test_return_coupling(self, tensor_image_dataset, tensor_image_dataset_2):
         result = ot_distance(
             tensor_image_dataset,
-            tensor_image_dataset,
+            tensor_image_dataset_2,
             method="sinkhorn",
             return_coupling=True,
         )
@@ -158,7 +158,14 @@ class TestOptimalTransportDistance:
         cost, coupling = result
         assert isinstance(cost, float)
         N = len(tensor_image_dataset)
-        assert coupling.shape == (N, N)
+        M = len(tensor_image_dataset_2)
+        assert coupling.shape == (N, M)
+
+    def test_same_dataset_near_zero(self, tensor_image_dataset):
+        cost = ot_distance(
+            tensor_image_dataset, tensor_image_dataset, method="python_ot"
+        )
+        assert cost < 1e-5
 
     def test_unsupported_method_raises(self, tensor_image_dataset):
         with pytest.raises(ValueError, match="Unsupported OT method"):

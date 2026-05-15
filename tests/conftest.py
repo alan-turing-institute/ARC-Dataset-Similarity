@@ -18,7 +18,7 @@ if not hasattr(geomloss, "utils"):
 
 
 class _TensorImageDataset(ImageDataset):
-    """ImageDataset that serves pre-built in-memory tensors - no disk I/O."""
+    """ImageDataset that serves pre-built in-memory tensors."""
 
     def __init__(
         self,
@@ -26,10 +26,11 @@ class _TensorImageDataset(ImageDataset):
         n_classes: int = 3,
         feature_dim: int = 8,
         return_paths: bool = False,
+        seed: int = 0,
     ) -> None:
         self._n_samples = n_samples
         self._n_classes = n_classes
-        torch.manual_seed(0)
+        torch.manual_seed(seed)
         self._tensors = torch.randn(n_samples, feature_dim)
         super().__init__(
             dataset_dir="/tmp",
@@ -64,6 +65,11 @@ def tensor_image_dataset() -> _TensorImageDataset:
 @pytest.fixture()
 def tensor_image_dataset_with_paths() -> _TensorImageDataset:
     return _TensorImageDataset(return_paths=True)
+
+
+@pytest.fixture()
+def tensor_image_dataset_2() -> _TensorImageDataset:
+    return _TensorImageDataset(seed=1)
 
 
 class _ImageDataset(Dataset[Any]):
