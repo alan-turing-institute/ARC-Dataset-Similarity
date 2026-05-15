@@ -41,7 +41,6 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "pandas>=2.3.3",
     "otdd",
-    "torchtext>0.14.1,<=0.18.0", # not actually required by us but by OTDD. Our torch setup leads to the wrong version being installed if we do not control version + source here
     "plotnine>=0.15.3",
 ]
 
@@ -53,7 +52,6 @@ dev = [
 ]
 
 [tool.uv.sources]
-otdd = { git = "https://github.com/microsoft/otdd" }
 torch = [
   { index = "pypi", marker = "platform_machine != 'aarch64'"},
   { index = "pytorch-cu126", marker = "platform_machine == 'aarch64'"},
@@ -62,10 +60,8 @@ torchvision = [
   { index = "pypi", marker = "platform_machine != 'aarch64'"},
   { index = "pytorch-cu126", marker = "platform_machine == 'aarch64'"},
 ]
-torchtext = [
-  { index = "pypi", marker = "platform_machine != 'aarch64'"},
-  { index = "pytorch-cu126", marker = "platform_machine == 'aarch64'"},
-]
+otdd = { git = "https://github.com/alan-turing-institute/arc-otdd", tag = "v1.1.0" }
+
 
 [[tool.uv.index]]
 name = "pytorch-cu126"
