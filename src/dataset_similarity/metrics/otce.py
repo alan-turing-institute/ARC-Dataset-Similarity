@@ -6,11 +6,16 @@ from __future__ import annotations
 
 from typing import Any
 
+import ot as pot
 import torch
+from otdd.pytorch.distance import DatasetDistance
 
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.metrics.ot import method_map, ot_distance
+from dataset_similarity.metrics.ot import method_map
+from dataset_similarity.metrics.otdd import _prepare_otdd_tensor_dataset
 from dataset_similarity.metrics.utils import prepare_tensor_dataset
+
+_OTCE_VARIANTS = ("otce", "f_otce", "jc_otce")
 
 
 def _conditional_entropy(
@@ -136,56 +141,123 @@ def otce_score_from_tensors(
     }
 
 
+def _label_distance_matrix(
+    dataset1: ImageDataset,
+    dataset2: ImageDataset,
+    diagonal_cov: bool = True,
+    **otdd_kwargs: Any,
+) -> torch.Tensor:
+    """
+    Return the (C_src, C_tgt) matrix of pairwise label Wasserstein distances
+    using OTDD's Gaussian approximation.
+
+    Args:
+        dataset1:     Source ImageDataset.
+        dataset2:     Target ImageDataset.
+        diagonal_cov: Use diagonal covariance (required on PyTorch 2.x). Default True.
+        **otdd_kwargs: Forwarded to DatasetDistance (e.g. device, inner_ot_method).
+    """
+    tds1 = _prepare_otdd_tensor_dataset(dataset1)
+    tds2 = _prepare_otdd_tensor_dataset(dataset2)
+    dd = DatasetDistance(
+        D1=tds1,
+        D2=tds2,
+        debiased_loss=False,
+        diagonal_cov=diagonal_cov,
+        **otdd_kwargs,
+    )
+    return dd._get_label_distances()  # (C_src, C_tgt)
+
+
 def otce_distance(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
     ot_method: str = "sinkhorn",
+    variant: str = "otce",
+    gamma: float = 0.5,
     return_coupling: bool = False,
+    label_dist_kwargs: dict[str, Any] | None = None,
     **ot_kwargs: Any,
 ) -> float | tuple[float, torch.Tensor]:
     """
     Compute OTCE distance between two ImageDatasets.
 
-    Expects each dataset to yield ``(feature_tensor, label)`` pairs
-    (i.e. ``return_paths=False``). Labels must be integer class indices.
+    Expects datasets to yield ``(feature_tensor, label)`` pairs
+    (``return_paths=False``). Labels must be integer class indices.
 
-    Returns a positive distance score (lower = better transfer). This is the
-    negation of the true OTCE score (-W - H) as defined in Yang et al. 2021,
-    where higher = better transfer. Use ``otce_score_from_tensors`` directly
-    to access the raw signed score.
+    Returns a positive distance (lower = better transfer).
 
     Args:
-        dataset1:        Source ImageDataset.
-        dataset2:        Target ImageDataset.
-        ot_method:       OT solver - "sinkhorn" | "flash_sinkhorn" | "python_ot".
-        return_coupling: If True, also return the (N, M) OT coupling matrix.
-        **ot_kwargs:     Forwarded to the chosen OT method.
+        dataset1:          Source ImageDataset.
+        dataset2:          Target ImageDataset.
+        ot_method:         OT solver - "sinkhorn" | "flash_sinkhorn" | "python_ot".
+                           Ignored when variant="jc_otce".
+        variant:           "otce"     - standard W + H (default).
+                           "f_otce"   - conditional entropy H only.
+                           "jc_otce"  - combined feature+label ground cost, then W + H.
+        gamma:             Balance between feature cost (gamma) and label cost (1-gamma)
+                           in the JC-OTCE ground cost. Only used when variant="jc_otce".
+        return_coupling:   If True, also return the (N, M) coupling matrix.
+        label_dist_kwargs: Kwargs forwarded to _label_distance_matrix (e.g.
+                           diagonal_cov, device). Only used when variant="jc_otce".
+        **ot_kwargs:       Forwarded to the chosen OT method (variant != "jc_otce"),
+                           or to pot.solve (variant="jc_otce", e.g. reg=0.1).
 
     Returns:
-        float OTCE distance, or tuple of (float OTCE distance, (N, M) coupling tensor)
-        if return_coupling=True.
+        float distance, or tuple of (float, (N, M) coupling) if return_coupling=True.
     """
+    if variant not in _OTCE_VARIANTS:
+        error_msg = f"variant must be one of {_OTCE_VARIANTS}, got {variant!r}"
+        raise ValueError(error_msg)
+    if variant != "jc_otce" and ot_method not in method_map:
+        error_msg = (
+            f"Unsupported ot_method: {ot_method!r}. "
+            f"Available: {list(method_map.keys())}"
+        )
+        raise ValueError(error_msg)
 
-    # Prepare feature and label tensors from datasets
     src_features, src_labels = prepare_tensor_dataset(dataset1, return_labels=True)
     tgt_features, tgt_labels = prepare_tensor_dataset(dataset2, return_labels=True)
-
-    wasserstein, coupling = ot_distance(
-        dataset1,
-        dataset2,
-        ot_method,
-        return_coupling=True,
-        **ot_kwargs,
-    )
-
-    # --- Step 2: conditional entropy ---
     src_labels = src_labels.to(src_features.device)
     tgt_labels = tgt_labels.to(tgt_features.device)
+
+    if variant == "jc_otce":
+        if not 0.0 <= gamma <= 1.0:
+            error_msg = f"gamma must be in [0, 1], got {gamma}"
+            raise ValueError(error_msg)
+
+        x_i = src_features.unsqueeze(1)
+        y_j = tgt_features.unsqueeze(0)
+        feature_cost = (x_i - y_j).pow(2).sum(-1)  # (N, M)
+
+        label_dist = _label_distance_matrix(
+            dataset1, dataset2, **(label_dist_kwargs or {})
+        ).to(src_features.device)
+
+        src_classes = src_labels.unique()
+        tgt_classes = tgt_labels.unique()
+        src_idx = torch.zeros_like(src_labels)
+        tgt_idx = torch.zeros_like(tgt_labels)
+        for k, c in enumerate(src_classes):
+            src_idx[src_labels == c] = k
+        for k, c in enumerate(tgt_classes):
+            tgt_idx[tgt_labels == c] = k
+
+        label_cost = label_dist[src_idx][:, tgt_idx]  # (N, M)
+        combined_cost = gamma * feature_cost + (1.0 - gamma) * label_cost
+
+        N, M = src_features.shape[0], tgt_features.shape[0]
+        a = src_features.new_full((N,), 1.0 / N).cpu()
+        b = tgt_features.new_full((M,), 1.0 / M).cpu()
+        sol = pot.solve(combined_cost.detach().cpu(), a=a, b=b, **ot_kwargs)
+        wasserstein: torch.Tensor = torch.tensor(float(sol.value))
+        coupling: torch.Tensor = torch.as_tensor(sol.plan, dtype=src_features.dtype)
+    else:
+        wasserstein, coupling = method_map[ot_method](
+            src_features, tgt_features, return_coupling=True, **ot_kwargs
+        )
+
     h = _conditional_entropy(coupling, src_labels, tgt_labels)
+    score: float = float(h.item() if variant == "f_otce" else (wasserstein + h).item())
 
-    # --- Step 3: OTCE ---
-    otce_distance: float = (wasserstein + h).item()
-
-    if return_coupling:
-        return otce_distance, coupling
-    return otce_distance
+    return (score, coupling) if return_coupling else score

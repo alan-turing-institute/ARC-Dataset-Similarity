@@ -96,3 +96,43 @@ class TestOTCEDistance:
     ):
         with pytest.raises(ValueError, match="return_paths"):
             otce_distance(tensor_image_dataset_with_paths, tensor_image_dataset)
+
+    def test_f_otce_returns_float(self, tensor_image_dataset):
+        result = otce_distance(
+            tensor_image_dataset, tensor_image_dataset, variant="f_otce"
+        )
+        assert isinstance(result, float)
+
+    def test_f_otce_non_negative(self, tensor_image_dataset):
+        result = otce_distance(
+            tensor_image_dataset, tensor_image_dataset, variant="f_otce"
+        )
+        assert result >= 0.0
+
+    def test_f_otce_leq_otce(self, tensor_image_dataset):
+        # F-OTCE = H; OTCE = W + H; since W >= 0, H <= W + H
+        f = otce_distance(tensor_image_dataset, tensor_image_dataset, variant="f_otce")
+        full = otce_distance(tensor_image_dataset, tensor_image_dataset)
+        assert f <= full + 1e-5
+
+    def test_jc_otce_returns_float(self, tensor_image_dataset):
+        result = otce_distance(
+            tensor_image_dataset,
+            tensor_image_dataset,
+            variant="jc_otce",
+            label_dist_kwargs={"diagonal_cov": True},
+        )
+        assert isinstance(result, float)
+
+    def test_jc_otce_non_negative(self, tensor_image_dataset):
+        result = otce_distance(
+            tensor_image_dataset,
+            tensor_image_dataset,
+            variant="jc_otce",
+            label_dist_kwargs={"diagonal_cov": True},
+        )
+        assert result >= 0.0
+
+    def test_invalid_variant_raises(self, tensor_image_dataset):
+        with pytest.raises(ValueError, match="variant"):
+            otce_distance(tensor_image_dataset, tensor_image_dataset, variant="bogus")
