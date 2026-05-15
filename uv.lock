@@ -530,7 +530,7 @@ requires-dist = [
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "markupsafe", specifier = "==3.0.*" },
     { name = "matplotlib", specifier = ">=3.10.8" },
-    { name = "otdd", git = "https://github.com/alan-turing-institute/arc-otdd?branch=torch-refresh" },
+    { name = "otdd", git = "https://github.com/alan-turing-institute/arc-otdd?tag=v1.1.0" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "plotnine", specifier = ">=0.15.3" },
     { name = "pyaml", specifier = ">=26.2.1" },
@@ -2087,7 +2087,7 @@ wheels = [
 [[package]]
 name = "otdd"
 version = "0.1.0"
-source = { git = "https://github.com/alan-turing-institute/arc-otdd?branch=torch-refresh#d1b3f5e3a12cdeb309093fed1ed5b4bf24b1adc6" }
+source = { git = "https://github.com/alan-turing-institute/arc-otdd?tag=v1.1.0#5c6dbe1fb1a4a33bcd415965786731192140e6e1" }
 dependencies = [
     { name = "adjusttext" },
     { name = "attrdict" },
