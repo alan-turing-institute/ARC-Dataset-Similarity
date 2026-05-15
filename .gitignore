@@ -4,6 +4,9 @@ embeddings/
 plots/
 results/
 
+# logging
+runs/
+
 # ignore temporary files
 .temp/
 

@@ -9,7 +9,7 @@ from typing import Any
 import torch
 
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.metrics.ot import method_map
+from dataset_similarity.metrics.ot import method_map, ot_distance
 from dataset_similarity.metrics.utils import prepare_tensor_dataset
 
 
@@ -52,10 +52,10 @@ def _conditional_entropy(
     joint = src_oh.T @ coupling @ tgt_oh  # (|S|, |T|)
 
     # Normalise to a proper joint distribution
-    joint = joint / joint.sum().clamp(min=1e-10)
+    joint = joint / joint.sum()
 
-    # Marginal P(Y_s); clamp only to avoid 0/0 in division, xlogy handles the others
-    p_src = joint.sum(dim=1, keepdim=True).clamp(min=1e-10)  # (|S|, 1)
+    # Marginal P(Y_s); every source class has at least one sample (via unique())
+    p_src = joint.sum(dim=1, keepdim=True)  # (|S|, 1)
 
     # Conditional P(Y_t | Y_s) = P(Y_s, Y_t) / P(Y_s)
     cond = joint / p_src  # (|S|, |T|)
@@ -165,21 +165,27 @@ def otce_distance(
         float OTCE distance, or tuple of (float OTCE distance, (N, M) coupling tensor)
         if return_coupling=True.
     """
+
+    # Prepare feature and label tensors from datasets
     src_features, src_labels = prepare_tensor_dataset(dataset1, return_labels=True)
     tgt_features, tgt_labels = prepare_tensor_dataset(dataset2, return_labels=True)
 
-    result = otce_score_from_tensors(
-        src_features,
-        src_labels,
-        tgt_features,
-        tgt_labels,
-        ot_method=ot_method,
+    wasserstein, coupling = ot_distance(
+        dataset1,
+        dataset2,
+        ot_method,
+        return_coupling=True,
         **ot_kwargs,
     )
 
-    # Negate the true OTCE (-W - H) to give a positive distance score (lower = better).
-    otce_score = -float(result["otce"].item())
+    # --- Step 2: conditional entropy ---
+    src_labels = src_labels.to(src_features.device)
+    tgt_labels = tgt_labels.to(tgt_features.device)
+    h = _conditional_entropy(coupling, src_labels, tgt_labels)
+
+    # --- Step 3: OTCE ---
+    otce_distance: float = (wasserstein + h).item()
 
     if return_coupling:
-        return otce_score, result["coupling"]
-    return otce_score
+        return otce_distance, coupling
+    return otce_distance

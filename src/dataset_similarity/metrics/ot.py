@@ -1,5 +1,6 @@
 from collections.abc import Callable
-from typing import Any
+from functools import partial
+from typing import Any, Literal, overload
 
 import ot as pot
 import torch
@@ -8,6 +9,8 @@ from geomloss import SamplesLoss
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.metrics.utils import prepare_tensor_dataset
 
+# flash-sinkhorn is an optional dependency with Linux + CUDA requirements, so we import
+# it in a try-except block and set a flag for availability
 try:
     from flash_sinkhorn import (  # pyright: ignore[reportMissingImports]
         SamplesLoss as FlashSamplesLoss,
@@ -34,19 +37,53 @@ def _resolve_weights(
     return a, b
 
 
-def _sinkhorn_loss(
-    loss_cls: Any,
+def sinkhorn_ot(
     data1: torch.Tensor,
     data2: torch.Tensor,
-    blur: float,
-    scaling: float,
-    reach: float | None,
-    weights1: torch.Tensor | None,
-    weights2: torch.Tensor | None,
+    blur: float = 0.05,
+    scaling: float = 0.9,
+    reach: float | None = None,
+    weights1: torch.Tensor | None = None,
+    weights2: torch.Tensor | None = None,
     p: int = 2,
     return_coupling: bool = False,
+    use_flash_sinkhorn: bool = False,
     **loss_kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
+    """
+    Sinkhorn Optimal Transport distance between two datasets.
+
+    Args:
+        data1:                  (N, D) tensor of source samples
+        data2:                  (M, D) tensor of target samples
+        blur:                   regularization (epsilon = blur^p);
+                                smaller = sharper/slower
+        scaling:                multiscale ratio in (0,1); higher = more accurate/slower
+        reach:                  if set, uses unbalanced OT (partial mass transport)
+        weights1:               (N,) tensor of source weights (uniform if None)
+        weights2:               (M,) tensor of target weights (uniform if None)
+        p:                      cost exponent (default 2 for squared Euclidean)
+        return_coupling:        if True, return the (N, M) coupling instead of
+                                the scalar cost; uses debias=False internally
+        use_flash_sinkhorn:     if True, use FlashSamplesLoss (Linux + CUDA only;
+                                requires pip install flash-sinkhorn)
+        **loss_kwargs:          passed through to SamplesLoss / FlashSamplesLoss
+
+    Returns:
+        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
+        if return_coupling=True, else None.
+    """
+    if use_flash_sinkhorn:
+        if not _FLASH_SINKHORN_AVAILABLE:
+            err_msg = (
+                "flash-sinkhorn is not installed. "
+                "It requires Linux with CUDA: pip install flash-sinkhorn"
+            )
+            raise ImportError(err_msg)
+        loss_cls = FlashSamplesLoss
+    else:
+        loss_cls = SamplesLoss
+
     a, b = _resolve_weights(data1, data2, weights1, weights2)
 
     if return_coupling:
@@ -87,111 +124,6 @@ def _sinkhorn_loss(
     return loss(a, data1, b, data2), None
 
 
-def sinkhorn_ot(
-    data1: torch.Tensor,
-    data2: torch.Tensor,
-    blur: float = 0.05,
-    scaling: float = 0.9,
-    reach: float | None = None,
-    weights1: torch.Tensor | None = None,
-    weights2: torch.Tensor | None = None,
-    p: int = 2,
-    return_coupling: bool = False,
-    **loss_kwargs: Any,
-) -> tuple[torch.Tensor, torch.Tensor | None]:
-    """
-    Sinkhorn Optimal Transport distance between two datasets.
-
-    Args:
-        data1:                  (N, D) tensor of source samples
-        data2:                  (M, D) tensor of target samples
-        blur:                   regularization (epsilon = blur^p);
-                                smaller = sharper/slower
-        scaling:                multiscale ratio in (0,1); higher = more accurate/slower
-        reach:                  if set, uses unbalanced OT (partial mass transport)
-        weights1:               (N,) tensor of source weights (uniform if None)
-        weights2:               (M,) tensor of target weights (uniform if None)
-        p:                      cost exponent (default 2 for squared Euclidean)
-        return_coupling:       if True, return the (N, M) coupling instead of
-                                the scalar cost; uses debias=False internally
-        **loss_kwargs:          passed through to SamplesLoss
-
-    Returns:
-        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
-        if return_coupling=True, else None.
-    """
-    return _sinkhorn_loss(
-        SamplesLoss,
-        data1,
-        data2,
-        blur,
-        scaling,
-        reach,
-        weights1,
-        weights2,
-        p=p,
-        return_coupling=return_coupling,
-        **loss_kwargs,
-    )
-
-
-def flash_sinkhorn_ot(
-    data1: torch.Tensor,
-    data2: torch.Tensor,
-    blur: float = 0.05,
-    scaling: float = 0.5,
-    reach: float | None = None,
-    weights1: torch.Tensor | None = None,
-    weights2: torch.Tensor | None = None,
-    p: int = 2,
-    return_coupling: bool = False,
-    **loss_kwargs: Any,
-) -> tuple[torch.Tensor, torch.Tensor | None]:
-    """
-    Flash-Sinkhorn Optimal Transport distance between two datasets.
-
-    Requires the flash-sinkhorn package (Linux + CUDA only).
-
-    Args:
-        data1:                  (N, D) tensor of source samples
-        data2:                  (M, D) tensor of target samples
-        blur:                   regularization (epsilon = blur^p);
-                                smaller = sharper/slower
-        scaling:                epsilon annealing factor in (0,1);
-                                higher = more accurate/slower
-        reach:                  if set, uses unbalanced OT (partial mass transport)
-        weights1:               (N,) tensor of source weights (uniform if None)
-        weights2:               (M,) tensor of target weights (uniform if None)
-        p:                      cost exponent (default 2 for squared Euclidean)
-        return_coupling:       if True, return the (N, M) coupling instead of
-                                the scalar cost; uses debias=False internally
-        **loss_kwargs:          passed through to FlashSamplesLoss
-
-    Returns:
-        Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
-        if return_coupling=True, else None.
-    """
-    if not _FLASH_SINKHORN_AVAILABLE:
-        err_msg = (
-            "flash-sinkhorn is not installed. "
-            "It requires Linux with CUDA: pip install flash-sinkhorn"
-        )
-        raise ImportError(err_msg)
-    return _sinkhorn_loss(
-        FlashSamplesLoss,
-        data1,
-        data2,
-        blur,
-        scaling,
-        reach,
-        weights1,
-        weights2,
-        p=p,
-        return_coupling=return_coupling,
-        **loss_kwargs,
-    )
-
-
 def python_ot(
     data1: torch.Tensor,
     data2: torch.Tensor,
@@ -221,7 +153,7 @@ def python_ot(
         metric:          distance metric passed to ``ot.solve_sample``; one of
                          ``"euclidean"`` (L1 cost) or ``"sqeuclidean"``
                          (squared-L2 cost, default)
-        return_coupling: if True, return the (N, M) coupling instead of
+        return_coupling: if True, return the (N, M) coupling in addition to
                          the scalar cost
         **solve_kwargs:  passed through to ``ot.solve_sample``
                          (e.g. ``reg``, ``method``)
@@ -248,15 +180,41 @@ def python_ot(
 
 method_map: dict[str, Callable[..., tuple[torch.Tensor, torch.Tensor | None]]] = {
     "sinkhorn": sinkhorn_ot,
-    "flash_sinkhorn": flash_sinkhorn_ot,
+    "flash_sinkhorn": partial(sinkhorn_ot, use_flash_sinkhorn=True, scaling=0.5),
     "python_ot": python_ot,
 }
+
+# These allow the type checker to understand that the returned values are not a tuple
+# when return_coupling=False
+
+
+@overload
+def ot_distance(
+    dataset1: ImageDataset,
+    dataset2: ImageDataset,
+    method: str = ...,
+    *,
+    return_coupling: Literal[True],
+    **method_kwargs: Any,
+) -> tuple[float, torch.Tensor]: ...
+
+
+@overload
+def ot_distance(
+    dataset1: ImageDataset,
+    dataset2: ImageDataset,
+    method: str = ...,
+    *,
+    return_coupling: Literal[False] = ...,
+    **method_kwargs: Any,
+) -> float: ...
 
 
 def ot_distance(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
     method: str = "sinkhorn",
+    return_coupling: bool = False,
     **method_kwargs: Any,
 ) -> float | tuple[float, torch.Tensor]:
     """
@@ -282,7 +240,9 @@ def ot_distance(
         )
         raise ValueError(err_msg)
 
-    cost, coupling = method_map[method](data1, data2, **method_kwargs)
+    cost, coupling = method_map[method](
+        data1, data2, return_coupling=return_coupling, **method_kwargs
+    )
     if coupling is not None:
         return float(cost.item()), coupling
     return float(cost.item())
