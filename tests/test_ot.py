@@ -61,7 +61,7 @@ class TestSinkhornOTTransportPlan:
         Y = torch.randn(20, 4, generator=rng)
         w1 = torch.softmax(torch.randn(20, generator=rng), dim=0)
         w2 = torch.softmax(torch.randn(20, generator=rng), dim=0)
-        # High blur → plan ≈ a⊗b, marginal constraints satisfied to machine precision
+        # High blur → plan ≈ a⊗b, so marginals should match weights approximately
         _, plan = sinkhorn_ot(
             X, Y, weights1=w1, weights2=w2, blur=2.0, return_coupling=True
         )

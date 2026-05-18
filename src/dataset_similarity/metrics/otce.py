@@ -169,9 +169,10 @@ def otce_distance(
     """
 
     # --- Step 1: compute OT cost and coupling ---
-    # to make mypy happy about the return type of ot_distance / otdd
-    distance_func = cast(
-        Callable[..., tuple[float, torch.Tensor]], otdd if use_otdd else ot_distance
+    distance_func = (
+        cast(  # to make mypy happy about the return type of ot_distance / otdd
+            Callable[..., tuple[float, torch.Tensor]], otdd if use_otdd else ot_distance
+        )
     )
     wasserstein, coupling = distance_func(
         dataset1, dataset2, return_coupling=True, **distance_kwargs
