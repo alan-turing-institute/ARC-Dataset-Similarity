@@ -4,6 +4,7 @@ kwargs:
     use_otdd: False
     method: sinkhorn
 
+    # Sinkhorn parameters forwarded to ot_distance
     # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence
     blur: 0.05
     # Multiscale annealing ratio in (0, 1); higher = more accurate but slower

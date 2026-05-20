@@ -3,7 +3,8 @@ kwargs:
     use_wasserstein: False
     use_otdd: True
 
-   # Arguments used here are defaults unless otherwise specified. Please
+    # OTDD kwargs
+    # Arguments used here are defaults unless otherwise specified. Please
     # see the source code for a description of what each parameter is:
     # https://github.com/alan-turing-institute/arc-otdd/blob/main/otdd/pytorch/distance.py#L67
     # general arguments

@@ -154,7 +154,6 @@ def otce_distance(
     Args:
         dataset1:        Source ImageDataset.
         dataset2:        Target ImageDataset.
-        ot_method:       OT solver - "sinkhorn" | "flash_sinkhorn" | "python_ot".
         return_coupling: If True, also return the (N, M) OT coupling matrix.
         **distance_kwargs:     Forwarded to the chosen distance method.
 
@@ -175,8 +174,12 @@ def otce_distance(
 
     # --- Step 2: conditional entropy ---
     # To work with both ImageDataset and DatasetMix:
-    src_labels = torch.tensor([dataset1[i][1] for i in range(len(dataset1))])
-    tgt_labels = torch.tensor([dataset2[i][1] for i in range(len(dataset2))])
+    src_labels = torch.tensor([dataset1[i][1] for i in range(len(dataset1))]).to(
+        coupling.device
+    )
+    tgt_labels = torch.tensor([dataset2[i][1] for i in range(len(dataset2))]).to(
+        coupling.device
+    )
 
     h = conditional_entropy(coupling, src_labels, tgt_labels)
 

@@ -48,6 +48,7 @@ def sinkhorn_ot(
     p: int = 2,
     return_coupling: bool = False,
     use_flash_sinkhorn: bool = False,
+    debias: bool = False,
     **loss_kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """
@@ -119,7 +120,13 @@ def sinkhorn_ot(
         return loss(a, data1, b, data2), plan
 
     loss = loss_cls(
-        "sinkhorn", p=p, blur=blur, scaling=scaling, reach=reach, **loss_kwargs
+        "sinkhorn",
+        p=p,
+        blur=blur,
+        scaling=scaling,
+        reach=reach,
+        debias=debias,
+        **loss_kwargs,
     )
     return loss(a, data1, b, data2), None
 
@@ -150,9 +157,7 @@ def python_ot(
         data2:           (M, D) tensor of target samples
         weights1:        (N,) source weights (uniform if None)
         weights2:        (M,) target weights (uniform if None)
-        metric:          distance metric passed to ``ot.solve_sample``; one of
-                         ``"euclidean"`` (L1 cost) or ``"sqeuclidean"``
-                         (squared-L2 cost, default)
+        metric:          distance metric passed to ``ot.solve_sample``
         return_coupling: if True, return the (N, M) coupling in addition to
                          the scalar cost
         **solve_kwargs:  passed through to ``ot.solve_sample``

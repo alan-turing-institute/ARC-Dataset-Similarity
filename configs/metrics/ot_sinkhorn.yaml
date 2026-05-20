@@ -1,6 +1,7 @@
 metric: ot_distance
 kwargs:
     method: sinkhorn
+    debias: True
 
     # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence
     blur: 0.05
