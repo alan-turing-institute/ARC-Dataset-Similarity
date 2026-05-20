@@ -21,7 +21,11 @@ class TestSinkhornOT:
         assert cost.ndim == 0
 
     def test_identical_clouds_near_zero(self):
-        cost, _ = sinkhorn_ot(_X, _X.clone())
+        cost, _ = sinkhorn_ot(
+            _X,
+            _X.clone(),
+            debias=True,
+        )
         assert cost.item() < 1e-3
 
     def test_distance_ordering(self):
