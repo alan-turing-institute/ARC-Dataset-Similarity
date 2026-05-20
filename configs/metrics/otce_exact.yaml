@@ -1,4 +1,5 @@
 metric: otce_distance
 kwargs:
-    ot_method: python_ot
-    metric: sqeuclidean
+    use_wasserstein: True
+    use_otdd: False
+    method: python_ot

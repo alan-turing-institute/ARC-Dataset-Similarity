@@ -5,8 +5,10 @@ datasets:
   - experiment_0_alpha_0.5
   - experiment_0_alpha_0.75
 metrics:
-  - mmd
   - otce_sinkhorn
   - otce_exact
   - ot_exact
   - ot_sinkhorn
+  - f_otce
+  - jc_otce
+  - jc_w_otce

@@ -1,8 +1,9 @@
 metric: otce_distance
 kwargs:
+    use_wasserstein: False
+    use_otdd: False
     method: sinkhorn
 
-    # Sinkhorn parameters forwarded to optimal_transport_distance
     # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence
     blur: 0.05
     # Multiscale annealing ratio in (0, 1); higher = more accurate but slower

@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from dataset_similarity.metrics.otce import (
-    _conditional_entropy,
+    conditional_entropy,
     otce_distance,
     otce_score_from_tensors,
 )
@@ -23,13 +23,13 @@ class TestConditionalEntropy:
         coupling = torch.full((4, 4), 1.0 / 16)
         src_labels = torch.tensor([0, 0, 1, 1])
         tgt_labels = torch.tensor([0, 0, 1, 1])
-        assert _conditional_entropy(coupling, src_labels, tgt_labels).ndim == 0
+        assert conditional_entropy(coupling, src_labels, tgt_labels).ndim == 0
 
     def test_non_negative(self):
         coupling = torch.full((4, 4), 1.0 / 16)
         src_labels = torch.tensor([0, 0, 1, 1])
         tgt_labels = torch.tensor([0, 0, 1, 1])
-        assert _conditional_entropy(coupling, src_labels, tgt_labels).item() >= 0
+        assert conditional_entropy(coupling, src_labels, tgt_labels).item() >= 0
 
     def test_perfect_block_diagonal_is_zero(self):
         # Coupling fully within matching classes → H(Y_t | Y_s) = 0
@@ -39,14 +39,14 @@ class TestConditionalEntropy:
         coupling[0:2, 0:2] = 0.25
         coupling[2:4, 2:4] = 0.25
         coupling /= coupling.sum()
-        assert _conditional_entropy(coupling, src_labels, tgt_labels).item() < 1e-5
+        assert conditional_entropy(coupling, src_labels, tgt_labels).item() < 1e-5
 
     def test_uniform_coupling_equals_log_num_classes(self):
         # Uniform coupling over 2 balanced classes → H = log(2)
         coupling = torch.full((4, 4), 1.0 / 16)
         src_labels = torch.tensor([0, 0, 1, 1])
         tgt_labels = torch.tensor([0, 0, 1, 1])
-        result = _conditional_entropy(coupling, src_labels, tgt_labels)
+        result = conditional_entropy(coupling, src_labels, tgt_labels)
         assert torch.isclose(result, torch.log(torch.tensor(2.0)), atol=1e-5)
 
 

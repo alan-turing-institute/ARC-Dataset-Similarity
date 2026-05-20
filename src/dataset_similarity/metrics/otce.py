@@ -14,7 +14,7 @@ from dataset_similarity.metrics.ot import method_map, ot_distance
 from dataset_similarity.metrics.otdd import otdd
 
 
-def _conditional_entropy(
+def conditional_entropy(
     coupling: torch.Tensor,
     src_labels: torch.Tensor,
     tgt_labels: torch.Tensor,
@@ -64,11 +64,6 @@ def _conditional_entropy(
     # H(Y_t | Y_s) = - Σ P(s,t) log P(t|s)
     # torch.xlogy(x, y) = x * log(y), with xlogy(0, 0) = 0
     return -torch.xlogy(joint, cond).sum()
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 
 def otce_score_from_tensors(
@@ -124,7 +119,7 @@ def otce_score_from_tensors(
     # --- Step 2: conditional entropy ---
     src_labels = src_labels.to(src_features.device)
     tgt_labels = tgt_labels.to(tgt_features.device)
-    h = _conditional_entropy(coupling, src_labels, tgt_labels)
+    h = conditional_entropy(coupling, src_labels, tgt_labels)
 
     # --- Step 3: OTCE ---
     otce = -wasserstein - h
@@ -179,10 +174,11 @@ def otce_distance(
     )
 
     # --- Step 2: conditional entropy ---
-    src_labels = torch.tensor(dataset1.data.label)
-    tgt_labels = torch.tensor(dataset2.data.label)
+    # To work with both ImageDataset and DatasetMix:
+    src_labels = torch.tensor([dataset1[i][1] for i in range(len(dataset1))])
+    tgt_labels = torch.tensor([dataset2[i][1] for i in range(len(dataset2))])
 
-    h = _conditional_entropy(coupling, src_labels, tgt_labels)
+    h = conditional_entropy(coupling, src_labels, tgt_labels)
 
     # --- Step 3: OTCE ---
     if use_wasserstein:
