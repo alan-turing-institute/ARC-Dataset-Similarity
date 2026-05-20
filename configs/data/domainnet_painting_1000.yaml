@@ -5,7 +5,6 @@ kwargs:
   size: 1000
   random_seed: 42
   embedding: clip
-  target_superclasses: None
   target_classes:
     - swan
     - stairs
