@@ -103,9 +103,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset",
-        choices=["DomainNet", "ImageNet"],
+        choices=["DomainNet", "ImageNet", "COCO"],
         default="DomainNet",
-        help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet'."),
+        help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet', 'COCO'."),
     )
     parser.add_argument(
         "--data_root",
@@ -118,7 +118,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset_split",
-        choices=["train", "test", "val"],
         default="train",
         help="Dataset split to embed (default: train).",
     )
