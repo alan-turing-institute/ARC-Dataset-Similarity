@@ -1,0 +1,9 @@
+data_config: domainnet_clipart_1000
+model_config: resnet50
+
+device: cpu
+
+training_args:
+  num_train_epochs: 10
+  per_device_train_batch_size: 32
+  learning_rate: 0.001

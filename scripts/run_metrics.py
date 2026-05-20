@@ -13,25 +13,15 @@ python scripts/run_metrics.py --metrics otdd_exact mmd
 import argparse
 import json
 import logging
-from typing import Any
 
 import dataset_similarity.metrics as metrics
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
-from dataset_similarity.data import DATASET_MAP
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.data.utils import load_dataset_from_config, load_yaml_from_path
 
 METRIC_CONFIG_DIR = CONFIG_DIR / "metrics"
 METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
-
-
-def load_dataset_from_config(cfg: dict[str, Any]) -> ImageDataset | DatasetMix:
-    name = cfg["name"]
-    if name == "DatasetMix":
-        return DatasetMix.from_dict(cfg["kwargs"])
-    dataset_cls = DATASET_MAP[cfg["name"]]
-    return dataset_cls.from_dict(cfg["kwargs"])
 
 
 def apply_metric(

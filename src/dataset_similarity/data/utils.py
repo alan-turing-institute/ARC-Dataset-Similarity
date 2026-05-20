@@ -1,50 +1,37 @@
-from pathlib import Path
 from typing import Any
 
-from yaml import safe_load
+import torch
+from torchvision import transforms
 
-from dataset_similarity.constants import DEFAULT_DATA_ROOT
-
-
-def get_embedding_path(
-    image_path: Path,
-    embedding_dir: Path,
-    data_root: Path = DEFAULT_DATA_ROOT,
-) -> Path:
-    """
-    Helper function which given an absolute image path and the name of an embedding
-    model, returns a path where embeddings of that image can be saved or loaded.
-
-    Args:
-        image_path: An absolute path to an image file in the original dataset directory.
-        embedding_dir: An absolute path to the directory where embeddings for the
-            dataset are stored, e.g. `.constants.DEFAULT_EMBEDDING_DIR / "clip"`.
-        data_root: An absolute path to the root directory of the original dataset. This
-            is used to compute the relative path of the image within the dataset, which
-            is then used to determine the embedding path. By default, this is set to
-            `dataset_similarity.constants.DEFAULT_DATA_ROOT`, but can be overridden if
-            the dataset is stored in a different location.
-
-    Returns:
-        Path: The absolute path where the embedding for the image can be saved or
-            loaded.
-    """
-    return embedding_dir / image_path.relative_to(data_root).with_suffix(".safetensors")
+from dataset_similarity.data import DATASET_MAP
+from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.mix import DatasetMix
 
 
-def load_yaml_from_path(
-    yaml_path: str | Path,
-) -> dict[str, Any]:
-    """
-    Wrapper function around yaml.safe_load to load a YAML file from a given path and
-    return its contents as a dictionary.
+def load_dataset_from_config(cfg: dict[str, Any]) -> ImageDataset | DatasetMix:
+    name = cfg["name"]
+    if name == "DatasetMix":
+        return DatasetMix.from_dict(cfg["kwargs"])
+    dataset_cls = DATASET_MAP[cfg["name"]]
+    return dataset_cls.from_dict(cfg["kwargs"])
 
-    Args:
-        yaml_path: Path to the YAML file to be loaded.
 
-    Returns:
-        dict: The contents of the YAML file as a dictionary.
-    """
-    with open(yaml_path) as f:
-        dictionary: dict[str, Any] = safe_load(f)
-    return dictionary
+_imagenet_preprocess = transforms.Compose(
+    [
+        transforms.Lambda(lambda x: x[:3]),  # drop alpha channel if RGBA
+        transforms.Resize((224, 224)),  # ResNet50 expects 224x224
+        transforms.ConvertImageDtype(torch.float32),  # uint8 --> float32 [0, 1]
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+        ),
+    ]
+)
+
+
+def image_ds_collate_fn(
+    batch: list[tuple[torch.Tensor, int]],
+) -> dict[str, torch.Tensor]:
+    pixel_values = torch.stack([_imagenet_preprocess(item[0]) for item in batch], dim=0)
+    labels = torch.tensor([item[1] for item in batch])
+    return {"pixel_values": pixel_values, "labels": labels}

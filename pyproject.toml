@@ -42,6 +42,7 @@ dependencies = [
     "pandas>=2.3.3",
     "otdd",
     "plotnine>=0.15.3",
+    "accelerate>=1.13.0",
 ]
 
 [dependency-groups]

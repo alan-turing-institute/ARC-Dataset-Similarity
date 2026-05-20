@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dataset_similarity.data.utils import get_embedding_path
+from dataset_similarity.utils import get_embedding_path
 
 
 def test_embedding_path(tmp_path: Path) -> None:
