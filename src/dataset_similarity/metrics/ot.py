@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from functools import partial
 from typing import Any, Literal, overload
@@ -8,6 +9,8 @@ from geomloss import SamplesLoss
 
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.metrics.utils import prepare_tensor_dataset
+
+logger = logging.getLogger(__name__)
 
 # flash-sinkhorn is an optional dependency with Linux + CUDA requirements, so we import
 # it in a try-except block and set a flag for availability
@@ -200,6 +203,7 @@ def ot_distance(
     method: str = ...,
     *,
     return_coupling: Literal[True],
+    device: str | torch.device | None = ...,
     **method_kwargs: Any,
 ) -> tuple[float, torch.Tensor]: ...
 
@@ -211,6 +215,7 @@ def ot_distance(
     method: str = ...,
     *,
     return_coupling: Literal[False] = ...,
+    device: str | torch.device | None = ...,
     **method_kwargs: Any,
 ) -> float: ...
 
@@ -220,6 +225,7 @@ def ot_distance(
     dataset2: ImageDataset,
     method: str = "sinkhorn",
     return_coupling: bool = False,
+    device: str | torch.device | None = None,
     **method_kwargs: Any,
 ) -> float | tuple[float, torch.Tensor]:
     """
@@ -229,14 +235,32 @@ def ot_distance(
         dataset1:       Source ImageDataset (must have return_paths=False)
         dataset2:       Target ImageDataset (must have return_paths=False)
         method:         OT method - one of "sinkhorn", "flash_sinkhorn", "python_ot"
+        device:         Device to move tensors to before computing (e.g. "cuda",
+                        "cpu"). If None, tensors stay on their current device (CPU).
+                        Note: method="python_ot" does not natively support CUDA;
+                        use method="sinkhorn" for GPU-compatible OT.
         **method_kwargs: Passed through to the chosen method function
 
     Returns:
         float OT cost, or tuple of (float OT cost, (N, M) coupling tensor)
         if return_coupling=True.
     """
-    data1 = prepare_tensor_dataset(dataset1)
-    data2 = prepare_tensor_dataset(dataset2)
+    data1: torch.Tensor = prepare_tensor_dataset(dataset1)
+    data2: torch.Tensor = prepare_tensor_dataset(dataset2)
+
+    if device is not None:
+        data1 = data1.to(device=device)
+        data2 = data2.to(device=device)
+
+    if (
+        device is not None
+        and torch.device(device).type == "cuda"
+        and method == "python_ot"
+    ):
+        logger.warning(
+            "method='python_ot' does not natively support CUDA. "
+            "Use method='sinkhorn' for GPU-compatible OT."
+        )
 
     if method not in method_map:
         err_msg = (

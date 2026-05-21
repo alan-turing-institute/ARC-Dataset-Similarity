@@ -138,6 +138,7 @@ def otce_distance(
     return_coupling: bool = False,
     use_wasserstein: bool = True,
     use_otdd: bool = False,
+    device: str | torch.device | None = None,
     **distance_kwargs: Any,
 ) -> float | tuple[float, torch.Tensor]:
     """
@@ -155,6 +156,9 @@ def otce_distance(
         dataset1:        Source ImageDataset.
         dataset2:        Target ImageDataset.
         return_coupling: If True, also return the (N, M) OT coupling matrix.
+        device:          Device to move tensors to before computing (e.g. "cuda",
+                         "cpu"). Forwarded to the underlying OT distance function.
+                         If None, tensors stay on their current device (CPU).
         **distance_kwargs:     Forwarded to the chosen distance method.
 
     Returns:
@@ -168,8 +172,12 @@ def otce_distance(
             Callable[..., tuple[float, torch.Tensor]], otdd if use_otdd else ot_distance
         )
     )
+    # Pass the device argument only if it's not None, otherwise use default behaviour
+    device_kwarg: dict[str, str | torch.device] = (
+        {"device": device} if device is not None else {}
+    )
     wasserstein, coupling = distance_func(
-        dataset1, dataset2, return_coupling=True, **distance_kwargs
+        dataset1, dataset2, return_coupling=True, **device_kwarg, **distance_kwargs
     )
 
     # --- Step 2: conditional entropy ---
