@@ -12,8 +12,8 @@ def get_embedding_path(
     data_root: Path = DEFAULT_DATA_ROOT,
 ) -> Path:
     """
-    Helper function which given an absolute image path and the name of an embedding
-    model, returns a path where embeddings of that image can be saved or loaded.
+    Helper function which given an absolute image path and an embedding directory path,
+    returns a path where embeddings of that image can be saved or loaded.
 
     Args:
         image_path: An absolute path to an image file in the original dataset directory.
@@ -29,6 +29,7 @@ def get_embedding_path(
         Path: The absolute path where the embedding for the image can be saved or
             loaded.
     """
+
     return embedding_dir / image_path.relative_to(data_root).with_suffix(".safetensors")
 
 
@@ -44,7 +45,18 @@ def load_yaml_from_path(
 
     Returns:
         dict: The contents of the YAML file as a dictionary.
+
+    Raises:
+         ValueError: If the YAML file is empty or does not contain a top-level mapping.
     """
+
     with open(yaml_path) as f:
-        dictionary: dict[str, Any] = safe_load(f)
-    return dictionary
+        loaded = safe_load(f)
+
+    if not isinstance(loaded, dict):
+        error_msg = (
+            f"Expected YAML file {yaml_path!s} to contain a top-level mapping, got "
+            f"{type(loaded).__name__}."
+        )
+        raise ValueError(error_msg)
+    return loaded

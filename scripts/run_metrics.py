@@ -18,7 +18,8 @@ import dataset_similarity.metrics as metrics
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
-from dataset_similarity.data.utils import load_dataset_from_config, load_yaml_from_path
+from dataset_similarity.data.utils import load_dataset_from_config
+from dataset_similarity.utils import load_yaml_from_path
 
 METRIC_CONFIG_DIR = CONFIG_DIR / "metrics"
 METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"

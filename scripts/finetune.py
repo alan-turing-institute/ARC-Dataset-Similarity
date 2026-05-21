@@ -25,7 +25,7 @@ def finetune(config_name: str):
     data_config: dict[str, str | dict] = load_yaml_from_path(
         DATA_CONFIG_DIR / f"{config['data_config']}.yaml"
     )
-    data_config["kwargs"].pop("embedding")  # remove embedding config
+    data_config["kwargs"].pop("embedding", None)  # remove embedding config
     dataset = load_dataset_from_config(data_config)
 
     # train model
