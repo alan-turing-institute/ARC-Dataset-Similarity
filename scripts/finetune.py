@@ -2,25 +2,23 @@ import argparse
 
 from transformers import AutoModelForImageClassification, Trainer, TrainingArguments
 
-from dataset_similarity.constants import CONFIG_DIR
+from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.utils import image_ds_collate_fn, load_dataset_from_config
 from dataset_similarity.utils import load_yaml_from_path
 
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
-MODEL_CONFIG_DIR = CONFIG_DIR / "model"
+TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 
 
-def finetune(config):
-    # load model and data configurations
-    model_config = load_yaml_from_path(
-        MODEL_CONFIG_DIR / f"{config['model_config']}.yaml"
-    )
+def finetune(config_name: str):
+    # load_config
+    config_path = FINETUNE_CONFIG_DIR / f"{config_name}.yaml"
+    config = load_yaml_from_path(config_path)
 
     # load_model
     model = AutoModelForImageClassification.from_pretrained(
-        model_config["model_name"],
-        device_map=config["device"],
+        **config["model_args"],
     )
 
     # load data
@@ -32,10 +30,11 @@ def finetune(config):
 
     # train model
     training_args = config["training_args"]
+    output_dir = TRAINED_MODELS_DIR / config_name
     trainer = Trainer(
         model=model,
         train_dataset=dataset,
-        args=TrainingArguments(**training_args),
+        args=TrainingArguments(output_dir=output_dir, **training_args),
         data_collator=image_ds_collate_fn,
     )
     trainer.train()
@@ -51,6 +50,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    config_path = FINETUNE_CONFIG_DIR / f"{args.config_name}.yaml"
-    config = load_yaml_from_path(config_path)
-    finetune(config)
+    finetune(args.config_name)

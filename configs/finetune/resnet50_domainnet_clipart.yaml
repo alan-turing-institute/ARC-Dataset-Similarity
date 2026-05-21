@@ -1,7 +1,11 @@
 data_config: domainnet_clipart_1000
-model_config: resnet50
 
-device: cpu
+# these are passed directly to:
+# transformers.AutoModelForImageClassification.from_pretrained
+
+model_args:
+  pretrained_model_name_or_path: "microsoft/resnet-50"
+  device_map: cpu
 
 training_args:
   num_train_epochs: 10
