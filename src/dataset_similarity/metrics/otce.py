@@ -10,7 +10,7 @@ from typing import Any, cast
 import torch
 
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.metrics.ot import method_map, ot_distance
+from dataset_similarity.metrics.ot import ot_distance
 from dataset_similarity.metrics.otdd import otdd
 
 
@@ -66,81 +66,14 @@ def conditional_entropy(
     return -torch.xlogy(joint, cond).sum()
 
 
-def otce_score_from_tensors(
-    src_features: torch.Tensor,
-    src_labels: torch.Tensor,
-    tgt_features: torch.Tensor,
-    tgt_labels: torch.Tensor,
-    ot_method: str = "sinkhorn",
-    weights_src: torch.Tensor | None = None,
-    weights_tgt: torch.Tensor | None = None,
-    **ot_kwargs: Any,
-) -> dict[str, torch.Tensor]:
-    """
-    Compute OTCE from pre-computed feature tensors and integer labels.
-
-    Args:
-        src_features:   (N, D) source feature matrix.
-        src_labels:     (N,)   integer class labels for source samples.
-        tgt_features:   (M, D) target feature matrix.
-        tgt_labels:     (M,)   integer class labels for target samples.
-        ot_method:      OT solver - "sinkhorn" | "flash_sinkhorn" | "python_ot".
-        weights_src:    Optional (N,) source sample weights (uniform if None).
-        weights_tgt:    Optional (M,) target sample weights (uniform if None).
-        **ot_kwargs:    Forwarded to the chosen OT method function.
-
-    Returns:
-        dict with keys:
-            "otce"               - scalar OTCE score (higher = better transfer).
-            "wasserstein"        - scalar OT cost W (domain shift).
-            "conditional_entropy"- scalar H(Y_t | Y_s) (task misalignment).
-            "coupling"           - (N, M) OT coupling matrix.
-    """
-    if ot_method not in method_map:
-        error_msg = (
-            f"Unsupported OT method: {ot_method!r}. "
-            f"Available: {list(method_map.keys())}"
-        )
-        raise ValueError(error_msg)
-
-    ot_fn = method_map[ot_method]
-
-    # --- Step 1: compute OT cost and coupling ---
-
-    wasserstein, coupling = ot_fn(
-        src_features,
-        tgt_features,
-        weights1=weights_src,
-        weights2=weights_tgt,
-        return_coupling=True,
-        **ot_kwargs,
-    )
-
-    # --- Step 2: conditional entropy ---
-    src_labels = src_labels.to(src_features.device)
-    tgt_labels = tgt_labels.to(tgt_features.device)
-    h = conditional_entropy(coupling, src_labels, tgt_labels)
-
-    # --- Step 3: OTCE ---
-    otce = -wasserstein - h
-
-    return {
-        "otce": otce,
-        "wasserstein": wasserstein,
-        "conditional_entropy": h,
-        "coupling": coupling,
-    }
-
-
 def otce_distance(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
-    return_coupling: bool = False,
     use_wasserstein: bool = True,
     use_otdd: bool = False,
     device: str | torch.device | None = None,
     **distance_kwargs: Any,
-) -> float | tuple[float, torch.Tensor]:
+) -> float:
     """
     Compute OTCE distance between two ImageDatasets.
 
@@ -197,6 +130,4 @@ def otce_distance(
     else:
         otce_dist = h.item()
 
-    if return_coupling:
-        return otce_dist, coupling
     return otce_dist

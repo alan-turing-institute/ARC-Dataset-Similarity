@@ -17,8 +17,8 @@ if not hasattr(geomloss, "utils"):
     geomloss.utils = geomloss._legacy.utils  # type: ignore[attr-defined]
 
 
-class _TensorImageDataset(ImageDataset):
-    """ImageDataset that serves pre-built in-memory tensors."""
+class _EmbeddingTensorDataset(ImageDataset):
+    """Dataset that serves pre-built in-memory tensors, representing image embeddings"""
 
     def __init__(
         self,
@@ -46,7 +46,7 @@ class _TensorImageDataset(ImageDataset):
     def _load_data(self) -> DataFrame:
         return DataFrame(
             {
-                "path": [f"/fake/{i}.jpg" for i in range(self._n_samples)],
+                "path": [f"/fake/{i}.safetensors" for i in range(self._n_samples)],
                 "label": [i % self._n_classes for i in range(self._n_samples)],
             }
         )
@@ -58,18 +58,18 @@ class _TensorImageDataset(ImageDataset):
 
 
 @pytest.fixture()
-def tensor_image_dataset() -> _TensorImageDataset:
-    return _TensorImageDataset()
+def embedding_tensor_dataset() -> _EmbeddingTensorDataset:
+    return _EmbeddingTensorDataset()
 
 
 @pytest.fixture()
-def tensor_image_dataset_with_paths() -> _TensorImageDataset:
-    return _TensorImageDataset(return_paths=True)
+def tensor_image_dataset_with_paths() -> _EmbeddingTensorDataset:
+    return _EmbeddingTensorDataset(return_paths=True)
 
 
 @pytest.fixture()
-def tensor_image_dataset_2() -> _TensorImageDataset:
-    return _TensorImageDataset(seed=1)
+def embedding_tensor_dataset_2() -> _EmbeddingTensorDataset:
+    return _EmbeddingTensorDataset(seed=1)
 
 
 class _ImageDataset(Dataset[Any]):

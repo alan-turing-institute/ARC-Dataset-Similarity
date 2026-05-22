@@ -6,7 +6,7 @@ from torch.utils.data import TensorDataset
 
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
-from dataset_similarity.metrics.utils import prepare_tensor_dataset
+from dataset_similarity.metrics.utils import extract_dataset_tensors
 
 
 def _prepare_tensor_dataset_targets(labels: torch.Tensor) -> torch.Tensor:
@@ -42,7 +42,7 @@ def _prepare_otdd_tensor_dataset(dataset: ImageDataset | DatasetMix) -> TensorDa
     Returns:
         TensorDataset: The processed TensorDataset ready for use with OTDD.
     """
-    features, labels = prepare_tensor_dataset(dataset, return_labels=True)
+    features, labels = extract_dataset_tensors(dataset, return_labels=True)
     targets = _prepare_tensor_dataset_targets(labels)
     tensor_dataset = TensorDataset(features, targets)
     tensor_dataset.classes = torch.sort(torch.unique(targets)).values

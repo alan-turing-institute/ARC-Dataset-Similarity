@@ -1,14 +1,13 @@
 import logging
 from collections.abc import Callable
 from functools import partial
-from typing import Any, Literal, overload
+from typing import Any
 
 import ot as pot
 import torch
-from geomloss import SamplesLoss
 
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.metrics.utils import prepare_tensor_dataset
+from dataset_similarity.metrics.utils import extract_dataset_tensors
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +23,6 @@ except ImportError:
     _FLASH_SINKHORN_AVAILABLE = False
 
 
-_PYTHON_OT_METRICS = ("euclidean", "sqeuclidean")
-
-
 def _resolve_weights(
     data1: torch.Tensor,
     data2: torch.Tensor,
@@ -40,7 +36,7 @@ def _resolve_weights(
     return a, b
 
 
-def sinkhorn_ot(
+def flash_sinkhorn_ot(
     data1: torch.Tensor,
     data2: torch.Tensor,
     blur: float = 0.05,
@@ -50,7 +46,6 @@ def sinkhorn_ot(
     weights2: torch.Tensor | None = None,
     p: int = 2,
     return_coupling: bool = False,
-    use_flash_sinkhorn: bool = False,
     debias: bool = False,
     **loss_kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
@@ -69,29 +64,38 @@ def sinkhorn_ot(
         p:                      cost exponent (default 2 for squared Euclidean)
         return_coupling:        if True, return the (N, M) coupling instead of
                                 the scalar cost; uses debias=False internally
-        use_flash_sinkhorn:     if True, use FlashSamplesLoss (Linux + CUDA only;
-                                requires pip install flash-sinkhorn)
         **loss_kwargs:          passed through to SamplesLoss / FlashSamplesLoss
 
     Returns:
         Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
         if return_coupling=True, else None.
     """
-    if use_flash_sinkhorn:
-        if not _FLASH_SINKHORN_AVAILABLE:
-            err_msg = (
-                "flash-sinkhorn is not installed. "
-                "It requires Linux with CUDA: pip install flash-sinkhorn"
-            )
-            raise ImportError(err_msg)
-        loss_cls = FlashSamplesLoss
-    else:
-        loss_cls = SamplesLoss
+    if not _FLASH_SINKHORN_AVAILABLE:
+        err_msg = (
+            "flash-sinkhorn is not installed. "
+            "It requires Linux with CUDA: pip install flash-sinkhorn"
+        )
+        raise ImportError(err_msg)
 
     a, b = _resolve_weights(data1, data2, weights1, weights2)
 
+    loss = FlashSamplesLoss(
+        "sinkhorn",
+        p=p,
+        blur=blur,
+        scaling=scaling,
+        reach=reach,
+        debias=debias,
+        **loss_kwargs,
+    )
+
     if return_coupling:
-        potentials_loss = loss_cls(
+        # A separate loss instance is needed with potentials=True and debias=False.
+        # debias=False is required because the Gibbs-kernel formula for the plan,
+        #   y_ij = exp((F_i + G_j - C_ij) / ε) * a_i * b_j,
+        # is only valid for the undebiased dual potentials (F, G).
+
+        potentials_loss = FlashSamplesLoss(
             "sinkhorn",
             p=p,
             blur=blur,
@@ -101,46 +105,32 @@ def sinkhorn_ot(
             potentials=True,
             **loss_kwargs,
         )
-        loss = loss_cls(
-            "sinkhorn",
-            p=p,
-            blur=blur,
-            scaling=scaling,
-            reach=reach,
-            debias=False,
-            **loss_kwargs,
-        )
         F, G = potentials_loss(a, data1, b, data2)
-        # geomloss prepends a batch dim when inputs are unbatched; remove it
+
+        # geomloss prepends a batch dimension when inputs are unbatched; remove it.
         F, G = F.squeeze(0), G.squeeze(0)
         x_i = data1.unsqueeze(1)  # (N, 1, D)
         y_j = data2.unsqueeze(0)  # (1, M, D)
         C_ij = (1 / p) * (x_i - y_j).abs().pow(p).sum(-1)  # (N, M)
         eps = blur**p
+
+        # Recover the transport plan from the Gibbs kernel:
         plan = ((F.unsqueeze(1) + G.unsqueeze(0) - C_ij) / eps).exp() * (
             a.unsqueeze(1) * b.unsqueeze(0)
         )
-        return loss(a, data1, b, data2), plan
+        # Recover the scalar cost from the dual objective
+        cost = (a * F).sum() + (b * G).sum()
+        return cost, plan
 
-    loss = loss_cls(
-        "sinkhorn",
-        p=p,
-        blur=blur,
-        scaling=scaling,
-        reach=reach,
-        debias=debias,
-        **loss_kwargs,
-    )
     return loss(a, data1, b, data2), None
 
 
 def python_ot(
     data1: torch.Tensor,
     data2: torch.Tensor,
-    weights1: torch.Tensor | None = None,
-    weights2: torch.Tensor | None = None,
     metric: str = "sqeuclidean",
     return_coupling: bool = False,
+    method: str | None = None,
     **solve_kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """
@@ -170,11 +160,13 @@ def python_ot(
         Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
         if return_coupling=True, else None.
     """
-    if metric not in _PYTHON_OT_METRICS:
-        err_msg = f"python_ot metric must be one of {_PYTHON_OT_METRICS}, got {metric}."
-        raise ValueError(err_msg)
-    a, b = _resolve_weights(data1, data2, weights1, weights2)
-    sol = pot.solve_sample(data1, data2, a, b, metric=metric, **solve_kwargs)
+    sol = pot.solve_sample(
+        data1,
+        data2,
+        metric=metric,
+        method=method,
+        **solve_kwargs,
+    )
 
     if return_coupling:
         plan = sol.plan
@@ -187,37 +179,10 @@ def python_ot(
 
 
 method_map: dict[str, Callable[..., tuple[torch.Tensor, torch.Tensor | None]]] = {
-    "sinkhorn": sinkhorn_ot,
-    "flash_sinkhorn": partial(sinkhorn_ot, use_flash_sinkhorn=True, scaling=0.5),
+    "sinkhorn": partial(python_ot, method="sinkhorn"),
+    "flash_sinkhorn": flash_sinkhorn_ot,
     "python_ot": python_ot,
 }
-
-# These allow the type checker to understand that the returned values are not a tuple
-# when return_coupling=False
-
-
-@overload
-def ot_distance(
-    dataset1: ImageDataset,
-    dataset2: ImageDataset,
-    method: str = ...,
-    *,
-    return_coupling: Literal[True],
-    device: str | torch.device | None = ...,
-    **method_kwargs: Any,
-) -> tuple[float, torch.Tensor]: ...
-
-
-@overload
-def ot_distance(
-    dataset1: ImageDataset,
-    dataset2: ImageDataset,
-    method: str = ...,
-    *,
-    return_coupling: Literal[False] = ...,
-    device: str | torch.device | None = ...,
-    **method_kwargs: Any,
-) -> float: ...
 
 
 def ot_distance(
@@ -245,8 +210,8 @@ def ot_distance(
         float OT cost, or tuple of (float OT cost, (N, M) coupling tensor)
         if return_coupling=True.
     """
-    data1: torch.Tensor = prepare_tensor_dataset(dataset1)
-    data2: torch.Tensor = prepare_tensor_dataset(dataset2)
+    data1: torch.Tensor = extract_dataset_tensors(dataset1)
+    data2: torch.Tensor = extract_dataset_tensors(dataset2)
 
     if device is not None:
         data1 = data1.to(device=device)

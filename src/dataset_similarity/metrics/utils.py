@@ -8,7 +8,7 @@ from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
 
 
-def prepare_tensor_dataset(
+def extract_dataset_tensors(
     dataset: ImageDataset | DatasetMix | Dataset,
     return_labels: bool = False,
 ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
