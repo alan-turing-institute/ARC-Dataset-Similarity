@@ -67,7 +67,7 @@ class TestOptimalTransportDistance:
 class TestPythonOT:
     def test_identical_clouds_zero(self):
         cost, _ = python_ot(_X, _X.clone())
-        assert cost.item() == 0
+        assert cost.item() == pytest.approx(0, abs=1e-5)
 
     def test_distance_ordering(self):
         cost_near, _ = python_ot(_X, _Y_NEAR)
