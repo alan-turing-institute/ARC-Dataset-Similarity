@@ -90,7 +90,7 @@ def flash_sinkhorn_ot(
         **kwargs,
     )
 
-    cost = loss(a, data1, b, data2).item()
+    cost = loss(a, data1, b, data2)
     plan = None
 
     if return_coupling:
