@@ -44,7 +44,7 @@ def flash_sinkhorn_ot(
     debias: bool = False,
     return_coupling: bool = False,
     **kwargs: Any,
-) -> tuple[torch.Tensor, torch.Tensor | None]:
+) -> tuple[float, torch.Tensor | None]:
     """
     Sinkhorn Optimal Transport distance between two datasets. This function acts as a
     wrapper around flash-sinkhorn's SamplesLoss to provide a convenient interface for
@@ -90,7 +90,7 @@ def flash_sinkhorn_ot(
         **kwargs,
     )
 
-    cost = loss(a, data1, b, data2)
+    cost = loss(a, data1, b, data2).item()
     plan = None
 
     if return_coupling:
@@ -107,7 +107,7 @@ def flash_sinkhorn_ot(
         eps = blur**p
         plan = ((F.t() + G - C) / eps).exp() * (a[:, None] * b[None, :])
 
-    return cost, plan
+    return cost.item(), plan
 
 
 def python_ot(
@@ -117,7 +117,7 @@ def python_ot(
     method: str | None = None,
     return_coupling: bool = False,
     **kwargs: Any,
-) -> tuple[torch.Tensor, torch.Tensor | None]:
+) -> tuple[float, torch.Tensor | None]:
     """
     Wrapper around `ot.solve_sample` from the POT library to compute the Optimal
     Transport distance. Whether this runs on the torch backend (supporting autograd and
@@ -207,7 +207,7 @@ def ot_distance(
             "Use method='sinkhorn' for GPU-compatible OT."
         )
 
-    ot_fn: Callable[..., tuple[torch.Tensor, torch.Tensor | None]] = (
+    ot_fn: Callable[..., tuple[float, torch.Tensor | None]] = (
         flash_sinkhorn_ot if use_flash_sinkhorn else python_ot  # type: ignore[assignment]
     )
 
@@ -215,5 +215,5 @@ def ot_distance(
         data1, data2, return_coupling=return_coupling, **method_kwargs
     )
     if coupling is not None:
-        return float(cost.item()), coupling
-    return float(cost.item())
+        return cost, coupling
+    return cost
