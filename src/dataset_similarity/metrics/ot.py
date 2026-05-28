@@ -97,7 +97,7 @@ def flash_sinkhorn_ot(
         # We need to set potentials=True and debias=False to obtain the OT plan via the
         # Gibbs kernel formula:
         #   y_ij = exp((F_i + G_j - C_ij) / ε) * a_i * b_j,
-        # This is because the formula is only valid for the Sinkhorn distnace dual
+        # This is because the formula is only valid for the Sinkhorn distance dual
         # potentials (F, G) (i.e. not for the debiased Sinkhorn divergence potentials)
 
         loss.debias = False
