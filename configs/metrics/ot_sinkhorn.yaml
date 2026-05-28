@@ -1,6 +1,7 @@
 metric: ot_distance
 kwargs:
     use_flash_sinkhorn: True
+    device: cuda
     debias: True
 
     # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence

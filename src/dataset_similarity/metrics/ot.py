@@ -119,10 +119,9 @@ def python_ot(
     **kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """
-    Optimal Transport distance (or coupling) between two datasets.
-
-    Delegates to ``ot.solve_sample``. Whether this runs on the torch backend
-    (supporting autograd and GPU) depends on the method:
+    Wrapper around `ot.solve_sample` from the POT library to compute the Optimal
+    Transport distance. Whether this runs on the torch backend (supporting autograd and
+    GPU) depends on the `method` argument:
 
     - ``method='geomloss'``: fully differentiable, GPU-compatible. Requires
       ``reg`` to be set. Use this when gradients or GPU execution are needed.
@@ -135,12 +134,14 @@ def python_ot(
         data2:           (M, D) tensor of target samples
         weights1:        (N,) source weights (uniform if None)
         weights2:        (M,) target weights (uniform if None)
-        metric:          distance metric passed to ``ot.solve_sample``
+        metric:          distance metric passed to `ot.solve_sample`
         method:          OT method - e.g. "sinkhorn", "emd", "geomloss" (see POT docs)
         return_coupling: if True, return the (N, M) coupling in addition to
-                         the scalar cost
-        **kwargs:  passed through to ``ot.solve_sample``
-                         (e.g. ``reg``, ``method``)
+                            the scalar cost
+        **kwargs:        passed through to `ot.solve_sample`, see POT documentation for
+                            details. Note that the `reg` argument is required for
+                            GPU-compatible Sinkhorn methods (e.g. "geomloss") but should
+                            not be set for exact EMD.
 
     Returns:
         Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor

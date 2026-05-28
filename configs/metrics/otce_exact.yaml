@@ -2,3 +2,4 @@ metric: otce_distance
 kwargs:
     use_wasserstein: True
     use_otdd: False
+    use_flash_sinkhorn: False

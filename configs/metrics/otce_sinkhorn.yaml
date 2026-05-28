@@ -3,6 +3,8 @@ kwargs:
     use_wasserstein: True
     use_otdd: False
     use_flash_sinkhorn: True
+    device: cuda
+    debias: False
 
     # Sinkhorn parameters forwarded to ot_distance
     # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence

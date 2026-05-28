@@ -44,7 +44,7 @@ kwargs:
     coupling_method: geomloss
     nworkers_dists: 0
     eigen_correction: False
-    device: cpu #changed from CPU
+    device: cuda #changed from CPU
     precision: single
     verbose: 1
 
