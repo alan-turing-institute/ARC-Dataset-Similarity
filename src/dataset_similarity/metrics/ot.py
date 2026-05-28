@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Callable
-from functools import partial
 from typing import Any
 
 import ot as pot
@@ -14,9 +13,7 @@ logger = logging.getLogger(__name__)
 # flash-sinkhorn is an optional dependency with Linux + CUDA requirements, so we import
 # it in a try-except block and set a flag for availability
 try:
-    from flash_sinkhorn import (  # pyright: ignore[reportMissingImports]
-        SamplesLoss as FlashSamplesLoss,
-    )
+    from flash_sinkhorn import SamplesLoss  # pyright: ignore[reportMissingImports]
 
     _FLASH_SINKHORN_AVAILABLE = True
 except ImportError:
@@ -39,32 +36,36 @@ def _resolve_weights(
 def flash_sinkhorn_ot(
     data1: torch.Tensor,
     data2: torch.Tensor,
-    blur: float = 0.05,
-    scaling: float = 0.9,
-    reach: float | None = None,
     weights1: torch.Tensor | None = None,
     weights2: torch.Tensor | None = None,
     p: int = 2,
-    return_coupling: bool = False,
+    blur: float = 0.05,
+    scaling: float = 0.9,
     debias: bool = False,
-    **loss_kwargs: Any,
+    return_coupling: bool = False,
+    **kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """
-    Sinkhorn Optimal Transport distance between two datasets.
+    Sinkhorn Optimal Transport distance between two datasets. This function acts as a
+    wrapper around flash-sinkhorn's SamplesLoss to provide a convenient interface for
+    computing OT distances and couplings between datasets.
 
     Args:
         data1:                  (N, D) tensor of source samples
         data2:                  (M, D) tensor of target samples
-        blur:                   regularization (epsilon = blur^p);
-                                smaller = sharper/slower
-        scaling:                multiscale ratio in (0,1); higher = more accurate/slower
-        reach:                  if set, uses unbalanced OT (partial mass transport)
         weights1:               (N,) tensor of source weights (uniform if None)
         weights2:               (M,) tensor of target weights (uniform if None)
         p:                      cost exponent (default 2 for squared Euclidean)
-        return_coupling:        if True, return the (N, M) coupling instead of
-                                the scalar cost; uses debias=False internally
-        **loss_kwargs:          passed through to SamplesLoss / FlashSamplesLoss
+        blur:                   regularization (epsilon = blur^p);
+                                    smaller = sharper/slower
+        scaling:                multiscale ratio in (0,1); higher = more accurate/slower
+        debias:                 whether to use the debiased Sinkhorn divergence (default
+                                    False).
+        return_coupling:        if True, return the (N, M) coupling instead of the
+                                    scalar cost; uses debias=False internally
+        **kwargs:               Additional kwargs to SamplesLoss. Note that potentials
+                                    is controlled internally to the function and should
+                                    not be set by the user.
 
     Returns:
         Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
@@ -79,59 +80,43 @@ def flash_sinkhorn_ot(
 
     a, b = _resolve_weights(data1, data2, weights1, weights2)
 
-    loss = FlashSamplesLoss(
+    loss = SamplesLoss(
         "sinkhorn",
         p=p,
         blur=blur,
         scaling=scaling,
-        reach=reach,
         debias=debias,
-        **loss_kwargs,
+        potentials=False,  # we want to start by computing the cost
+        **kwargs,
     )
 
+    cost = loss(a, data1, b, data2)
+    plan = None
+
     if return_coupling:
-        # A separate loss instance is needed with potentials=True and debias=False.
-        # debias=False is required because the Gibbs-kernel formula for the plan,
+        # We need to set potentials=True and debias=False to obtain the OT plan via the
+        # Gibbs kernel formula:
         #   y_ij = exp((F_i + G_j - C_ij) / ε) * a_i * b_j,
-        # is only valid for the undebiased dual potentials (F, G).
+        # This is because the formula is only valid for the Sinkhorn distnace dual
+        # potentials (F, G) (i.e. not for the debiased Sinkhorn divergence potentials)
 
-        potentials_loss = FlashSamplesLoss(
-            "sinkhorn",
-            p=p,
-            blur=blur,
-            scaling=scaling,
-            reach=reach,
-            debias=False,
-            potentials=True,
-            **loss_kwargs,
-        )
-        F, G = potentials_loss(a, data1, b, data2)
-
-        # geomloss prepends a batch dimension when inputs are unbatched; remove it.
-        F, G = F.squeeze(0), G.squeeze(0)
-        x_i = data1.unsqueeze(1)  # (N, 1, D)
-        y_j = data2.unsqueeze(0)  # (1, M, D)
-        C_ij = (1 / p) * (x_i - y_j).abs().pow(p).sum(-1)  # (N, M)
+        loss.debias = False
+        loss.potentials = True
+        F, G = loss(a, data1, b, data2)
+        C = (torch.cdist(data1, data2, p=p) ** p) / p  # (N, M)
         eps = blur**p
+        plan = ((F.t() + G - C) / eps).exp() * (a[:, None] * b[None, :])
 
-        # Recover the transport plan from the Gibbs kernel:
-        plan = ((F.unsqueeze(1) + G.unsqueeze(0) - C_ij) / eps).exp() * (
-            a.unsqueeze(1) * b.unsqueeze(0)
-        )
-        # Recover the scalar cost from the dual objective
-        cost = (a * F).sum() + (b * G).sum()
-        return cost, plan
-
-    return loss(a, data1, b, data2), None
+    return cost, plan
 
 
 def python_ot(
     data1: torch.Tensor,
     data2: torch.Tensor,
     metric: str = "sqeuclidean",
-    return_coupling: bool = False,
     method: str | None = None,
-    **solve_kwargs: Any,
+    return_coupling: bool = False,
+    **kwargs: Any,
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """
     Optimal Transport distance (or coupling) between two datasets.
@@ -151,9 +136,10 @@ def python_ot(
         weights1:        (N,) source weights (uniform if None)
         weights2:        (M,) target weights (uniform if None)
         metric:          distance metric passed to ``ot.solve_sample``
+        method:          OT method - e.g. "sinkhorn", "emd", "geomloss" (see POT docs)
         return_coupling: if True, return the (N, M) coupling in addition to
                          the scalar cost
-        **solve_kwargs:  passed through to ``ot.solve_sample``
+        **kwargs:  passed through to ``ot.solve_sample``
                          (e.g. ``reg``, ``method``)
 
     Returns:
@@ -165,30 +151,23 @@ def python_ot(
         data2,
         metric=metric,
         method=method,
-        **solve_kwargs,
+        **kwargs,
     )
 
+    plan = None
     if return_coupling:
         plan = sol.plan
         if not isinstance(plan, torch.Tensor):
             # use to_dense() if it's a sparse tensor, else return as-is
             plan = plan.to_dense() if hasattr(plan, "to_dense") else plan[:]
-        return sol.value, plan
 
-    return sol.value, None
-
-
-method_map: dict[str, Callable[..., tuple[torch.Tensor, torch.Tensor | None]]] = {
-    "sinkhorn": partial(python_ot, method="sinkhorn"),
-    "flash_sinkhorn": flash_sinkhorn_ot,
-    "python_ot": python_ot,
-}
+    return sol.value, plan
 
 
 def ot_distance(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
-    method: str = "sinkhorn",
+    use_flash_sinkhorn: bool = False,
     return_coupling: bool = False,
     device: str | torch.device | None = None,
     **method_kwargs: Any,
@@ -220,21 +199,18 @@ def ot_distance(
     if (
         device is not None
         and torch.device(device).type == "cuda"
-        and method == "python_ot"
+        and not use_flash_sinkhorn
     ):
         logger.warning(
             "method='python_ot' does not natively support CUDA. "
             "Use method='sinkhorn' for GPU-compatible OT."
         )
 
-    if method not in method_map:
-        err_msg = (
-            f"Unsupported OT method: {method}. "
-            f"Supported methods: {list(method_map.keys())}"
-        )
-        raise ValueError(err_msg)
+    ot_fn: Callable[..., tuple[torch.Tensor, torch.Tensor | None]] = (
+        flash_sinkhorn_ot if use_flash_sinkhorn else python_ot  # type: ignore[assignment]
+    )
 
-    cost, coupling = method_map[method](
+    cost, coupling = ot_fn(
         data1, data2, return_coupling=return_coupling, **method_kwargs
     )
     if coupling is not None:

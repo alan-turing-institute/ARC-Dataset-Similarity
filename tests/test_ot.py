@@ -20,19 +20,9 @@ _Y_FAR = torch.randn(50, 8) + 10.0
 
 
 class TestOptimalTransportDistance:
-    def test_sinkhorn_method(
-        self, embedding_tensor_dataset, embedding_tensor_dataset_2
-    ):
+    def test_no_coupling(self, embedding_tensor_dataset, embedding_tensor_dataset_2):
         cost = ot_distance(
-            embedding_tensor_dataset, embedding_tensor_dataset_2, method="sinkhorn"
-        )
-        assert isinstance(cost, float)
-
-    def test_python_ot_method(
-        self, embedding_tensor_dataset, embedding_tensor_dataset_2
-    ):
-        cost = ot_distance(
-            embedding_tensor_dataset, embedding_tensor_dataset_2, method="python_ot"
+            embedding_tensor_dataset, embedding_tensor_dataset_2, return_coupling=False
         )
         assert isinstance(cost, float)
 
@@ -42,6 +32,7 @@ class TestOptimalTransportDistance:
         result = ot_distance(
             embedding_tensor_dataset,
             embedding_tensor_dataset_2,
+            use_flash_sinkhorn=False,
             method="sinkhorn",
             return_coupling=True,
         )
@@ -53,15 +44,10 @@ class TestOptimalTransportDistance:
 
     def test_same_dataset_near_zero(self, embedding_tensor_dataset):
         cost = ot_distance(
-            embedding_tensor_dataset, embedding_tensor_dataset, method="python_ot"
+            embedding_tensor_dataset,
+            embedding_tensor_dataset,
         )
         assert cost < 1e-5
-
-    def test_unsupported_method_raises(self, embedding_tensor_dataset):
-        with pytest.raises(ValueError, match="Unsupported OT method"):
-            ot_distance(
-                embedding_tensor_dataset, embedding_tensor_dataset, method="bogus"
-            )
 
 
 class TestPythonOT:

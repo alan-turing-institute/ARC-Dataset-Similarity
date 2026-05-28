@@ -1,6 +1,6 @@
 metric: ot_distance
 kwargs:
-    method: sinkhorn
+    use_flash_sinkhorn: True
     debias: True
 
     # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence
@@ -9,5 +9,3 @@ kwargs:
     scaling: 0.9
     # Cost exponent: p=2 gives squared-Euclidean cost
     p: 2
-    # Set to a positive float to use unbalanced (partial) OT; null = balanced OT
-    reach: null

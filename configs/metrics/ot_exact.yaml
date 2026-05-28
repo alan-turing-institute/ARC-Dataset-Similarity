@@ -1,6 +1,6 @@
 metric: ot_distance
 kwargs:
-    method: python_ot
+    use_flash_sinkhorn: False
 
     # Cost metric: "sqeuclidean" (squared L2) or "euclidean" (L1)
     metric: sqeuclidean
