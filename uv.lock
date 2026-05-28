@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'win32'",
@@ -505,6 +505,7 @@ name = "dataset-similarity"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "flash-sinkhorn", marker = "sys_platform == 'linux'" },
     { name = "geomloss" },
     { name = "jupyter" },
     { name = "markupsafe" },
@@ -535,6 +536,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "flash-sinkhorn", marker = "sys_platform == 'linux'" },
     { name = "geomloss", specifier = ">=0.3.1" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "markupsafe", specifier = "==3.0.*" },
@@ -646,6 +648,22 @@ source = { registry = "https://download.pytorch.org/whl/cu126" }
 sdist = { url = "https://files.pythonhosted.org/packages/b5/fe/997687a931ab51049acce6fa1f23e8f01216374ea81374ddee763c493db5/filelock-3.29.0.tar.gz", hash = "sha256:69974355e960702e789734cb4871f884ea6fe50bd8404051a3530bc07809cf90" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/47/dd9a212ef6e343a6857485ffe25bba537304f1913bdbed446a23f7f592e1/filelock-3.29.0-py3-none-any.whl", hash = "sha256:96f5f6344709aa1572bbf631c640e4ebeeb519e08da902c39a001882f30ac258" },
+]
+
+[[package]]
+name = "flash-sinkhorn"
+version = "0.3.3.post1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "(python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'win32') or (python_full_version < '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "python_full_version >= '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "(python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'win32') or (platform_machine == 'aarch64' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
+    { name = "triton", marker = "(python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/69/71/19e9ae59007cf2a840868bb552925f3f115f8e1ed351ca5afcd2dc9e8800/flash_sinkhorn-0.3.3.post1.tar.gz", hash = "sha256:08abfdbb8d72a068e8d3441c13b8e1c7a8cacf94b00b658ce8fca1fab167d535", size = 145324, upload-time = "2026-04-06T00:31:12.714Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/28/3af26e0f82168761885249d9dd11dd17a3aec0f588058d5c9da03336336e/flash_sinkhorn-0.3.3.post1-py3-none-any.whl", hash = "sha256:a2a0c40adc6c213ec9630996929cdfe57c780fecad883261da068c317041fea3", size = 168897, upload-time = "2026-04-06T00:31:11.447Z" },
 ]
 
 [[package]]
