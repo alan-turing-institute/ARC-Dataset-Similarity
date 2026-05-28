@@ -53,12 +53,14 @@ class COCODataset(ImageDataset):
         target_classes: list[str] | None = None,
         target_superclasses: list[str] | None = None,
         split: Literal["train2017", "val2017"] = "train2017",
+        drop_duplicates: bool = True,
         size: float | int | None = None,
         random_seed: int | None = None,
         embedding: None | str = None,
         embedding_dir: None | Path | str = DEFAULT_EMBEDDING_DIR,
         return_paths: bool = False,
     ) -> None:
+        self.drop_duplicates = drop_duplicates
         # Target classes also need to be processed before calling super().__init__()
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
             dict[int, dict[str, str]],
@@ -71,14 +73,9 @@ class COCODataset(ImageDataset):
         }
         self.supercategory_to_classnumber_map: dict[str, list[int]] = {}
         for label, meta in self.label_to_meta_map.items():
-            supercategory = meta["supercategory"]
-            if supercategory not in self.supercategory_to_classnumber_map:
-                self.supercategory_to_classnumber_map[supercategory] = []
-            self.supercategory_to_classnumber_map[supercategory].append(label)
-
-        self.classnumber_to_name_map: dict[int, str] = {
-            label: meta["name"] for label, meta in self.label_to_meta_map.items()
-        }
+            self.supercategory_to_classnumber_map.setdefault(
+                meta["supercategory"], []
+            ).append(label)
 
         if target_superclasses is not None:
             for sc in target_superclasses:
@@ -86,7 +83,7 @@ class COCODataset(ImageDataset):
                     err_msg = f"Unknown supercategory '{sc}'"
                     raise ValueError(err_msg)
             expanded = [
-                self.classnumber_to_name_map[label]
+                self.label_to_meta_map[label]["name"]
                 for sc in target_superclasses
                 for label in self.supercategory_to_classnumber_map[sc]
             ]
@@ -96,14 +93,10 @@ class COCODataset(ImageDataset):
                 target_classes = list(dict.fromkeys(target_classes + expanded))
 
         if target_classes is not None:
-            resolved: list[str] = []
             for cls in target_classes:
-                if cls in self.name_to_label_map:
-                    resolved.append(cls)
-                else:
+                if cls not in self.name_to_label_map:
                     err_msg = f"Unknown class '{cls}'"
                     raise ValueError(err_msg)
-            target_classes = resolved
 
         super().__init__(
             dataset_dir=dataset_dir,
@@ -125,11 +118,19 @@ class COCODataset(ImageDataset):
         else:
             cat_ids = coco.getCatIds(catNms=self.target_classes)
 
+        cat_img_ids: dict[int, list[int]] = {
+            cat_id: coco.getImgIds(catIds=[cat_id]) for cat_id in cat_ids
+        }
+
         rows: list[dict[str, Path | int]] = []
-        for cat_id in cat_ids:
-            img_ids = coco.getImgIds(catIds=[cat_id])
-            for img_info in coco.loadImgs(img_ids):
-                img_path = self.dataset_dir / self.split / img_info["file_name"]
+        for cat_id, img_ids in cat_img_ids.items():
+            for img_id in img_ids:
+                img_path = (
+                    self.dataset_dir / self.split / coco.imgs[img_id]["file_name"]
+                )
                 rows.append({"path": img_path, "label": cat_id})
 
-        return pd.DataFrame(rows, columns=["path", "label"])
+        df = pd.DataFrame(rows, columns=["path", "label"])
+        if self.drop_duplicates:
+            df = df.drop_duplicates(subset="path", keep="first").reset_index(drop=True)
+        return df
