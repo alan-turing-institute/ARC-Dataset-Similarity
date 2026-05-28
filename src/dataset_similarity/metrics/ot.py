@@ -162,7 +162,7 @@ def python_ot(
             # use to_dense() if it's a sparse tensor, else return as-is
             plan = plan.to_dense() if hasattr(plan, "to_dense") else plan[:]
 
-    return sol.value, plan
+    return sol.value.item(), plan
 
 
 def ot_distance(
