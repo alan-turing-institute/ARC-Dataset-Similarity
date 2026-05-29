@@ -45,18 +45,7 @@ def load_yaml_from_path(
 
     Returns:
         dict: The contents of the YAML file as a dictionary.
-
-    Raises:
-         ValueError: If the YAML file is empty or does not contain a top-level mapping.
     """
 
     with open(yaml_path) as f:
-        loaded = safe_load(f)
-
-    if not isinstance(loaded, dict):
-        error_msg = (
-            f"Expected YAML file {yaml_path!s} to contain a top-level mapping, got "
-            f"{type(loaded).__name__}."
-        )
-        raise ValueError(error_msg)
-    return loaded
+        return dict(safe_load(f))
