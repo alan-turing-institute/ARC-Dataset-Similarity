@@ -17,7 +17,7 @@ DATA_CONFIG_DIR = CONFIG_DIR / "data"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 
 
-def finetune(config_name: str):
+def main(config_name: str):
     # load_config
     config_path = FINETUNE_CONFIG_DIR / f"{config_name}.yaml"
     config = load_yaml_from_path(config_path)
@@ -67,4 +67,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    finetune(args.config_name)
+    main(args.config_name)
