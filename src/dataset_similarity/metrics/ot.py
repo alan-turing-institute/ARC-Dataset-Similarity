@@ -134,16 +134,10 @@ def python_ot(
     Args:
         data1:           (N, D) tensor of source samples
         data2:           (M, D) tensor of target samples
-        weights1:        (N,) source weights (uniform if None)
-        weights2:        (M,) target weights (uniform if None)
         metric:          distance metric passed to `ot.solve_sample`
         method:          OT method - e.g. "sinkhorn", "emd", "geomloss" (see POT docs)
-        return_coupling: if True, return the (N, M) coupling in addition to
-                            the scalar cost
-        **kwargs:        passed through to `ot.solve_sample`, see POT documentation for
-                            details. Note that the `reg` argument is required for
-                            GPU-compatible Sinkhorn methods (e.g. "geomloss") but should
-                            not be set for exact EMD.
+        return_coupling: if True, return the (N, M) coupling in addition to the scalar cost
+        **kwargs:        passed through to `ot.solve_sample` (e.g. `a`/`b` for weights, `reg` for Sinkhorn)
 
     Returns:
         Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
