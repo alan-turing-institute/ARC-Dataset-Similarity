@@ -1,0 +1,12 @@
+data_config: domainnet_real_1000
+
+# these are passed directly to:
+# transformers.AutoModelForImageClassification.from_pretrained
+model_args:
+  pretrained_model_name_or_path: "microsoft/swin-base-patch4-window12-384"
+  device_map: cpu
+
+training_args:
+  num_train_epochs: 10
+  per_device_train_batch_size: 32
+  learning_rate: 0.001

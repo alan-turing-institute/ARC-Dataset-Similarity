@@ -34,7 +34,7 @@ def finetune(config_name: str):
     data_config: dict[str, str | dict] = load_yaml_from_path(
         DATA_CONFIG_DIR / f"{config['data_config']}.yaml"
     )
-    if data_config.get["kwargs"] is None:
+    if data_config.get("kwargs") is None:
         data_config["kwargs"] = {}
     data_config["kwargs"]["embedding"] = None  # remove embedding config
     dataset = load_dataset_from_config(data_config)
