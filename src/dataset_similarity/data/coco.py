@@ -122,15 +122,11 @@ class COCODataset(ImageDataset):
             cat_id: coco.getImgIds(catIds=[cat_id]) for cat_id in cat_ids
         }
 
-        rows: list[dict[str, Path | int]] = []
-        for cat_id, img_ids in cat_img_ids.items():
-            for img_id in img_ids:
-                img_path = (
-                    self.dataset_dir / self.split / coco.imgs[img_id]["file_name"]
-                )
-                rows.append({"path": img_path, "label": cat_id})
-
-        df = pd.DataFrame(rows, columns=["path", "label"])
+        df = pd.DataFrame(
+            {"path": self.dataset_dir / self.split / coco.imgs[img_id]["file_name"], "label": cat_id} 
+            for cat_id, img_ids in cat_img_ids.items()
+            for img_id in img_ids
+        )
         if self.drop_duplicates:
             df = df.drop_duplicates(subset="path", keep="first").reset_index(drop=True)
         return df
