@@ -36,15 +36,13 @@ to the `embeddings/` directory, but these can be overridden with the `--data_roo
 on all available flags.
 """
 
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 
 from dataset_similarity.constants import DEFAULT_DATA_ROOT, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data import DATASET_MAP
-from dataset_similarity.data.utils import load_yaml_from_path
 from dataset_similarity.embedding import Extractor
+from dataset_similarity.utils import load_yaml_from_path
 
 
 def main(args: argparse.Namespace) -> None:

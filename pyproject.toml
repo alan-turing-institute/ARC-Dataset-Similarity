@@ -45,6 +45,7 @@ dependencies = [
     "pot>=0.9.6.post1",
     "plotnine>=0.15.3",
     "flash-sinkhorn; sys_platform == 'linux'",
+    "accelerate>=1.13.0",
 ]
 
 [dependency-groups]

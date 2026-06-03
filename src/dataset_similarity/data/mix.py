@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from dataset_similarity.constants import CONFIG_DIR
 from dataset_similarity.data import DATASET_MAP
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.utils import load_yaml_from_path
 
 
 class DatasetMix(Dataset):  # type: ignore[misc]

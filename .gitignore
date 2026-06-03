@@ -3,6 +3,7 @@
 embeddings/
 plots/
 results/
+trained_models/
 
 # logging
 runs/
