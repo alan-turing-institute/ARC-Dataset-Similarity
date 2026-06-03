@@ -12,7 +12,7 @@ from itertools import combinations
 import yaml
 
 from dataset_similarity.constants import CONFIG_DIR
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.utils import load_yaml_from_path
 
 
 def main(args):
