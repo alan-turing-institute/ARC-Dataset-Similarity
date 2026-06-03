@@ -36,8 +36,6 @@ to the `embeddings/` directory, but these can be overridden with the `--data_roo
 on all available flags.
 """
 
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 
