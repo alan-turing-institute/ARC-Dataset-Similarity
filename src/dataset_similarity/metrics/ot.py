@@ -173,14 +173,12 @@ def ot_distance(
     Optimal Transport distance between two datasets.
 
     Args:
-        dataset1:       Source ImageDataset (must have return_paths=False)
-        dataset2:       Target ImageDataset (must have return_paths=False)
-        method:         OT method - one of "sinkhorn", "flash_sinkhorn", "python_ot"
-        device:         Device to move tensors to before computing (e.g. "cuda",
-                        "cpu"). If None, tensors stay on their current device (CPU).
-                        Note: method="python_ot" does not natively support CUDA;
-                        use method="sinkhorn" for GPU-compatible OT.
-        **method_kwargs: Passed through to the chosen method function
+        dataset1:          Source ImageDataset (must have return_paths=False)
+        dataset2:          Target ImageDataset (must have return_paths=False)
+        use_flash_sinkhorn: If True, use flash-sinkhorn (requires CUDA + Linux).
+        device:            Device to move tensors to before computing (e.g. "cuda", "cpu").
+                           If None, tensors stay on their current device (CPU).
+        **method_kwargs:   Passed through to the chosen backend (flash_sinkhorn_ot or python_ot).
 
     Returns:
         float OT cost, or tuple of (float OT cost, (N, M) coupling tensor)
