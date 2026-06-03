@@ -41,18 +41,15 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
 
     def __init__(
         self,
-        dataset_dir: str | Path,
+        dataset_dir: Path,
         target_classes: list[str] | None,
         split: str,
         size: float | int | None,
         random_seed: int | None,
         embedding: None | str,
-        embedding_dir: None | Path | str,
         return_paths: bool,
     ) -> None:
         super().__init__()
-        if not isinstance(dataset_dir, Path):
-            dataset_dir = Path(dataset_dir)
         self.dataset_dir = dataset_dir
         self.split = split
         self.target_classes = target_classes
@@ -61,16 +58,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         self.random_seed = random_seed
         if self.size is not None:
             self.data = self.subsample_data()
-        if embedding is not None:
-            if embedding_dir is None:
-                msg = "`embedding_dir` must be provided if `embedding` is not None"
-                raise ValueError(msg)
-            if not isinstance(embedding_dir, Path):
-                embedding_dir = Path(embedding_dir)
-            embedding_path = embedding_dir / embedding
-        else:
-            embedding_path = None
-        self.embedding_path = embedding_path
+        self.embedding = embedding
         self.return_paths = return_paths
 
     def subsample_data(self) -> DataFrame:
@@ -140,13 +128,11 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         """
         sample = self.data.iloc[idx]
         image_path = sample["path"]
-        if self.embedding_path is None:
+        if self.embedding is None:
             tensor = read_image(image_path, mode="RGB")
         else:
             image_embedding_path = get_embedding_path(
-                image_path=image_path,
-                embedding_dir=self.embedding_path,
-                data_root=self.dataset_dir.parent,
+                image_path=image_path, embedding=self.embedding
             )
             tensor = load_file(image_embedding_path)["embedding"]
         if self.return_paths:

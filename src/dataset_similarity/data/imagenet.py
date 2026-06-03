@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Literal, TypedDict
 
 import pandas as pd
 
-from dataset_similarity.constants import DEFAULT_EMBEDDING_DIR, IMAGENET_DIR
+from dataset_similarity.constants import DATA_DIR, IMAGENET_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.utils import load_yaml_from_path
 
@@ -20,8 +18,6 @@ class ImageNetDataset(ImageDataset):
     PyTorch dataset for `ImageNet ILSVRC <https://image-net.org/>`_.
 
     Args:
-        dataset_dir: Absolute path to the dataset directory containing ImageNet images.
-            Defaults to `dataset_similarity.constants.IMAGENET_DIR`.
         target_classes: List of class names to include in the dataset. If None, all
             classes are included. Elements must be valid class names as specified in the
             class mapping file at
@@ -38,10 +34,6 @@ class ImageNetDataset(ImageDataset):
         embedding: If not `None`, the name of the embedding model to use for this
             dataset. If `None`, raw images are returned by `__getitem__`. Defaults to
             `None`.
-        embedding_dir: The absolute path to the directory where the embeddings are
-            stored. This is used to compute the path to the embedding for each image.
-            Must be provided if `embedding` is not None. Defaults to
-            `dataset_similarity.constants.DEFAULT_EMBEDDING_DIR`.
         return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a `Path` object.
             Defaults to `False`.
@@ -49,19 +41,17 @@ class ImageNetDataset(ImageDataset):
 
     def __init__(
         self,
-        dataset_dir: str | Path = IMAGENET_DIR,
         target_classes: list[str] | None = None,
         split: Literal["train", "val"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
         embedding: None | str = None,
-        embedding_dir: None | Path | str = DEFAULT_EMBEDDING_DIR,
         return_paths: bool = False,
     ) -> None:
         # Synset = synonym set. Needs processing before calling super().__init__()
         # E.g. "n02119789" is a synset ID with name "kit_fox" and class_number 1.
         self.synset_map: dict[str, SynsetInfo] = load_yaml_from_path(
-            Path(dataset_dir).parent / "metadata" / "imagenet_class_mapping.yaml"
+            DATA_DIR / "metadata" / "imagenet_class_mapping.yaml"
         )
 
         # synset_id -> class_number
@@ -96,13 +86,12 @@ class ImageNetDataset(ImageDataset):
             target_classes = resolved
 
         super().__init__(
-            dataset_dir=dataset_dir,
+            dataset_dir=IMAGENET_DIR,
             target_classes=target_classes,
             split=split,
             size=size,
             random_seed=random_seed,
             embedding=embedding,
-            embedding_dir=embedding_dir,
             return_paths=return_paths,
         )
 
