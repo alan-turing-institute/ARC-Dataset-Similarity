@@ -67,6 +67,13 @@ def main(args: argparse.Namespace) -> None:
         }
         if args.dataset == "DomainNet":
             init_kwargs["domains"] = args.domains
+
+    # if experiment config contains extractor kwargs pass them through to the Extractor
+    # constructor, also stop them from being passed to the dataset constructor
+    kwargs_extractor = init_kwargs.pop("embedding", None)
+    if kwargs_extractor is not None:
+        args.extractor = kwargs_extractor
+
     dataset = dataset_fn(**init_kwargs, embedding=None, return_paths=True)
 
     print(f"{len(dataset)} images ready.")

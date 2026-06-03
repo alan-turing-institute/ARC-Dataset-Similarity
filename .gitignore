@@ -5,6 +5,9 @@ plots/
 results/
 trained_models/
 
+# logging
+runs/
+
 # ignore temporary files
 .temp/
 
