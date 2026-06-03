@@ -1,9 +1,15 @@
 import argparse
 
-from transformers import AutoModelForImageClassification, Trainer, TrainingArguments
+import torch
+from transformers import (
+    AutoImageProcessor,
+    AutoModelForImageClassification,
+    Trainer,
+    TrainingArguments,
+)
 
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
-from dataset_similarity.data.utils import image_ds_collate_fn, load_dataset_from_config
+from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.utils import load_yaml_from_path
 
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
@@ -20,6 +26,9 @@ def finetune(config_name: str):
     model = AutoModelForImageClassification.from_pretrained(
         **config["model_args"],
     )
+    processor = AutoImageProcessor.from_pretrained(
+        **config["model_args"],
+    )
 
     # load data
     data_config: dict[str, str | dict] = load_yaml_from_path(
@@ -28,6 +37,12 @@ def finetune(config_name: str):
     data_config["kwargs"]["embedding"] = None  # remove embedding config
     dataset = load_dataset_from_config(data_config)
 
+    def collate_fn(
+        batch: list[tuple[torch.Tensor, int]],
+    ) -> dict[str, torch.Tensor]:
+        inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
+        return {**inputs, "labels": torch.tensor([item[1] for item in batch])}
+
     # train model
     training_args = config["training_args"]
     output_dir = TRAINED_MODELS_DIR / config_name
@@ -35,7 +50,7 @@ def finetune(config_name: str):
         model=model,
         train_dataset=dataset,
         args=TrainingArguments(output_dir=output_dir, **training_args),
-        data_collator=image_ds_collate_fn,
+        data_collator=collate_fn,
     )
     trainer.train()
 
