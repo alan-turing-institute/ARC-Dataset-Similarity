@@ -104,6 +104,8 @@ def flash_sinkhorn_ot(
         loss.potentials = True
         F, G = loss(a, data1, b, data2)
         C = (torch.cdist(data1, data2, p=p) ** p) / p  # (N, M)
+        if loss.half_cost:  # only matches geomloss if True
+            C = C / p
         eps = blur**p
         plan = ((F.t() + G - C) / eps).exp() * (a[:, None] * b[None, :])
 
