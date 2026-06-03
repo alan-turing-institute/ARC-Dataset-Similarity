@@ -53,17 +53,17 @@ class TestOptimalTransportDistance:
 class TestPythonOT:
     def test_identical_clouds_zero(self):
         cost, _ = python_ot(_X, _X.clone())
-        assert cost.item() == pytest.approx(0, abs=1e-5)
+        assert cost == pytest.approx(0, abs=1e-5)
 
     def test_distance_ordering(self):
         cost_near, _ = python_ot(_X, _Y_NEAR)
         cost_far, _ = python_ot(_X, _Y_FAR)
-        assert cost_far.item() > cost_near.item()
+        assert cost_far > cost_near
 
     def test_custom_weights(self):
         w = torch.ones(len(_X)) / len(_X)
-        cost, _ = python_ot(_X, _Y_NEAR, a=w, b=w)
-        assert cost.ndim == 0
+        cost, _ = python_ot(_X, _X, a=w, b=w)
+        assert cost == 0
 
 
 class TestPythonOTTransportPlan:
@@ -93,10 +93,6 @@ class TestPythonOTTransportPlan:
 
 
 class TestPythonOTSinkhorn:
-    def test_returns_scalar(self):
-        cost, _ = python_ot(_X, _Y_NEAR, **_SINKHORN_KWARGS)
-        assert cost.ndim == 0
-
     def test_distance_ordering(self):
         # With entropic regularisation the cost is not near zero, but identical
         # clouds should cost no more than shifted ones.
@@ -104,8 +100,8 @@ class TestPythonOTSinkhorn:
         cost_near, _ = python_ot(_X, _Y_NEAR, **_SINKHORN_KWARGS)
         cost_far, _ = python_ot(_X, _Y_FAR, **_SINKHORN_KWARGS)
 
-        assert cost_near.item() > cost_identical.item()
-        assert cost_far.item() > cost_near.item()
+        assert cost_near > cost_identical
+        assert cost_far > cost_near
 
 
 class TestPythonOTSinkhornTransportPlan:
