@@ -197,8 +197,9 @@ def ot_distance(
         and not use_flash_sinkhorn
     ):
         logger.warning(
-            "method='python_ot' does not natively support CUDA. "
-            "Use method='sinkhorn' for GPU-compatible OT."
+            "CUDA device requested but use_flash_sinkhorn=False. "
+            "POT-based OT may fall back to NumPy/C and not run on GPU; consider "
+            "use_flash_sinkhorn=True or passing method='geomloss' (with reg=...) to python_ot."
         )
 
     ot_fn: Callable[..., tuple[float, torch.Tensor | None]] = (
