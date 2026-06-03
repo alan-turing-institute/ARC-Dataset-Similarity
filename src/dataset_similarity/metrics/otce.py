@@ -80,24 +80,22 @@ def otce_distance(
     Expects each dataset to yield ``(feature_tensor, label)`` pairs
     (i.e. ``return_paths=False``). Labels must be integer class indices.
 
-    Returns a positive distance score (lower = better transfer). This is the
-    negation of the true OTCE score (-W - H) as defined in Yang et al. 2021,
-    where higher = better transfer. Use ``otce_score_from_tensors`` directly
-    to access the raw signed score.
+    Returns a positive distance score (lower = better transfer). This corresponds to
+    W + H, where W is the OT/Wasserstein cost term (optional) and H is the conditional
+    entropy term from Yang et al. 2021.
 
     Args:
-        dataset1:        Source ImageDataset.
-        dataset2:        Target ImageDataset.
-        return_coupling: If True, also return the (N, M) OT coupling matrix.
-        device:          Device to move tensors to before computing (e.g. "cuda",
-                         "cpu"). Forwarded to the underlying OT distance function.
-                         If None, tensors stay on their current device (CPU).
-        **distance_kwargs:     Forwarded to the chosen distance method.
+        dataset1:         Source ImageDataset.
+        dataset2:         Target ImageDataset.
+        use_wasserstein:  If True, include the OT/Wasserstein term W in the returned distance.
+        use_otdd:         If True, compute W and the coupling via OTDD instead of OT.
+        device:           Device to move tensors to before computing (e.g. "cuda", "cpu").
+                          Forwarded to the underlying OT distance function. If None, tensors
+                          stay on their current device (CPU).
+        **distance_kwargs: Forwarded to the chosen distance method.
 
     Returns:
-        float OTCE distance, or tuple of (float OTCE distance, (N, M) coupling tensor)
-        if return_coupling=True.
-    """
+        float OTCE distance.
 
     # --- Step 1: compute OT cost and coupling ---
     distance_func = (
