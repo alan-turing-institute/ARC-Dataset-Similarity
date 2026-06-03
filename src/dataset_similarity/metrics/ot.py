@@ -136,8 +136,10 @@ def python_ot(
         data2:           (M, D) tensor of target samples
         metric:          distance metric passed to `ot.solve_sample`
         method:          OT method - e.g. "sinkhorn", "emd", "geomloss" (see POT docs)
-        return_coupling: if True, return the (N, M) coupling in addition to the scalar cost
-        **kwargs:        passed through to `ot.solve_sample` (e.g. `a`/`b` for weights, `reg` for Sinkhorn)
+        return_coupling: if True, return the (N, M) coupling in addition to the scalar
+                            cost
+        **kwargs:        passed through to `ot.solve_sample` (e.g. `a`/`b` for weights,
+                            `reg` for Sinkhorn)
 
     Returns:
         Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
@@ -176,9 +178,10 @@ def ot_distance(
         dataset1:          Source ImageDataset (must have return_paths=False)
         dataset2:          Target ImageDataset (must have return_paths=False)
         use_flash_sinkhorn: If True, use flash-sinkhorn (requires CUDA + Linux).
-        device:            Device to move tensors to before computing (e.g. "cuda", "cpu").
-                           If None, tensors stay on their current device (CPU).
-        **method_kwargs:   Passed through to the chosen backend (flash_sinkhorn_ot or python_ot).
+        device:            Device to move tensors to before computing (e.g. "cuda",
+                           "cpu"). If None, tensors stay on their current device (CPU).
+        **method_kwargs:   Passed through to the chosen backend (flash_sinkhorn_ot or
+                           python_ot).
 
     Returns:
         float OT cost, or tuple of (float OT cost, (N, M) coupling tensor)
@@ -199,7 +202,8 @@ def ot_distance(
         logger.warning(
             "CUDA device requested but use_flash_sinkhorn=False. "
             "POT-based OT may fall back to NumPy/C and not run on GPU; consider "
-            "use_flash_sinkhorn=True or passing method='geomloss' (with reg=...) to python_ot."
+            "use_flash_sinkhorn=True or passing method='geomloss' (with reg=...) to "
+            "python_ot."
         )
 
     ot_fn: Callable[..., tuple[float, torch.Tensor | None]] = (

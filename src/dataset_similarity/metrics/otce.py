@@ -87,15 +87,17 @@ def otce_distance(
     Args:
         dataset1:         Source ImageDataset.
         dataset2:         Target ImageDataset.
-        use_wasserstein:  If True, include the OT/Wasserstein term W in the returned distance.
+        use_wasserstein:  If True, include the OT/Wasserstein term W in the returned
+                          distance.
         use_otdd:         If True, compute W and the coupling via OTDD instead of OT.
-        device:           Device to move tensors to before computing (e.g. "cuda", "cpu").
-                          Forwarded to the underlying OT distance function. If None, tensors
-                          stay on their current device (CPU).
+        device:           Device to move tensors to before computing (e.g. "cuda",
+                          "cpu"). Forwarded to the underlying OT distance function. If
+                          None, tensors stay on their current device (CPU).
         **distance_kwargs: Forwarded to the chosen distance method.
 
     Returns:
         float OTCE distance.
+    """
 
     # --- Step 1: compute OT cost and coupling ---
     distance_func = (
