@@ -5,7 +5,7 @@ import pandas as pd
 
 from dataset_similarity.constants import DATA_DIR, IMAGENET_DIR
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.utils import load_yaml_from_path
 
 
 class SynsetInfo(TypedDict):

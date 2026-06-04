@@ -33,12 +33,11 @@ import argparse
 
 from dataset_similarity.constants import CONFIG_DIR, EMBEDDING_DIR
 from dataset_similarity.data import DATASET_MAP
-from dataset_similarity.data.utils import load_yaml_from_path
 from dataset_similarity.embedding import Extractor
+from dataset_similarity.utils import load_yaml_from_path
 
 
 def main(args: argparse.Namespace) -> None:
-    # TODO: refactor to use load dataset from config fn after merging
     data_cfg = load_yaml_from_path(CONFIG_DIR / "data" / args.config_file)
     extractor_name = data_cfg["kwargs"].pop("extractor")
     dataset_fn = DATASET_MAP[data_cfg["name"]]

@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
-from dataset_similarity.data.utils import get_embedding_path, load_yaml_from_path
+from dataset_similarity.utils import get_embedding_path, load_yaml_from_path
 
 
 class ImageDataset(ABC, Dataset):  # type: ignore[misc]

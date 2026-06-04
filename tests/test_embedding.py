@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +15,7 @@ _IMG_SIZE = 224
 
 
 class _DummyExtractor(Extractor):
-    """Concrete extractor returning deterministic tensors — no model loading."""
+    """Concrete extractor returning deterministic tensors - no model loading."""
 
     def __init__(
         self, data_root: Path, embedding_dir: Path, model_name: str = "clip"
@@ -190,7 +188,7 @@ def test_encode_dinov3_calls_model_directly() -> None:
 
 
 # ---------------------------------------------------------------------------
-# extract_dataset — file saving
+# extract_dataset - file saving
 # ---------------------------------------------------------------------------
 
 
