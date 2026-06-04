@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +10,7 @@ from transformers import AutoModel, AutoProcessor
 
 from dataset_similarity.constants import DEFAULT_DATA_ROOT, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import get_embedding_path
+from dataset_similarity.utils import get_embedding_path
 
 MODEL_NAMES: dict[str, str] = {
     "clip": "openai/clip-vit-base-patch32",

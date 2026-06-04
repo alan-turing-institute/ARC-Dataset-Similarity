@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 from typing import Any
 
@@ -8,7 +6,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.transforms import functional as F
 
-#  initial transformation examples
+# initial transformation examples
 
 horizontal_flip = transforms.Compose(
     [

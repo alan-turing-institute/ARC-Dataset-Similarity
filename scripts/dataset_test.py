@@ -15,7 +15,7 @@ from dataset_similarity.data.transform import (
     horizontal_flip,
     rotation_180,
 )
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.utils import load_yaml_from_path
 
 
 def main(
