@@ -43,6 +43,8 @@ dependencies = [
     "otdd",
     "plotnine>=0.15.3",
     "accelerate>=1.13.0",
+    "mlflow>=3.13.0",
+    "optuna>=4.9.0",
 ]
 
 [dependency-groups]

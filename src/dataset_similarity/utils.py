@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from yaml import safe_load
+from yaml import safe_dump, safe_load
 
 from dataset_similarity.constants import DEFAULT_DATA_ROOT
 
@@ -49,3 +49,19 @@ def load_yaml_from_path(
 
     with open(yaml_path) as f:
         return dict(safe_load(f))
+
+
+def save_yaml_to_path(
+    data: dict[str, Any],
+    yaml_path: str | Path,
+) -> None:
+    """
+    Helper function to save a dictionary as a YAML file to a specified path.
+
+    Args:
+        data: The dictionary to be saved as YAML.
+        yaml_path: The path where the YAML file should be saved.
+    """
+
+    with open(yaml_path, "w") as f:
+        safe_dump(data, f)
