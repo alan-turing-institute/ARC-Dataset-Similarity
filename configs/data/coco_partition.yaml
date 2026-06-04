@@ -1,0 +1,12 @@
+# Dataset Builder
+name: COCO
+kwargs:
+  split: train2017
+  random_seed: 42
+  embedding: clip
+  ratio: [0.5, 0.1, 0.2, 0.2]
+  positive_fraction: 0.25
+  min_bbox_area_fraction: 0.01
+  max_bbox_area_fraction: 0.5
+  min_objects_per_image:
+  max_objects_per_image:

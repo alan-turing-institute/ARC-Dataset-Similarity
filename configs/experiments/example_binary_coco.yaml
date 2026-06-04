@@ -1,0 +1,5 @@
+dataset: coco_partition
+task: binary_horse
+metrics:
+  - otdd_exact
+  - mmd

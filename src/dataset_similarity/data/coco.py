@@ -1,8 +1,8 @@
-from __future__ import annotations
-
+from collections import defaultdict
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
+import numpy as np
 import pandas as pd
 from pycocotools.coco import COCO
 
@@ -68,7 +68,7 @@ class COCODataset(ImageDataset):
                 Path(dataset_dir).parent / "metadata" / "coco_class_mapping.yaml"
             ),
         )
-        self.name_to_label_map: dict[str, int] = {
+        self.class_to_label_map: dict[str, int] = {
             meta["name"]: label for label, meta in self.label_to_meta_map.items()
         }
         self.supercategory_to_classnumber_map: dict[str, list[int]] = {}
@@ -94,7 +94,7 @@ class COCODataset(ImageDataset):
 
         if target_classes is not None:
             for cls in target_classes:
-                if cls not in self.name_to_label_map:
+                if cls not in self.class_to_label_map:
                     err_msg = f"Unknown class '{cls}'"
                     raise ValueError(err_msg)
 
@@ -118,12 +118,8 @@ class COCODataset(ImageDataset):
         else:
             cat_ids = coco.getCatIds(catNms=self.target_classes)
 
-        cat_img_ids: dict[int, list[int]] = {
-            cat_id: coco.getImgIds(catIds=[cat_id]) for cat_id in cat_ids
-        }
-
         rows: list[dict[str, Path | int]] = []
-        for cat_id, img_ids in cat_img_ids.items():
+        for cat_id, img_ids in cat_ids.items():
             for img_id in img_ids:
                 img_path = (
                     self.dataset_dir / self.split / coco.imgs[img_id]["file_name"]
@@ -134,3 +130,103 @@ class COCODataset(ImageDataset):
         if self.drop_duplicates:
             df = df.drop_duplicates(subset="path", keep="first").reset_index(drop=True)
         return df
+
+
+def split_coco_image_ids(
+    dataset_dir: Path | str,
+    coco_split: Literal["train2017", "val2017"],
+    task_pool_size: int | float,
+    random_seed: int | None = None,
+    include_datastore: bool = False,
+) -> tuple[set[int] | None, set[int]]:
+    """Deterministically partition COCO image IDs into a data store and a task pool.
+
+    Args:
+        dataset_dir: Path to the COCO dataset directory.
+        coco_split: COCO split to partition (``"train2017"`` or ``"val2017"``).
+        task_pool_size: If a float in ``(0, 1)``, fraction of images for the task pool.
+            If a positive integer, exact count of images for the task pool.
+        random_seed: Seed for reproducibility.
+
+    Returns:
+        A tuple ``(datastore_ids, task_pool_ids)`` of disjoint image ID sets.
+    """
+    ann_file = Path(dataset_dir) / "annotations" / f"instances_{coco_split}.json"
+    coco = COCO(str(ann_file))
+    all_ids = np.array(sorted(coco.getImgIds()))
+
+    if not include_datastore:
+        return None, set(all_ids)
+
+    rng = np.random.default_rng(random_seed)
+    shuffled = rng.permutation(all_ids)
+
+    n_total = len(shuffled)
+    n_task = (
+        int(task_pool_size * n_total)
+        if isinstance(task_pool_size, float)
+        else int(task_pool_size)
+    )
+
+    task_pool_ids: set[int] = set(shuffled[:n_task].tolist())
+    datastore_ids: set[int] = set(shuffled[n_task:].tolist())
+    return datastore_ids, task_pool_ids
+
+
+def _load_coco_with_annotations(
+    dataset_dir: Path,
+    coco_split: str,
+    image_ids: set[int] | None = None,
+) -> pd.DataFrame:
+    """Load COCO annotations with per-(image, category) metadata.
+
+    Returns a DataFrame with one row per ``(image_id, category_id)`` pair, including
+    annotation-level metadata needed for task-level filtering. Used internally by
+    ``COCOTaskPool``.
+
+    Columns:
+        image_id, path, label (category_id), supercategory,
+        max_bbox_area_frac, n_category_instances, n_total_instances
+    """
+    ann_file = dataset_dir / "annotations" / f"instances_{coco_split}.json"
+    coco = COCO(str(ann_file))
+
+    all_cat_ids: set[int] = set(coco.getCatIds())
+
+    img_ids = coco.getImgIds() if image_ids is None else sorted(image_ids)
+
+    rows: list[dict[str, Any]] = []
+    for img_id in img_ids:
+        img_info = coco.imgs.get(img_id)
+        if img_info is None:
+            continue
+        image_area = img_info["height"] * img_info["width"]
+        img_path = dataset_dir / coco_split / img_info["file_name"]
+        anns = coco.imgToAnns.get(img_id, [])
+        n_total = len(anns)
+
+        cat_anns: dict[int, list[Any]] = defaultdict(list)
+        for ann in anns:
+            if ann["category_id"] in all_cat_ids:
+                cat_anns[ann["category_id"]].append(ann)
+
+        for cat_id, cat_ann_list in cat_anns.items():
+            cat_info = coco.cats[cat_id]
+            max_bbox_area_frac = (
+                max(a["area"] for a in cat_ann_list) / image_area
+                if image_area > 0
+                else 0.0
+            )
+            rows.append(
+                {
+                    "image_id": img_id,
+                    "path": img_path,
+                    "label": cat_id,
+                    "supercategory": cat_info["supercategory"],
+                    "max_bbox_area_frac": max_bbox_area_frac,
+                    "n_category_instances": len(cat_ann_list),
+                    "n_total_instances": n_total,
+                }
+            )
+
+    return pd.DataFrame(rows)
