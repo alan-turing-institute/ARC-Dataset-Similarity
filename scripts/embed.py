@@ -3,17 +3,10 @@ This script embeds images from a specified dataset and saves the embeddings as p
 .safetensors files. It supports all datasets implemented in dataset_similarity.data, and
 all extractors implemented by dataset_similarity.embedding.Extractor.
 
-To run, specify the dataset and extractor. The dataset can be specified either by name
-and kwargs, or by a config file containing both. For example:
+The main way to use the script is with a config file specifying the dataset.
 
 ```bash
-python scripts/embed.py --dataset DomainNet --dataset_split train --extractor clip
-```
-
-to embed the DomainNet training split with the CLIP extractor, or
-
-```bash
-python scripts/embed.py --config-file /absolute/path/to/config.yaml --extractor clip
+python scripts/embed.py --dataset config.yaml
 ```
 
 to embed using a config file. The config file should be a YAML file containing the
@@ -36,51 +29,30 @@ to the `embeddings/` directory, but these can be overridden with the `--data_roo
 on all available flags.
 """
 
-from __future__ import annotations
-
 import argparse
-from pathlib import Path
 
-from dataset_similarity.constants import DEFAULT_DATA_ROOT, DEFAULT_EMBEDDING_DIR
+from dataset_similarity.constants import CONFIG_DIR, EMBEDDING_DIR
 from dataset_similarity.data import DATASET_MAP
 from dataset_similarity.data.utils import load_yaml_from_path
 from dataset_similarity.embedding import Extractor
 
 
 def main(args: argparse.Namespace) -> None:
-    if args.config_file is not None:
-        data_cfg = load_yaml_from_path(args.config_file)
-        dataset_fn = DATASET_MAP[data_cfg["name"]]
-        init_kwargs = data_cfg["kwargs"]
-    else:
-        if args.dataset_split == "test" and args.dataset == "ImageNet":
-            err_msg = "ImageNet does not have a 'test' split. Choose 'train' or 'val'."
-            raise ValueError(err_msg)
-        if args.dataset_split == "val" and args.dataset == "DomainNet":
-            err_msg = "DomainNet does not have a 'val' split. Choose 'train' or 'test'."
-            raise ValueError(err_msg)
-        dataset_fn = DATASET_MAP[args.dataset]
-        init_kwargs = {
-            "dataset_dir": args.data_root / args.dataset,
-            "target_classes": args.target_classes,
-            "split": args.dataset_split,
-            "size": args.size,
-            "random_seed": args.random_seed,
-        }
-        if args.dataset == "DomainNet":
-            init_kwargs["domains"] = args.domains
+    # TODO: refactor to use load dataset from config fn after merging
+    data_cfg = load_yaml_from_path(CONFIG_DIR / "data" / args.config_file)
+    extractor_name = data_cfg["kwargs"].pop("extractor")
+    dataset_fn = DATASET_MAP[data_cfg["name"]]
+    init_kwargs = data_cfg["kwargs"]
     dataset = dataset_fn(**init_kwargs, embedding=None, return_paths=True)
 
     print(f"{len(dataset)} images ready.")
-    print(f"Loading extractor '{args.extractor}' on device '{args.device}' …")
+    print(f"Loading extractor '{extractor_name}' on device '{args.device}' …")
 
     extractor = Extractor(
-        model_name=args.extractor,
+        model_name=extractor_name,
         hf_model_id=args.model_name,
         **({"hf_model_id": args.model_name} if args.model_name else {}),
         device=args.device,
-        data_root=args.data_root,
-        embedding_dir=args.embedding_dir,
     )
 
     extractor.extract_dataset(
@@ -88,12 +60,22 @@ def main(args: argparse.Namespace) -> None:
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
-    print(f"Saved to: {extractor.output_dir}")
+    print(f"Saved to: {EMBEDDING_DIR / extractor_name / data_cfg['name']}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Embed images and save per-image safetensors files."
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        help="Name of config file inside configs/datasets/, e.g. `imagenet.yaml`",
+    )
+    parser.add_argument(
+        "--device",
+        default="cpu",
+        help="Torch device, e.g. cpu, cuda, mps (default: cpu).",
     )
     parser.add_argument(
         "--batch_size",
@@ -102,74 +84,9 @@ if __name__ == "__main__":
         help="Batch size for inference (default: 32).",
     )
     parser.add_argument(
-        "--dataset",
-        choices=["DomainNet", "ImageNet", "COCO"],
-        default="DomainNet",
-        help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet', 'COCO'."),
-    )
-    parser.add_argument(
-        "--data_root",
-        default=DEFAULT_DATA_ROOT,
-        type=Path,
-        help=(
-            "Absolute path to root dataset directory. Images should be in "
-            "<dataset_dir>/<dataset>/."
-        ),
-    )
-    parser.add_argument(
-        "--dataset_split",
-        default="train",
-        help="Dataset split to embed (default: train).",
-    )
-    parser.add_argument(
-        "--device",
-        default="cpu",
-        help="Torch device, e.g. cpu, cuda, mps (default: cpu).",
-    )
-    parser.add_argument("--domains", nargs="+", type=str, default=None)
-    parser.add_argument("--target-classes", nargs="+", type=str, default=None)
-    parser.add_argument(
-        "--size",
-        type=float,  # Int okay alone, but argparse needs to know how to parse it
-        default=None,
-        help=(
-            "If a float in (0, 1), the fraction of samples to retain. If a positive "
-            "integer, the number of samples to retain."
-        ),
-    )
-    parser.add_argument(
-        "--random_seed",
-        type=int,
-        default=None,
-        help=(
-            "Random seed for dataset subsampling (default: None, "
-            "i.e. non-deterministic)."
-        ),
-    )
-    parser.add_argument("--config-file", type=str, default=None)
-    parser.add_argument(
-        "--extractor",
-        choices=["clip", "siglip", "dinov3"],
-        default="dinov3",
-        help="Embedding model to use (default: dinov3).",
-    )
-    parser.add_argument(
-        "--model_name",
-        default=None,
-        help="HuggingFace model ID override.",
-    )
-    parser.add_argument(
         "--num_workers",
         type=int,
         default=0,
         help="Number of worker processes for data loading (default: 0).",
-    )
-    parser.add_argument(
-        "--embedding_dir",
-        default=DEFAULT_EMBEDDING_DIR,
-        help=(
-            "Absolute path to directory in which to save per-image .safetensors files"
-            " (default: embeddings)."
-        ),
     )
     main(parser.parse_args())
