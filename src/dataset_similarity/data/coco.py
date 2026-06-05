@@ -1,10 +1,9 @@
-from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal, cast
 
-import numpy as np
 import pandas as pd
 from pycocotools.coco import COCO
+from sklearn.model_selection import train_test_split
 
 from dataset_similarity.constants import COCO_DIR, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.base import ImageDataset
@@ -18,15 +17,6 @@ class COCODataset(ImageDataset):
     Args:
         dataset_dir: Absolute path to the dataset directory containing COCO images.
             Defaults to `dataset_similarity.constants.COCO_DIR`.
-        target_classes: List of class names to include in the dataset. If None, all
-            classes are included. Elements must be valid class names as specified in the
-            class mapping file at
-            `dataset_dir.parent / "metadata/coco_class_mapping.yaml"`. Defaults to
-            `None`.
-        target_superclasses: List of supercategory names whose member classes are all
-            included. Expands to the corresponding class names before filtering, and is
-            merged with `target_classes` when both are provided. If None, no
-            supercategory filtering is applied. Defaults to `None`.
         split: Dataset split identifier. Must be `"train2017"` or `"val2017"`.
             Defaults to `"train2017"`.
         size: If a float in `(0, 1)`, the fraction of samples to retain.
@@ -50,10 +40,7 @@ class COCODataset(ImageDataset):
     def __init__(
         self,
         dataset_dir: str | Path = COCO_DIR,
-        target_classes: list[str] | None = None,
-        target_superclasses: list[str] | None = None,
         split: Literal["train2017", "val2017"] = "train2017",
-        drop_duplicates: bool = True,
         size: float | int | None = None,
         random_seed: int | None = None,
         embedding: None | str = None,
@@ -63,14 +50,13 @@ class COCODataset(ImageDataset):
         positive_superclass: list[str] | None = None,
         negative_class: list[str] | None = None,
         negative_superclass: list[str] | None = None,
+        min_objects_per_image: int | None = None,
+        max_objects_per_image: int | None = None,
+        min_bbox_area_fraction: float | None = None,
+        max_bbox_area_fraction: float | None = None,
+        positive_fraction: float | None = None,
     ) -> None:
-        self.positive_class = positive_class
-        self.positive_superclass = positive_superclass
-        self.negative_class = negative_class
-        self.negative_superclass = negative_superclass
-        self.drop_duplicates = drop_duplicates
-        self.drop_duplicates = drop_duplicates
-        # Target classes also need to be processed before calling super().__init__()
+        # Classes need to be processed before calling super.__init__
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
             dict[int, dict[str, str]],
             load_yaml_from_path(
@@ -86,30 +72,58 @@ class COCODataset(ImageDataset):
                 meta["supercategory"], []
             ).append(label)
 
-        if target_superclasses is not None:
-            for sc in target_superclasses:
-                if sc not in self.supercategory_to_classnumber_map:
-                    err_msg = f"Unknown supercategory '{sc}'"
-                    raise ValueError(err_msg)
-            expanded = [
-                self.label_to_meta_map[label]["name"]
-                for sc in target_superclasses
-                for label in self.supercategory_to_classnumber_map[sc]
+        # Validate class inputs
+        positive_passed = positive_class is not None or positive_superclass is not None
+        negative_passed = negative_class is not None or negative_superclass is not None
+
+        if negative_passed and (not positive_passed):
+            msg = (
+                "If negative classes are specified, positive classes must also be "
+                "specified."
+            )
+            raise ValueError(msg)
+
+        if (positive_fraction is not None) and (not positive_passed):
+            msg = (
+                "If `positive_fraction` is specified, positive classes must also be"
+                " specified."
+            )
+            raise ValueError(msg)
+
+        # Define classes
+        self.positive_class = self._prepare_classes(positive_class, positive_superclass)
+        _negative_class: list[int] | None = self._prepare_classes(
+            negative_class, negative_superclass
+        )
+        if isinstance(_negative_class, list) and isinstance(self.positive_class, list):
+            _negative_class = [
+                cls for cls in _negative_class if cls not in self.positive_class
             ]
-            if target_classes is None:
-                target_classes = expanded
-            else:
-                target_classes = list(dict.fromkeys(target_classes + expanded))
+        self.negative_class = _negative_class
 
-        if target_classes is not None:
-            for cls in target_classes:
-                if cls not in self.class_to_label_map:
-                    err_msg = f"Unknown class '{cls}'"
-                    raise ValueError(err_msg)
+        # Whether we need to drop classes depends on if all classes are negative
+        keep_labels = None
+        if self.negative_class is not None:
+            keep_labels = (self.positive_class or []) + self.negative_class
+            # Bodge for now as super wants string class names
+            keep_classes = [
+                cls
+                for cls, _ in self.class_to_label_map.items()
+                if label in keep_labels
+            ]
+        self.keep_labels = keep_labels
 
+        # Task settings
+        self.min_objects_per_image = min_objects_per_image
+        self.max_objects_per_image = max_objects_per_image
+        self.min_bbox_area_fraction = min_bbox_area_fraction
+        self.max_bbox_area_fraction = max_bbox_area_fraction
+        self.positive_fraction = positive_fraction
+
+        # Super will use keep_classes to filter the dataset by class
         super().__init__(
             dataset_dir=dataset_dir,
-            target_classes=target_classes,
+            keep_classes=keep_classes,
             split=split,
             size=size,
             random_seed=random_seed,
@@ -121,142 +135,130 @@ class COCODataset(ImageDataset):
     def _load_data(self) -> pd.DataFrame:
         ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
         coco = COCO(str(ann_file))
+        df = pd.DataFrame(
+            _get_row_from_img_id(img_id, coco, self.split)
+            for img_id in coco.getImgIds()
+        )
 
-        if self.target_classes is None:
-            cat_ids = coco.getCatIds()
-        else:
-            cat_ids = coco.getCatIds(catNms=self.target_classes)
+        # Filter dataset for keep classes
+        if self.keep_labels is not None:
+            df = df[df.cats.apply(lambda x: any(cls in x for cls in self.keep_labels))]
 
-        rows: list[dict[str, Path | int]] = []
-        for cat_id, img_ids in cat_ids.items():
-            for img_id in img_ids:
-                img_path = (
-                    self.dataset_dir / self.split / coco.imgs[img_id]["file_name"]
-                )
-                rows.append({"path": img_path, "label": cat_id})
+        # Create binary task if requested
+        if self.positive_class is not None:
+            df["label"] = df.cats.apply(
+                lambda x: int(any(cls in x for cls in self.positive_class))
+            )
 
-        df = pd.DataFrame(rows, columns=["path", "label"])
-        if self.drop_duplicates:
-            df = df.drop_duplicates(subset="path", keep="first").reset_index(drop=True)
+        # TODO: maybe toggle whether to apply below only to positive or negative classes
+        # instead of generic (will need a new init kwarg to specify this)
+
+        # Data filtering based on number of objects
+        if self.min_objects_per_image is not None:
+            df = df[df.num_objects >= self.min_objects_per_image]
+        if self.max_objects_per_image is not None:
+            df = df[df.num_objects <= self.max_objects_per_image]
+
+        # Data filtering based on bounding box area fraction
+        if self.min_bbox_area_fraction is not None:
+            df = df[df.min_bbox_frac >= self.min_bbox_area_fraction]
+        if self.max_bbox_area_fraction is not None:
+            df = df[df.max_bbox_frac <= self.max_bbox_area_fraction]
+
+        # Return
         return df
 
-    def _load_data_with_annotations(self) -> pd.DataFrame:
-        ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
-        coco = COCO(str(ann_file))
+    def _prepare_classes(
+        self,
+        classes: list[str] | None,
+        superclasses: list[str] | None,
+    ) -> list[int] | None:
+        """
+        Helper fn for initialising positive and negative classes based on whether
+        individual or superclasses are specified.
 
-        rows = []
-        for img_id in coco.getImgIds():
-            annot = coco.imgToAnns[img_id]
-            img_info = coco.imgs.get(img_id)
-            image_area = img_info["height"] * img_info["width"]
+        Args:
+            classes (list[str] | None): _description_
+            superclasses (list[str] | None): _description_
 
-            row_annots = {
-                "img_id": img_id,
-                "n_objects": len(annot),
-                "category_id": [obj["category_id"] for obj in annot],
-                "bbox_area_ratio": [
-                    (obj["bbox"][2] * obj["bbox"][2]) / image_area for obj in annot
-                ],
+        Returns:
+            list[int] | None: _description_
+        """
+        if classes is None and superclasses is None:
+            return None
+        return list(
+            {self.class_to_label_map[cls] for cls in (classes or [])}
+            | {
+                label
+                for sc in (superclasses or [])
+                for label in self.supercategory_to_classnumber_map[sc]
             }
-            rows.append(row_annots)
+        )
 
-        return pd.DataFrame(rows)
+    def subsample_data(self) -> pd.DataFrame:
+        """
+        Overwrite of super method as strata need to be defined on "label" column,
+        which may not exist in the COCO dataset depending on kwargs. Additionally
+        implements class balancing.
+
+        Replaces ``self.data`` in-place with a random stratified subset.
+
+        Args:
+            size: If a float in ``(0, 1)``, the fraction of samples to retain.
+                If a positive integer, the exact number of samples to retain.
+            random_seed: Seed for the random number generator, for
+                reproducibility. If ``None``, the result is non-deterministic.
+
+        Returns:
+            The new ``self.data`` DataFrame after resampling.
+        """
+        self._strip_single_classes_from_samples()
+
+        _, new_data = train_test_split(
+            self.data,
+            test_size=self.size,
+            stratify=self.data["label"] if self.positive_class is not None else None,
+            random_state=self.random_seed,
+        )
+
+        # TODO: implement class balancing. Likely needs a helper fn
+        # if self.positive_fraction is not None:
+
+        return new_data.reset_index(drop=True)
 
     def _filter(self) -> None:
         # df.category_id.apply(lambda row: positive_class in row)
         return None
 
 
-def split_coco_image_ids(
-    coco: COCO,
-    task_pool_size: int | float,
-    random_seed: int | None = None,
-    include_datastore: bool = False,
-) -> tuple[set[int] | None, set[int]]:
-    """Deterministically partition COCO image IDs into a data store and a task pool.
+def _get_row_from_img_id(img_id: int, coco: COCO, split: str) -> dict[str, Any]:
+    """
+    Helper fn which given a COCO image ID, returns a dictionary containing keys for
+    the img_id, number of categories, number of objects, and object areas
+    (each one corresponding to the categories).
 
     Args:
-        dataset_dir: Path to the COCO dataset directory.
-        coco_split: COCO split to partition (``"train2017"`` or ``"val2017"``).
-        task_pool_size: If a float in ``(0, 1)``, fraction of images for the task pool.
-            If a positive integer, exact count of images for the task pool.
-        random_seed: Seed for reproducibility.
+        img_id: The COCO image ID to retrieve information for.
+        coco: The COCO object containing the dataset annotations
+        split: The split to which the image belongs
 
     Returns:
-        A tuple ``(datastore_ids, task_pool_ids)`` of disjoint image ID sets.
+        dict: The dictionary containing the image information
     """
-    all_ids = np.array(sorted(coco.getImgIds()))
-
-    if not include_datastore:
-        return None, set(all_ids)
-
-    rng = np.random.default_rng(random_seed)
-    shuffled = rng.permutation(all_ids)
-
-    n_total = len(shuffled)
-    n_task = (
-        int(task_pool_size * n_total)
-        if isinstance(task_pool_size, float)
-        else int(task_pool_size)
-    )
-
-    task_pool_ids: set[int] = set(shuffled[:n_task].tolist())
-    datastore_ids: set[int] = set(shuffled[n_task:].tolist())
-    return datastore_ids, task_pool_ids
-
-
-def _load_coco_with_annotations(
-    coco: COCO,
-    dataset_dir: Path,
-    coco_split: str,
-    image_ids: set[int] | None = None,
-) -> pd.DataFrame:
-    """Load COCO annotations with per-(image, category) metadata.
-
-    Returns a DataFrame with one row per ``(image_id, category_id)`` pair, including
-    annotation-level metadata needed for task-level filtering. Used internally by
-    ``COCOTaskPartition``.
-
-    Columns:
-        image_id, path, label (category_id), supercategory,
-        max_bbox_area_frac, n_category_instances, n_total_instances
-    """
-    all_cat_ids: set[int] = set(coco.getCatIds())
-
-    img_ids = coco.getImgIds() if image_ids is None else sorted(image_ids)
-
-    rows: list[dict[str, Any]] = []
-    for img_id in img_ids:
-        img_info = coco.imgs.get(img_id)
-        if img_info is None:
-            continue
-        image_area = img_info["height"] * img_info["width"]
-        img_path = dataset_dir / coco_split / img_info["file_name"]
-        anns = coco.imgToAnns.get(img_id, [])
-        n_total = len(anns)
-
-        cat_anns: dict[int, list[Any]] = defaultdict(list)
-        for ann in anns:
-            if ann["category_id"] in all_cat_ids:
-                cat_anns[ann["category_id"]].append(ann)
-
-        for cat_id, cat_ann_list in cat_anns.items():
-            cat_info = coco.cats[cat_id]
-            max_bbox_area_frac = (
-                max(a["area"] for a in cat_ann_list) / image_area
-                if image_area > 0
-                else 0.0
-            )
-            rows.append(
-                {
-                    "image_id": img_id,
-                    "path": img_path,
-                    "label": cat_id,
-                    "supercategory": cat_info["supercategory"],
-                    "max_bbox_area_frac": max_bbox_area_frac,
-                    "n_category_instances": len(cat_ann_list),
-                    "n_total_instances": n_total,
-                }
-            )
-
-    return pd.DataFrame(rows)
+    # TODO: remove split arg and code after updating download script
+    path = COCO_DIR / "images" / split / coco.imgs[img_id]["file_name"]
+    ann = coco.imgToAnns[img_id]
+    cats = [ann["category_id"] for ann in ann]
+    img_info = coco.imgs[img_id]
+    img_area = img_info["width"] * img_info["height"]
+    areas = [ann["area"] for ann in ann]
+    return {
+        "img_id": img_id,
+        "path": path,
+        "cats": cats,
+        "num_objects": len(cats),
+        "img_area": img_area,
+        "min_bbox_frac": min(areas) / img_area if len(areas) > 0 else 0,
+        "max_bbox_frac": max(areas) / img_area if len(areas) > 0 else 0,
+        "areas": areas,
+    }

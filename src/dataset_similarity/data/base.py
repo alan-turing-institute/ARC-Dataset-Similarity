@@ -22,7 +22,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
 
     Args:
         dataset_dir: Absolute path to the directory containing the dataset images.
-        target_classes: List of class names to include in the dataset. If None, all
+        keep_classes: List of class names to include in the dataset. If None, all
             classes are included.
         split: Dataset split identifier (e.g. ``"train"`` or ``"test"``).
         size: If a float in ``(0, 1)``, the fraction of samples to retain.
@@ -42,7 +42,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
     def __init__(
         self,
         dataset_dir: str | Path,
-        target_classes: list[str] | None,
+        keep_classes: list[str] | None,
         split: str,
         size: float | int | None,
         random_seed: int | None,
@@ -55,7 +55,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             dataset_dir = Path(dataset_dir)
         self.dataset_dir = dataset_dir
         self.split = split
-        self.target_classes = target_classes
+        self.keep_classes = keep_classes
         self.data = self._load_data()
         self.size = size
         self.random_seed = random_seed
