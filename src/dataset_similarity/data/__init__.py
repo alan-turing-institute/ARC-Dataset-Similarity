@@ -1,6 +1,6 @@
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.coco import COCODataset
-from dataset_similarity.data.coco_task_pool import (
+from dataset_similarity.data.coco_task import (
     COCOTaskDataset,
     COCOTaskPartition,
 )

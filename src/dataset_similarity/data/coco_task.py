@@ -59,25 +59,30 @@ class COCOTaskPartition:
     """Manages the task-dataset partition of COCO and creates classification datasets.
 
     Partitions COCO image IDs deterministically into a large unlabelled data store and
-    a smaller task pool, then provides a factory method for building binary
-    classification datasets from the task pool with fine-grained sampling control.
-
-    The data store partition can be loaded separately as::
-
-        datastore_ids, pool_ids = split_coco_image_ids(
-            dataset_dir, split, task_pool_size, random_seed
-        )
-        datastore = COCODataset(image_ids=datastore_ids, return_paths=True)
+    a task pool, then provides a factory method for building binary classification
+    datasets from the task pool.
 
     Args:
         dataset_dir: Path to the COCO dataset directory.
         split: COCO split to partition (``"train2017"`` or ``"val2017"``).
-        task_pool_size: Fraction ``(0, 1)`` or exact count of images reserved for the
-            task pool. The remainder becomes the data store.
         random_seed: Seed for the deterministic partition. Fix this to ensure the
-            same images are always in the task pool.
-        train_val_test_ratio: Proportions for further splitting the task pool into
-            train / val / test sub-pools. Must sum to 1.
+            same images are always in the same split.
+        embedding: Embedding model name passed through to created datasets, or
+            ``None`` for raw images.
+        embedding_dir: Directory where embeddings are stored.
+        ratio: Four-tuple ``(train, val, test, datastore)`` of fractions of the
+            total image pool assigned to each split. Must sum to 1.
+        positive_fraction: Target fraction of positive examples in created
+            datasets. The majority class is downsampled to match. ``None``
+            disables rebalancing.
+        min_bbox_area_fraction: Minimum ``max_bbox_area_frac`` for a positive
+            image to be included. ``None`` disables the filter.
+        max_bbox_area_fraction: Maximum ``max_bbox_area_frac`` for a positive
+            image to be included. ``None`` disables the filter.
+        min_objects_per_image: Minimum ``n_total_instances`` for an image to be
+            included. ``None`` disables the filter.
+        max_objects_per_image: Maximum ``n_total_instances`` for an image to be
+            included. ``None`` disables the filter.
     """
 
     def __init__(
@@ -94,61 +99,69 @@ class COCOTaskPartition:
         min_objects_per_image: int | None = None,
         max_objects_per_image: int | None = None,
     ) -> None:
-        # sampling configs
+        self.embedding = embedding
+        self.embedding_dir = embedding_dir
+        self._dataset_dir = Path(dataset_dir)
+        self._split = split
+        self.random_seed = random_seed
+        self.positive_fraction = positive_fraction
         self.min_bbox_area_fraction = min_bbox_area_fraction
         self.max_bbox_area_fraction = max_bbox_area_fraction
         self.min_objects_per_image = min_objects_per_image
         self.max_objects_per_image = max_objects_per_image
-        self.positive_fraction = positive_fraction
 
-        self.embedding = embedding
-        self.embedding_dir = embedding_dir
-
-        self._dataset_dir = Path(dataset_dir)
-        self._split = split
-        self.random_seed = random_seed
-        task_pool_size = sum(ratio[:-1])
-        include_datastore = ratio[3] > 0.0
-
+        train_r, val_r, _, datastore_r = ratio
         ann_file = self._dataset_dir / "annotations" / f"instances_{split}.json"
         self.coco_annots = COCO(str(ann_file))
 
         datastore_ids, pool_ids = split_coco_image_ids(
-            self.coco_annots, task_pool_size, random_seed, include_datastore
+            self.coco_annots, sum(ratio[:-1]), random_seed, datastore_r > 0.0
         )
-
         self._data = _load_coco_with_annotations(
             self.coco_annots, self._dataset_dir, split
         )
+        self._label_to_meta, self._class_to_label, self._supercategory_to_labels = (
+            self._build_class_mappings()
+        )
+        self._train_ids, self._val_ids, self._test_ids = self._partition_pool_ids(
+            pool_ids, train_r, val_r, random_seed
+        )
+        self._datastore_ids = datastore_ids
 
+    def _build_class_mappings(
+        self,
+    ) -> tuple[dict[int, dict[str, str]], dict[str, int], dict[str, list[int]]]:
         label_to_meta: dict[int, dict[str, str]] = cast(
             dict[int, dict[str, str]],
             load_yaml_from_path(
                 self._dataset_dir.parent / "metadata" / "coco_class_mapping.yaml"
             ),
         )
-        self._label_to_meta = label_to_meta
-        self._class_to_label: dict[str, int] = {
+        class_to_label: dict[str, int] = {
             meta["name"]: label for label, meta in label_to_meta.items()
         }
-        self._supercategory_to_labels: dict[str, list[int]] = {}
+        supercategory_to_labels: dict[str, list[int]] = {}
         for label, meta in label_to_meta.items():
-            self._supercategory_to_labels.setdefault(meta["supercategory"], []).append(
-                label
-            )
+            supercategory_to_labels.setdefault(meta["supercategory"], []).append(label)
+        return label_to_meta, class_to_label, supercategory_to_labels
 
-        # Deterministically split pool image IDs into train/val/test
-        all_pool_ids = np.array(sorted(pool_ids))
-        rng = np.random.default_rng(None if random_seed is None else random_seed + 1)
-        shuffled = rng.permutation(all_pool_ids)
+    def _partition_pool_ids(
+        self,
+        pool_ids: set[int],
+        train_r: float,
+        val_r: float,
+        random_seed: int | None,
+    ) -> tuple[set[int], set[int], set[int]]:
+        shuffled = np.random.default_rng(
+            None if random_seed is None else random_seed + 1
+        ).permutation(np.array(sorted(pool_ids)))
         n = len(shuffled)
-        train_r, val_r, test_r, datastore_r = ratio
         n_train = int(train_r * n)
         n_val = int(val_r * n)
-        self._train_ids: set[int] = set(shuffled[:n_train].tolist())
-        self._val_ids: set[int] = set(shuffled[n_train : n_train + n_val].tolist())
-        self._test_ids: set[int] = set(shuffled[n_train + n_val :].tolist())
-        self._datastore_ids = datastore_ids
+        train_ids: set[int] = set(shuffled[:n_train].tolist())
+        val_ids: set[int] = set(shuffled[n_train : n_train + n_val].tolist())
+        test_ids: set[int] = set(shuffled[n_train + n_val :].tolist())
+        return train_ids, val_ids, test_ids
 
     @classmethod
     def from_dict(cls, cfg: dict[str, Any]) -> "COCOTaskPartition":
@@ -163,24 +176,12 @@ class COCOTaskPartition:
     ) -> COCOTaskDataset:
         """Build a binary classification dataset from the task pool.
 
-        The pipeline applied in order:
-        1. Filter to the requested pool sub-split (train / val / test).
-        2. Identify positive images (those containing any ``task.positive_classes``
-           annotation that passes size/count filters).
-        3. Identify negative images (those not in the positive set), apply object-count
-           filters, and manage related-class composition.
-        4. Enforce class balance via ``sampling.positive_fraction``.
-        5. Subsample to ``sampling.size``.
-
         Args:
-            task: Specification of the classification task (positive class, negative
-                class management).
-            pool_split: Which sub-split of the task pool to draw from.
-            sampling: Annotation-level and class-balance sampling controls. ``None``
-                means no filtering or rebalancing.
-            embedding: Embedding model name for the returned dataset, or ``None`` for
-                raw images.
-            embedding_dir: Directory where embeddings are stored.
+            pool_split: Which sub-split to draw images from.
+            positive_classes: COCO class names whose images are labelled 1.
+            positive_superclasses: COCO supercategory names; all member classes
+                are treated as positive. At least one of ``positive_classes`` or
+                ``positive_superclasses`` must be provided.
 
         Returns:
             A ``COCOTaskDataset`` ready for iteration.
