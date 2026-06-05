@@ -1,3 +1,5 @@
+# The following config implements our first proof of concept experiment for use with the
+# metrics script and poc_experiment notebook.
 datasets:
   - domainnet_real_1000
   - domainnet_clipart_1000

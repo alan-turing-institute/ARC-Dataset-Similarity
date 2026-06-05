@@ -1,13 +1,15 @@
 dataset1: domainnet_real_1000
 dataset2: domainnet_clipart_1000
 metrics:
-  - otdd_approx
-  - otdd_exact
+  # Unlabelled metrics
   - mmd
-  - f_otce
-  - jc_otce
-  - jc_w_otce
   - ot_exact
   - ot_sinkhorn
-  - otce_exact
-  - otce_sinkhorn
+
+  # Labelled metrics
+  - otdd_approx
+  - otdd_exact
+  - otce_ot_sinkhorn_both
+  - otce_ot_sinkhorn_coupling
+  - otce_otdd_both
+  - otce_otdd_coupling
