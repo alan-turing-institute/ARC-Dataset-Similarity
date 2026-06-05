@@ -6,7 +6,7 @@ from pycocotools.coco import COCO
 
 from dataset_similarity.constants import COCO_DIR, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.utils import load_yaml_from_path
 
 
 class COCODataset(ImageDataset):
@@ -121,7 +121,10 @@ class COCODataset(ImageDataset):
         }
 
         df = pd.DataFrame(
-            {"path": self.dataset_dir / self.split / coco.imgs[img_id]["file_name"], "label": cat_id} 
+            {
+                "path": self.dataset_dir / self.split / coco.imgs[img_id]["file_name"],
+                "label": cat_id,
+            }
             for cat_id, img_ids in cat_img_ids.items()
             for img_id in img_ids
         )
