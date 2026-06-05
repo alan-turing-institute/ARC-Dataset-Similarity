@@ -102,10 +102,10 @@ class COCODataset(ImageDataset):
         self.negative_class = _negative_class
 
         # Whether we need to drop classes depends on if all classes are negative
-        keep_labels = None
+        # TODO: bodge for now as super wants string class names
+        keep_labels, keep_classes = None, None
         if self.negative_class is not None:
             keep_labels = (self.positive_class or []) + self.negative_class
-            # Bodge for now as super wants string class names
             keep_classes = [
                 cls
                 for cls, _ in self.class_to_label_map.items()
