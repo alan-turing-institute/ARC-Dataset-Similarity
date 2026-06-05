@@ -9,31 +9,30 @@ The main way to use the script is with a config file specifying the dataset.
 python scripts/embed.py --dataset config.yaml --device cuda
 ```
 
-to embed using a config file. The config file should be a YAML file containing the
-dataset name and any kwargs needed to initialize the dataset. For example:
+where config.yaml is a YAML file in the `CONFIG_DIR / data` directory. The config file
+should be a YAML file containing the dataset name and any kwargs needed to initialize
+the dataset. For example:
 
 ```yaml
 name: DomainNet
 kwargs:
-  dataset_dir: /absolute/path/to/data/DomainNet
   split: train
+  embedding: clip
   domains: [clipart, real]
   target_classes: [class1, class2, class3]
   size: 1000
   random_seed: 42
 ```
 
-By default, the script looks for datasets in the `data/` directory and saves embeddings
-to the `embeddings/` directory, but these can be overridden with the `--data_root` and
-`--embedding_dir` flags, respectively. See `python scripts/embed.py --help` for details
-on all available flags.
+Note that the embedding key must not be `None` and will be used to determine which
+extractor to use.
 """
 
 import argparse
 
 from dataset_similarity.constants import CONFIG_DIR, EMBEDDING_DIR
 from dataset_similarity.data import DATASET_MAP
-from dataset_similarity.embedding import Extractor
+from dataset_similarity.embedding import MODEL_NAMES, Extractor
 from dataset_similarity.utils import load_yaml_from_path
 
 
@@ -49,8 +48,7 @@ def main(args: argparse.Namespace) -> None:
 
     extractor = Extractor(
         model_name=extractor_name,
-        hf_model_id=args.model_name,
-        **({"hf_model_id": args.model_name} if args.model_name else {}),
+        hf_model_id=MODEL_NAMES[extractor_name],
         device=args.device,
     )
 
@@ -69,7 +67,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        help="Name of config file inside configs/datasets/, e.g. `imagenet.yaml`",
+        help="Name of config file inside configs/data/, e.g. `imagenet.yaml`",
+        required=True,
     )
     parser.add_argument(
         "--device",

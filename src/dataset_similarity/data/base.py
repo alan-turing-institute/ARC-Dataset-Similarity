@@ -32,9 +32,6 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             ``None``, the result is non-deterministic.
         embedding: If not ``None``, the name of the embedding model to use for this
             dataset. If ``None``, raw images are returned by ``__getitem__``.
-        embedding_dir: The absolute path to the directory where the embeddings are
-            stored. This is used to compute the path to the embedding for each image.
-            Must be provided if `embedding` is not None.
         return_paths: If ``True``, ``__getitem__`` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a ``Path`` object.
     """

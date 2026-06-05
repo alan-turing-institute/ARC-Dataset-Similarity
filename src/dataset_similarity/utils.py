@@ -18,7 +18,7 @@ def get_embedding_path(
         image_path: An absolute path to an image file in the original dataset directory.
         embedding: A string denoting the name of the embedding model, e.g. "clip". This
             is used to determine the directory where the embedding for the image is
-            stored, e.g. `.constants.DEFAULT_EMBEDDING_DIR / "clip"`.
+            stored, e.g. `.constants.DATA_DIR / "clip"`.
 
     Returns:
         Path: The absolute path where the embedding for the image can be saved or
