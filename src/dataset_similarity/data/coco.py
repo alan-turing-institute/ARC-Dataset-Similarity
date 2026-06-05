@@ -133,8 +133,7 @@ class COCODataset(ImageDataset):
 
 
 def split_coco_image_ids(
-    dataset_dir: Path | str,
-    coco_split: Literal["train2017", "val2017"],
+    coco: COCO,
     task_pool_size: int | float,
     random_seed: int | None = None,
     include_datastore: bool = False,
@@ -151,8 +150,6 @@ def split_coco_image_ids(
     Returns:
         A tuple ``(datastore_ids, task_pool_ids)`` of disjoint image ID sets.
     """
-    ann_file = Path(dataset_dir) / "annotations" / f"instances_{coco_split}.json"
-    coco = COCO(str(ann_file))
     all_ids = np.array(sorted(coco.getImgIds()))
 
     if not include_datastore:
@@ -174,6 +171,7 @@ def split_coco_image_ids(
 
 
 def _load_coco_with_annotations(
+    coco: COCO,
     dataset_dir: Path,
     coco_split: str,
     image_ids: set[int] | None = None,
@@ -188,9 +186,6 @@ def _load_coco_with_annotations(
         image_id, path, label (category_id), supercategory,
         max_bbox_area_frac, n_category_instances, n_total_instances
     """
-    ann_file = dataset_dir / "annotations" / f"instances_{coco_split}.json"
-    coco = COCO(str(ann_file))
-
     all_cat_ids: set[int] = set(coco.getCatIds())
 
     img_ids = coco.getImgIds() if image_ids is None else sorted(image_ids)

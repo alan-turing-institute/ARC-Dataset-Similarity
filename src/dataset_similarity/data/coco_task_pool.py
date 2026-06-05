@@ -3,6 +3,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
+from pycocotools.coco import COCO
 
 from dataset_similarity.constants import COCO_DIR, DEFAULT_EMBEDDING_DIR
 from dataset_similarity.data.base import ImageDataset
@@ -110,11 +111,16 @@ class COCOTaskPool:
         task_pool_size = sum(ratio[:-1])
         include_datastore = ratio[3] > 0.0
 
+        ann_file = self._dataset_dir / "annotations" / f"instances_{split}.json"
+        self.coco_annots = COCO(str(ann_file))
+
         datastore_ids, pool_ids = split_coco_image_ids(
-            self._dataset_dir, split, task_pool_size, random_seed, include_datastore
+            self.coco_annots, task_pool_size, random_seed, include_datastore
         )
 
-        self._data = _load_coco_with_annotations(self._dataset_dir, split, pool_ids)
+        self._data = _load_coco_with_annotations(
+            self.coco_annots, self._dataset_dir, split
+        )
 
         label_to_meta: dict[int, dict[str, str]] = cast(
             dict[int, dict[str, str]],
