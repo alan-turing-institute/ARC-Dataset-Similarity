@@ -170,14 +170,14 @@ class COCOTaskPartition:
 
     def create_dataset(
         self,
-        pool_split: Literal["train", "val", "test", "datastore"],
+        partition: Literal["train", "val", "test", "datastore"],
         positive_classes: list[str] | None = None,
         positive_superclasses: list[str] | None = None,
     ) -> COCOTaskDataset:
         """Build a binary classification dataset from the task pool.
 
         Args:
-            pool_split: Which sub-split to draw images from.
+            partition: Which sub-split to draw images from.
             positive_classes: COCO class names whose images are labelled 1.
             positive_superclasses: COCO supercategory names; all member classes
                 are treated as positive. At least one of ``positive_classes`` or
@@ -191,10 +191,10 @@ class COCOTaskPartition:
             "val": self._val_ids,
             "test": self._test_ids,
             "datastore": self._datastore_ids,
-        }[pool_split]
+        }[partition]
 
         if split_ids is None:
-            msg = f"Requested pool_split '{pool_split}' not available."
+            msg = f"Requested partition '{partition}' not available."
             raise ValueError(msg)
 
         df = self._data[self._data["image_id"].isin(split_ids)]

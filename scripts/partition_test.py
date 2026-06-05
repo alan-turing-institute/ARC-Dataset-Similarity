@@ -38,14 +38,14 @@ def main(cfg_name: str, dataset_cfg: dict, task_cfg: dict, metrics_list: list[st
 
     # Instantiate dataset partition builder
     logger.info("Loading dataset builder")
-    pool = COCOTaskPartition.from_dict(dataset_cfg["kwargs"])
+    partition = COCOTaskPartition.from_dict(dataset_cfg["kwargs"])
     logger.info("Dataset builder loaded successfully")
 
     logger.info("Building datasets")
-    # train = pool.create_dataset(pool_split="train", **task_cfg["kwargs"])
-    # val = pool.create_dataset(pool_split="val", **task_cfg["kwargs"])
-    test = pool.create_dataset(pool_split="test", **task_cfg["kwargs"])
-    datastore = pool.create_dataset(pool_split="datastore", **task_cfg["kwargs"])
+    # train = partition.create_dataset(partition="train", **task_cfg["kwargs"])
+    # val = partition.create_dataset(partition="val", **task_cfg["kwargs"])
+    test = partition.create_dataset(partition="test", **task_cfg["kwargs"])
+    datastore = partition.create_dataset(partition="datastore", **task_cfg["kwargs"])
     logger.info("Dataset partitions built successfully")
 
     # logger.info("Evaluating model performance")
