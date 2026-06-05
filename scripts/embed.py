@@ -6,7 +6,7 @@ all extractors implemented by dataset_similarity.embedding.Extractor.
 The main way to use the script is with a config file specifying the dataset.
 
 ```bash
-python scripts/embed.py --dataset config.yaml
+python scripts/embed.py --dataset config.yaml --device cuda
 ```
 
 to embed using a config file. The config file should be a YAML file containing the
