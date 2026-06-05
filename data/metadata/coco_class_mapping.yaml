@@ -1,0 +1,240 @@
+1:
+  name: person
+  supercategory: person
+2:
+  name: bicycle
+  supercategory: vehicle
+3:
+  name: car
+  supercategory: vehicle
+4:
+  name: motorcycle
+  supercategory: vehicle
+5:
+  name: airplane
+  supercategory: vehicle
+6:
+  name: bus
+  supercategory: vehicle
+7:
+  name: train
+  supercategory: vehicle
+8:
+  name: truck
+  supercategory: vehicle
+9:
+  name: boat
+  supercategory: vehicle
+10:
+  name: traffic light
+  supercategory: outdoor
+11:
+  name: fire hydrant
+  supercategory: outdoor
+13:
+  name: stop sign
+  supercategory: outdoor
+14:
+  name: parking meter
+  supercategory: outdoor
+15:
+  name: bench
+  supercategory: outdoor
+16:
+  name: bird
+  supercategory: animal
+17:
+  name: cat
+  supercategory: animal
+18:
+  name: dog
+  supercategory: animal
+19:
+  name: horse
+  supercategory: animal
+20:
+  name: sheep
+  supercategory: animal
+21:
+  name: cow
+  supercategory: animal
+22:
+  name: elephant
+  supercategory: animal
+23:
+  name: bear
+  supercategory: animal
+24:
+  name: zebra
+  supercategory: animal
+25:
+  name: giraffe
+  supercategory: animal
+27:
+  name: backpack
+  supercategory: accessory
+28:
+  name: umbrella
+  supercategory: accessory
+31:
+  name: handbag
+  supercategory: accessory
+32:
+  name: tie
+  supercategory: accessory
+33:
+  name: suitcase
+  supercategory: accessory
+34:
+  name: frisbee
+  supercategory: sports
+35:
+  name: skis
+  supercategory: sports
+36:
+  name: snowboard
+  supercategory: sports
+37:
+  name: sports ball
+  supercategory: sports
+38:
+  name: kite
+  supercategory: sports
+39:
+  name: baseball bat
+  supercategory: sports
+40:
+  name: baseball glove
+  supercategory: sports
+41:
+  name: skateboard
+  supercategory: sports
+42:
+  name: surfboard
+  supercategory: sports
+43:
+  name: tennis racket
+  supercategory: sports
+44:
+  name: bottle
+  supercategory: kitchen
+46:
+  name: wine glass
+  supercategory: kitchen
+47:
+  name: cup
+  supercategory: kitchen
+48:
+  name: fork
+  supercategory: kitchen
+49:
+  name: knife
+  supercategory: kitchen
+50:
+  name: spoon
+  supercategory: kitchen
+51:
+  name: bowl
+  supercategory: kitchen
+52:
+  name: banana
+  supercategory: food
+53:
+  name: apple
+  supercategory: food
+54:
+  name: sandwich
+  supercategory: food
+55:
+  name: orange
+  supercategory: food
+56:
+  name: broccoli
+  supercategory: food
+57:
+  name: carrot
+  supercategory: food
+58:
+  name: hot dog
+  supercategory: food
+59:
+  name: pizza
+  supercategory: food
+60:
+  name: donut
+  supercategory: food
+61:
+  name: cake
+  supercategory: food
+62:
+  name: chair
+  supercategory: furniture
+63:
+  name: couch
+  supercategory: furniture
+64:
+  name: potted plant
+  supercategory: furniture
+65:
+  name: bed
+  supercategory: furniture
+67:
+  name: dining table
+  supercategory: furniture
+70:
+  name: toilet
+  supercategory: furniture
+72:
+  name: tv
+  supercategory: electronic
+73:
+  name: laptop
+  supercategory: electronic
+74:
+  name: mouse
+  supercategory: electronic
+75:
+  name: remote
+  supercategory: electronic
+76:
+  name: keyboard
+  supercategory: electronic
+77:
+  name: cell phone
+  supercategory: electronic
+78:
+  name: microwave
+  supercategory: appliance
+79:
+  name: oven
+  supercategory: appliance
+80:
+  name: toaster
+  supercategory: appliance
+81:
+  name: sink
+  supercategory: appliance
+82:
+  name: refrigerator
+  supercategory: appliance
+84:
+  name: book
+  supercategory: indoor
+85:
+  name: clock
+  supercategory: indoor
+86:
+  name: vase
+  supercategory: indoor
+87:
+  name: scissors
+  supercategory: indoor
+88:
+  name: teddy bear
+  supercategory: indoor
+89:
+  name: hair drier
+  supercategory: indoor
+90:
+  name: toothbrush
+  supercategory: indoor

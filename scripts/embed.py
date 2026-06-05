@@ -67,6 +67,13 @@ def main(args: argparse.Namespace) -> None:
         }
         if args.dataset == "DomainNet":
             init_kwargs["domains"] = args.domains
+
+    # if experiment config contains extractor kwargs pass them through to the Extractor
+    # constructor, also stop them from being passed to the dataset constructor
+    kwargs_extractor = init_kwargs.pop("embedding", None)
+    if kwargs_extractor is not None:
+        args.extractor = kwargs_extractor
+
     dataset = dataset_fn(**init_kwargs, embedding=None, return_paths=True)
 
     print(f"{len(dataset)} images ready.")
@@ -101,9 +108,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset",
-        choices=["DomainNet", "ImageNet"],
+        choices=["DomainNet", "ImageNet", "COCO"],
         default="DomainNet",
-        help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet'."),
+        help=("Dataset to embed. Supported: 'DomainNet', 'ImageNet', 'COCO'."),
     )
     parser.add_argument(
         "--data_root",
@@ -116,7 +123,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dataset_split",
-        choices=["train", "test", "val"],
         default="train",
         help="Dataset split to embed (default: train).",
     )

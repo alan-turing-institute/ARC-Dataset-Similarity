@@ -1,0 +1,5 @@
+dataset1: coco_vehicle_1000
+dataset2: coco_furniture_1000
+metrics:
+  - otdd_exact
+  - mmd

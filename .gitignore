@@ -5,7 +5,7 @@ plots/
 results/
 trained_models/
 
-# tensorboard logs
+# logging
 runs/
 
 # ignore temporary files

@@ -1,0 +1,9 @@
+name: COCO
+kwargs:
+  split: val2017
+  size: 1000
+  random_seed: 42
+  embedding: clip
+  target_superclasses:
+    - furniture
+  target_classes:
