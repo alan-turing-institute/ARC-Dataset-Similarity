@@ -59,7 +59,16 @@ class COCODataset(ImageDataset):
         embedding: None | str = None,
         embedding_dir: None | Path | str = DEFAULT_EMBEDDING_DIR,
         return_paths: bool = False,
+        positive_class: list[str] | None = None,
+        positive_superclass: list[str] | None = None,
+        negative_class: list[str] | None = None,
+        negative_superclass: list[str] | None = None,
     ) -> None:
+        self.positive_class = positive_class
+        self.positive_superclass = positive_superclass
+        self.negative_class = negative_class
+        self.negative_superclass = negative_superclass
+        self.drop_duplicates = drop_duplicates
         self.drop_duplicates = drop_duplicates
         # Target classes also need to be processed before calling super().__init__()
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
@@ -130,6 +139,32 @@ class COCODataset(ImageDataset):
         if self.drop_duplicates:
             df = df.drop_duplicates(subset="path", keep="first").reset_index(drop=True)
         return df
+
+    def _load_data_with_annotations(self) -> pd.DataFrame:
+        ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
+        coco = COCO(str(ann_file))
+
+        rows = []
+        for img_id in coco.getImgIds():
+            annot = coco.imgToAnns[img_id]
+            img_info = coco.imgs.get(img_id)
+            image_area = img_info["height"] * img_info["width"]
+
+            row_annots = {
+                "img_id": img_id,
+                "n_objects": len(annot),
+                "category_id": [obj["category_id"] for obj in annot],
+                "bbox_area_ratio": [
+                    (obj["bbox"][2] * obj["bbox"][2]) / image_area for obj in annot
+                ],
+            }
+            rows.append(row_annots)
+
+        return pd.DataFrame(rows)
+
+    def _filter(self) -> None:
+        # df.category_id.apply(lambda row: positive_class in row)
+        return None
 
 
 def split_coco_image_ids(
