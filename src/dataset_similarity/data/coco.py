@@ -180,7 +180,7 @@ def _load_coco_with_annotations(
 
     Returns a DataFrame with one row per ``(image_id, category_id)`` pair, including
     annotation-level metadata needed for task-level filtering. Used internally by
-    ``COCOTaskPool``.
+    ``COCOTaskPartition``.
 
     Columns:
         image_id, path, label (category_id), supercategory,

@@ -2,7 +2,7 @@ from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.coco import COCODataset
 from dataset_similarity.data.coco_task_pool import (
     COCOTaskDataset,
-    COCOTaskPool,
+    COCOTaskPartition,
 )
 from dataset_similarity.data.domainnet import DomainNetDataset
 from dataset_similarity.data.imagenet import ImageNetDataset
@@ -10,7 +10,7 @@ from dataset_similarity.data.imagenet import ImageNetDataset
 __all__ = [
     "COCODataset",
     "COCOTaskDataset",
-    "COCOTaskPool",
+    "COCOTaskPartition",
     "DomainNetDataset",
     "ImageNetDataset",
 ]

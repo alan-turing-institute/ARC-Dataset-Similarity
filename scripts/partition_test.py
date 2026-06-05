@@ -5,7 +5,7 @@ import logging
 import dataset_similarity.metrics as metrics
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.coco_task_pool import COCOTaskPool
+from dataset_similarity.data.coco_task_pool import COCOTaskPartition
 from dataset_similarity.data.mix import DatasetMix
 from dataset_similarity.data.utils import load_yaml_from_path
 
@@ -38,7 +38,7 @@ def main(cfg_name: str, dataset_cfg: dict, task_cfg: dict, metrics_list: list[st
 
     # Instantiate dataset partition builder
     logger.info("Loading dataset builder")
-    pool = COCOTaskPool.from_dict(dataset_cfg["kwargs"])
+    pool = COCOTaskPartition.from_dict(dataset_cfg["kwargs"])
     logger.info("Dataset builder loaded successfully")
 
     logger.info("Building datasets")

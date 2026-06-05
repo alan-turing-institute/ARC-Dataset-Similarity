@@ -17,11 +17,11 @@ from dataset_similarity.data.utils import load_yaml_from_path
 
 
 class COCOTaskDataset(ImageDataset):
-    """A binary classification dataset built from a ``COCOTaskPool``.
+    """A binary classification dataset built from a ``COCOTaskPartition``.
 
     Conforms to the ``ImageDataset`` interface so that all existing tooling
     (metrics, embedding extraction, YAML configs) works without modification.
-    Instantiated by ``COCOTaskPool.create_dataset``; not intended to be constructed
+    Instantiated by ``COCOTaskPartition.create_dataset``; not intended to be constructed
     directly.
 
     Args:
@@ -55,7 +55,7 @@ class COCOTaskDataset(ImageDataset):
         return self._prebuilt_data
 
 
-class COCOTaskPool:
+class COCOTaskPartition:
     """Manages the task-dataset partition of COCO and creates classification datasets.
 
     Partitions COCO image IDs deterministically into a large unlabelled data store and
@@ -93,7 +93,6 @@ class COCOTaskPool:
         max_bbox_area_fraction: float | None = None,
         min_objects_per_image: int | None = None,
         max_objects_per_image: int | None = None,
-        # include_datastore: bool = False,
     ) -> None:
         # sampling configs
         self.min_bbox_area_fraction = min_bbox_area_fraction
@@ -152,7 +151,7 @@ class COCOTaskPool:
         self._datastore_ids = datastore_ids
 
     @classmethod
-    def from_dict(cls, cfg: dict[str, Any]) -> "COCOTaskPool":
+    def from_dict(cls, cfg: dict[str, Any]) -> "COCOTaskPartition":
         """Construct a ``COCOBuilder`` from a plain config dictionary."""
         return cls(**cfg)
 
