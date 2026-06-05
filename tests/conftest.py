@@ -37,7 +37,6 @@ class _EmbeddingTensorDataset(ImageDataset):
             size=None,
             random_seed=None,
             embedding=None,
-            embedding_dir=None,
             return_paths=return_paths,
         )
 
