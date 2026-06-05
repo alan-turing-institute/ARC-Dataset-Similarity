@@ -39,9 +39,9 @@ from dataset_similarity.utils import load_yaml_from_path
 
 def main(args: argparse.Namespace) -> None:
     data_cfg = load_yaml_from_path(CONFIG_DIR / "data" / args.dataset)
-    extractor_name = data_cfg["kwargs"].pop("extractor")
+    init_kwargs = dict(data_cfg["kwargs"])
+    extractor_name = init_kwargs.pop("embedding")
     dataset_fn = DATASET_MAP[data_cfg["name"]]
-    init_kwargs = data_cfg["kwargs"]
     dataset = dataset_fn(**init_kwargs, embedding=None, return_paths=True)
 
     print(f"{len(dataset)} images ready.")
