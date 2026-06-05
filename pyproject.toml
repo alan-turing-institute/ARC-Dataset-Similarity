@@ -44,6 +44,7 @@ dependencies = [
     "geomloss>=0.3.1",
     "pot>=0.9.6.post1",
     "plotnine>=0.15.3",
+    "pycocotools>=2.0.11",
     "flash-sinkhorn; sys_platform == 'linux'",
     "accelerate>=1.13.0",
 ]
