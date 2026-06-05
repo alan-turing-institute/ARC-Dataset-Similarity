@@ -1,3 +1,5 @@
+# The following defines an example input for a single dataset pair to the metrics
+# script.
 dataset1: domainnet_real_1000
 dataset2: domainnet_clipart_1000
 metrics:
