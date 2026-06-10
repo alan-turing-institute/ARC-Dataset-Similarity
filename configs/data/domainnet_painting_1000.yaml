@@ -4,7 +4,7 @@ kwargs:
   domains: painting
   size: 1000
   random_seed: 42
-  embedding: clip
+  embedding: dinov3
   keep_classes:
     - swan
     - stairs

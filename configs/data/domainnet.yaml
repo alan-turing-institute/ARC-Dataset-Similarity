@@ -1,2 +1,4 @@
 name: "DomainNet"
-kwargs: {}
+kwargs:
+  split: train
+  embedding: dinov3
