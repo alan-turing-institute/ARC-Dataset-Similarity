@@ -5,16 +5,6 @@ plots/
 results/
 trained_models/
 
-# Allow new COCO annotations
-!/data/COCO/
-/data/COCO/*
-!/data/COCO/annotations/
-/data/COCO/annotations/*
-!/data/COCO/annotations/instances_trainARC.json
-!/data/COCO/annotations/instances_valARC.json
-!/data/COCO/annotations/instances_testARC.json
-!/data/COCO/annotations/instances_store.json
-
 
 # logging
 runs/
