@@ -126,8 +126,7 @@ class COCODataset(ImageDataset):
         ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
         coco = COCO(str(ann_file))
         df = pd.DataFrame(
-            _get_row_from_img_id(img_id, coco, self.split)
-            for img_id in coco.getImgIds()
+            _get_row_from_img_id(img_id, coco) for img_id in coco.getImgIds()
         )
 
         # Filter dataset for keep classes
@@ -245,7 +244,7 @@ class COCODataset(ImageDataset):
         return None
 
 
-def _get_row_from_img_id(img_id: int, coco: COCO, split: str) -> dict[str, Any]:
+def _get_row_from_img_id(img_id: int, coco: COCO) -> dict[str, Any]:
     """
     Helper fn which given a COCO image ID, returns a dictionary containing keys for
     the img_id, number of categories, number of objects, and object areas
@@ -259,8 +258,7 @@ def _get_row_from_img_id(img_id: int, coco: COCO, split: str) -> dict[str, Any]:
     Returns:
         dict: The dictionary containing the image information
     """
-    # TODO: remove split arg and code after updating download script
-    path = COCO_DIR / split / coco.imgs[img_id]["file_name"]
+    path = COCO_DIR / "images" / coco.imgs[img_id]["file_name"]
     ann = coco.imgToAnns[img_id]
     cats = [ann["category_id"] for ann in ann]
     img_info = coco.imgs[img_id]
