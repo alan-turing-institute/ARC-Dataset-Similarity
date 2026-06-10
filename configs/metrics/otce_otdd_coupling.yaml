@@ -1,6 +1,7 @@
+# The following is equivalent to JC-OTCE
 metric: otce_distance
 kwargs:
-    use_wasserstein: True
+    use_wasserstein: False
     use_otdd: True
 
     # OTDD kwargs

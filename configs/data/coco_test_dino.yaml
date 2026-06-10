@@ -1,0 +1,5 @@
+# This config is used for embedding the full COCO test set with DinoV3.
+name: COCO
+kwargs:
+  split: test2017
+  embedding: dinov3

@@ -101,7 +101,6 @@ Use the provided helper script to download and extract the 2017 images and annot
 python scripts/download_coco.py --split train val test
 ```
 
-
 Alternatively, download the zip files manually from [https://cocodataset.org/#download](https://cocodataset.org/#download) and extract them into `data/COCO/`:
 
 - `train2017.zip` (~18 GB) → `images/train2017/`
@@ -109,20 +108,35 @@ Alternatively, download the zip files manually from [https://cocodataset.org/#do
 - `test2017.zip` (~6 GB) → `images/test2017/`
 - `annotations_trainval2017.zip` (~240 MB) → `annotations/`
 
-### Directory layout
+### Sort Images
 
-    data/
-        COCO/
-            images/
-                train2017/
-                    *.jpg
-                val2017/
-                    *.jpg
-                test2017/
-                    *.jpg
-            annotations/
-                instances_train2017.json
-                instances_val2017.json
-                captions_train2017.json
-                captions_val2017.json
-                ...
+Next, run the following to put all images from COCO together:
+
+```bash
+find data/COCO/images/train2017/ -maxdepth 1 -type f -print0 | xargs -0 -I {} mv {} data/COCO/images/
+find data/COCO/images/val2017/ -maxdepth 1 -type f -print0 | xargs -0 -I {} mv {} data/COCO/images/
+```
+
+### Create New Annotations
+
+Finally, create the ARC annotations of COCO by running the following script:
+
+```bash
+python scripts/make_coco_splits.py
+```
+
+### Directory Layout After Finishing
+
+Your directory should look as follows:
+
+.
+└── data/
+    └── COCO/
+        ├── images/
+        │   └── *.jpg
+        └── annotations/
+            ├── instances_store.json
+            ├── instances_testARC.json
+            ├── instances_trainARC.json
+            ├── instances_valARC.json
+            └── ...

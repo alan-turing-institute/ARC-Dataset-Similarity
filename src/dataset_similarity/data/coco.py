@@ -1,10 +1,9 @@
-from pathlib import Path
-from typing import Literal, cast
+from typing import cast
 
 import pandas as pd
 from pycocotools.coco import COCO
 
-from dataset_similarity.constants import COCO_DIR, DEFAULT_EMBEDDING_DIR
+from dataset_similarity.constants import COCO_DIR, DATA_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.utils import load_yaml_from_path
 
@@ -14,8 +13,6 @@ class COCODataset(ImageDataset):
     PyTorch dataset for `MS COCO <https://cocodataset.org/>`_.
 
     Args:
-        dataset_dir: Absolute path to the dataset directory containing COCO images.
-            Defaults to `dataset_similarity.constants.COCO_DIR`.
         target_classes: List of class names to include in the dataset. If None, all
             classes are included. Elements must be valid class names as specified in the
             class mapping file at
@@ -25,8 +22,8 @@ class COCODataset(ImageDataset):
             included. Expands to the corresponding class names before filtering, and is
             merged with `target_classes` when both are provided. If None, no
             supercategory filtering is applied. Defaults to `None`.
-        split: Dataset split identifier. Must be `"train2017"` or `"val2017"`.
-            Defaults to `"train2017"`.
+        split: Dataset split identifier. Any of "train2017", "val2017", "trainARC",
+            "valARC", "testARC", or "store". Defaults to "train2017".
         size: If a float in `(0, 1)`, the fraction of samples to retain.
             If a positive integer, the exact number of samples to retain. If
             `None`, no subsampling is performed and the full dataset is used. Defaults
@@ -36,10 +33,6 @@ class COCODataset(ImageDataset):
         embedding: If not `None`, the name of the embedding model to use for this
             dataset. If `None`, raw images are returned by `__getitem__`. Defaults to
             `None`.
-        embedding_dir: The absolute path to the directory where the embeddings are
-            stored. This is used to compute the path to the embedding for each image.
-            Must be provided if `embedding` is not None. Defaults to
-            `dataset_similarity.constants.DEFAULT_EMBEDDING_DIR`.
         return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a `Path` object.
             Defaults to `False`.
@@ -47,24 +40,20 @@ class COCODataset(ImageDataset):
 
     def __init__(
         self,
-        dataset_dir: str | Path = COCO_DIR,
         target_classes: list[str] | None = None,
         target_superclasses: list[str] | None = None,
-        split: Literal["train2017", "val2017"] = "train2017",
+        split: str = "train2017",
         drop_duplicates: bool = True,
         size: float | int | None = None,
         random_seed: int | None = None,
         embedding: None | str = None,
-        embedding_dir: None | Path | str = DEFAULT_EMBEDDING_DIR,
         return_paths: bool = False,
     ) -> None:
         self.drop_duplicates = drop_duplicates
         # Target classes also need to be processed before calling super().__init__()
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
             dict[int, dict[str, str]],
-            load_yaml_from_path(
-                Path(dataset_dir).parent / "metadata" / "coco_class_mapping.yaml"
-            ),
+            load_yaml_from_path(DATA_DIR / "metadata" / "coco_class_mapping.yaml"),
         )
         self.name_to_label_map: dict[str, int] = {
             meta["name"]: label for label, meta in self.label_to_meta_map.items()
@@ -97,13 +86,12 @@ class COCODataset(ImageDataset):
                     raise ValueError(err_msg)
 
         super().__init__(
-            dataset_dir=dataset_dir,
+            dataset_dir=COCO_DIR,
             target_classes=target_classes,
             split=split,
             size=size,
             random_seed=random_seed,
             embedding=embedding,
-            embedding_dir=embedding_dir,
             return_paths=return_paths,
         )
 
