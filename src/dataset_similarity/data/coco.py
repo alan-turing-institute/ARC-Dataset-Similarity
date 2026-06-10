@@ -1,4 +1,4 @@
-from typing import Literal, cast
+from typing import cast
 
 import pandas as pd
 from pycocotools.coco import COCO
@@ -22,8 +22,8 @@ class COCODataset(ImageDataset):
             included. Expands to the corresponding class names before filtering, and is
             merged with `target_classes` when both are provided. If None, no
             supercategory filtering is applied. Defaults to `None`.
-        split: Dataset split identifier. Must be `"train2017"` or `"val2017"`.
-            Defaults to `"train2017"`.
+        split: Dataset split identifier. Any of "train2017", "val2017", "trainARC",
+            "valARC", "testARC", or "store". Defaults to "train2017".
         size: If a float in `(0, 1)`, the fraction of samples to retain.
             If a positive integer, the exact number of samples to retain. If
             `None`, no subsampling is performed and the full dataset is used. Defaults
@@ -42,7 +42,7 @@ class COCODataset(ImageDataset):
         self,
         target_classes: list[str] | None = None,
         target_superclasses: list[str] | None = None,
-        split: Literal["train2017", "val2017"] = "train2017",
+        split: str = "train2017",
         drop_duplicates: bool = True,
         size: float | int | None = None,
         random_seed: int | None = None,
