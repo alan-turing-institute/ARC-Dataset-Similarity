@@ -14,3 +14,4 @@ training_args:
   learning_rate: 0.001
   metric_for_best_model: average_precision
   greater_is_better: true
+  eval_strategy: epoch
