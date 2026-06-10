@@ -1,0 +1,10 @@
+# The following is equivalent to original OTCE
+metric: otce_distance
+kwargs:
+    use_wasserstein: True
+    use_otdd: False
+    use_flash_sinkhorn: False
+    device: cuda
+    method: sinkhorn
+    reg: 0.1
+    debias: True

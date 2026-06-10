@@ -41,8 +41,12 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "pandas>=2.3.3",
     "otdd",
+    "geomloss>=0.3.1",
+    "pot>=0.9.6.post1",
     "plotnine>=0.15.3",
     "pycocotools>=2.0.11",
+    "flash-sinkhorn; sys_platform == 'linux'",
+    "accelerate>=1.13.0",
 ]
 
 [dependency-groups]
@@ -84,6 +88,7 @@ addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
 filterwarnings = [
   "error",
+  "ignore::DeprecationWarning:geomloss",
 ]
 log_cli_level = "INFO"
 testpaths = [

@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
-from dataset_similarity.data.utils import get_embedding_path, load_yaml_from_path
+from dataset_similarity.utils import get_embedding_path, load_yaml_from_path
 
 
 class ImageDataset(ABC, Dataset):  # type: ignore[misc]
@@ -32,27 +32,21 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             ``None``, the result is non-deterministic.
         embedding: If not ``None``, the name of the embedding model to use for this
             dataset. If ``None``, raw images are returned by ``__getitem__``.
-        embedding_dir: The absolute path to the directory where the embeddings are
-            stored. This is used to compute the path to the embedding for each image.
-            Must be provided if `embedding` is not None.
         return_paths: If ``True``, ``__getitem__`` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a ``Path`` object.
     """
 
     def __init__(
         self,
-        dataset_dir: str | Path,
+        dataset_dir: Path,
         keep_classes: list[str] | None,
         split: str,
         size: float | int | None,
         random_seed: int | None,
         embedding: None | str,
-        embedding_dir: None | Path | str,
         return_paths: bool,
     ) -> None:
         super().__init__()
-        if not isinstance(dataset_dir, Path):
-            dataset_dir = Path(dataset_dir)
         self.dataset_dir = dataset_dir
         self.split = split
         self.keep_classes = keep_classes
@@ -61,16 +55,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         self.random_seed = random_seed
         if self.size is not None:
             self.data = self.subsample_data()
-        if embedding is not None:
-            if embedding_dir is None:
-                msg = "`embedding_dir` must be provided if `embedding` is not None"
-                raise ValueError(msg)
-            if not isinstance(embedding_dir, Path):
-                embedding_dir = Path(embedding_dir)
-            embedding_path = embedding_dir / embedding
-        else:
-            embedding_path = None
-        self.embedding_path = embedding_path
+        self.embedding = embedding
         self.return_paths = return_paths
 
     def subsample_data(self) -> DataFrame:
@@ -140,13 +125,11 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         """
         sample = self.data.iloc[idx]
         image_path = sample["path"]
-        if self.embedding_path is None:
+        if self.embedding is None:
             tensor = read_image(image_path, mode="RGB")
         else:
             image_embedding_path = get_embedding_path(
-                image_path=image_path,
-                embedding_dir=self.embedding_path,
-                data_root=self.dataset_dir.parent,
+                image_path=image_path, embedding=self.embedding
             )
             tensor = load_file(image_embedding_path)["embedding"]
         if self.return_paths:

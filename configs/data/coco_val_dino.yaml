@@ -1,0 +1,5 @@
+# This config is used for embedding the full COCO validation set with DinoV3.
+name: COCO
+kwargs:
+  split: val2017
+  embedding: dinov3

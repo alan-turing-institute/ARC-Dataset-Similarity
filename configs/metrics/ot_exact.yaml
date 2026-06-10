@@ -1,0 +1,4 @@
+metric: ot_distance
+kwargs:
+    use_flash_sinkhorn: False
+    metric: sqeuclidean  # Cost metric: "sqeuclidean" (squared L2) or "euclidean" (L1)

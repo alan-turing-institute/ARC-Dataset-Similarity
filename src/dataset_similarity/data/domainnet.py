@@ -1,13 +1,10 @@
-from __future__ import annotations
-
-from pathlib import Path
 from typing import Literal
 
 import pandas as pd
 
-from dataset_similarity.constants import DEFAULT_EMBEDDING_DIR, DOMAINNET_DIR
+from dataset_similarity.constants import DATA_DIR, DOMAINNET_DIR
 from dataset_similarity.data.base import ImageDataset
-from dataset_similarity.data.utils import load_yaml_from_path
+from dataset_similarity.utils import load_yaml_from_path
 
 
 class DomainNetDataset(ImageDataset):
@@ -15,8 +12,6 @@ class DomainNetDataset(ImageDataset):
     PyTorch dataset for `DomainNet <http://ai.bu.edu/M3SDA/>`_.
 
     Args:
-        dataset_dir: Absolute path to the dataset directory containing DomainNet images.
-            Defaults to `dataset_similarity.constants.DOMAINNET_DIR`.
         domains: If not `None`, either a single domain name as a string, or a list of
             domain names. Each domain name must be one of `"clipart"`, `"infograph"`,
             `"painting"`, `"quickdraw"`, `"real"`, or `"sketch"`. If `None`, all domains
@@ -37,10 +32,6 @@ class DomainNetDataset(ImageDataset):
         embedding: If not `None`, the name of the embedding model to use for this
             dataset. If `None`, raw images are returned by `__getitem__`. Defaults to
             `None`.
-        embedding_dir: The absolute path to the directory where the embeddings are
-            stored. This is used to compute the path to the embedding for each image.
-            Must be provided if `embedding` is not None. Defaults to
-            `dataset_similarity.constants.DEFAULT_EMBEDDING_DIR`.
         return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a `Path` object.
             Defaults to `False`.
@@ -50,14 +41,12 @@ class DomainNetDataset(ImageDataset):
 
     def __init__(
         self,
-        dataset_dir: str | Path = DOMAINNET_DIR,
         domains: str | list[str] | None = None,
         keep_classes: list[str] | None = None,
         split: Literal["train", "test"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
         embedding: None | str = None,
-        embedding_dir: None | Path | str = DEFAULT_EMBEDDING_DIR,
         return_paths: bool = False,
     ) -> None:
         # Domain needs to be processed before calling super().__init__()
@@ -80,7 +69,7 @@ class DomainNetDataset(ImageDataset):
 
         # Target classes also need to be processed before calling super().__init__()
         self.class_to_label_map: dict[str, int] = load_yaml_from_path(
-            Path(dataset_dir).parent / "metadata" / "domainnet_class_mapping.yaml"
+            DATA_DIR / "metadata" / "domainnet_class_mapping.yaml"
         )
         self.classnumber_to_name_map: dict[int, str] = {
             label: name for name, label in self.class_to_label_map.items()
@@ -90,7 +79,7 @@ class DomainNetDataset(ImageDataset):
                 if cls not in self.class_to_label_map:
                     err_msg = (
                         f"Unknown class {cls}. Check the class mapping at "
-                        f"{Path(dataset_dir).parent}"
+                        f"{DATA_DIR}"
                         "/metadata/domainnet_class_mapping.yaml for valid class "
                         "names."
                     )
@@ -100,13 +89,12 @@ class DomainNetDataset(ImageDataset):
             }
 
         super().__init__(
-            dataset_dir=dataset_dir,
+            dataset_dir=DOMAINNET_DIR,
             keep_classes=keep_classes,
             split=split,
             size=size,
             random_seed=random_seed,
             embedding=embedding,
-            embedding_dir=embedding_dir,
             return_paths=return_paths,
         )
 

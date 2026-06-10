@@ -6,6 +6,7 @@ from torch.utils.data import TensorDataset
 
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
+from dataset_similarity.metrics.utils import extract_dataset_tensors
 
 
 def _prepare_tensor_dataset_targets(labels: torch.Tensor) -> torch.Tensor:
@@ -41,20 +42,7 @@ def _prepare_otdd_tensor_dataset(dataset: ImageDataset | DatasetMix) -> TensorDa
     Returns:
         TensorDataset: The processed TensorDataset ready for use with OTDD.
     """
-    if isinstance(dataset, ImageDataset) and dataset.return_paths:
-        err_msg = (
-            "OTDD computation does not support ImageDatasets with return_paths=True. "
-            "Please initialize the dataset with return_paths=False to compute OTDD."
-        )
-        raise ValueError(err_msg)
-    features = []
-    labels = []
-    for idx in range(len(dataset)):
-        sample = dataset[idx]
-        features.append(sample[0])
-        labels.append(sample[1])
-    features = torch.stack(features)
-    labels = torch.tensor(labels)
+    features, labels = extract_dataset_tensors(dataset, return_labels=True)
     targets = _prepare_tensor_dataset_targets(labels)
     tensor_dataset = TensorDataset(features, targets)
     tensor_dataset.classes = torch.sort(torch.unique(targets)).values
@@ -99,7 +87,11 @@ def otdd(
         D2=tds2,
         **kwargs,
     )
-    distance: float | tuple[float, torch.Tensor] = otdd_distance.distance(
-        return_coupling=return_coupling, maxsamples=maxsamples
+    if return_coupling:
+        distance_tensor, coupling = otdd_distance.distance(
+            return_coupling=True, maxsamples=maxsamples
+        )
+        return float(distance_tensor.item()), coupling
+    return float(
+        otdd_distance.distance(return_coupling=False, maxsamples=maxsamples).item()
     )
-    return distance.item() if isinstance(distance, torch.Tensor) else distance
