@@ -55,6 +55,7 @@ class COCODataset(ImageDataset):
         min_bbox_area_fraction: float | None = None,
         max_bbox_area_fraction: float | None = None,
         positive_fraction: float | None = None,
+        filter_class: Literal["positive", "negative"] | None = None,
     ) -> None:
         # Classes need to be processed before calling super.__init__
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
@@ -119,6 +120,7 @@ class COCODataset(ImageDataset):
         self.min_bbox_area_fraction = min_bbox_area_fraction
         self.max_bbox_area_fraction = max_bbox_area_fraction
         self.positive_fraction = positive_fraction
+        self.filter_class = filter_class
 
         # Super will use keep_classes to filter the dataset by class
         super().__init__(
@@ -150,22 +152,22 @@ class COCODataset(ImageDataset):
                 lambda x: int(any(cls in x for cls in self.positive_class))
             )
 
-        # TODO: maybe toggle whether to apply below only to positive or negative classes
-        # instead of generic (will need a new init kwarg to specify this)
+        # Apply object/bbox filters to the target subset (or all rows)
+        if self.filter_class is not None and "label" in df.columns:
+            target_label = 1 if self.filter_class == "positive" else 0
+            keep = self._apply_object_filters(df[df["label"] == target_label])
+            return pd.concat([keep, df[df["label"] != target_label]]).sort_index()
+        return self._apply_object_filters(df)
 
-        # Data filtering based on number of objects
+    def _apply_object_filters(self, df: pd.DataFrame) -> pd.DataFrame:
         if self.min_objects_per_image is not None:
             df = df[df.num_objects >= self.min_objects_per_image]
         if self.max_objects_per_image is not None:
             df = df[df.num_objects <= self.max_objects_per_image]
-
-        # Data filtering based on bounding box area fraction
         if self.min_bbox_area_fraction is not None:
             df = df[df.min_bbox_frac >= self.min_bbox_area_fraction]
         if self.max_bbox_area_fraction is not None:
             df = df[df.max_bbox_frac <= self.max_bbox_area_fraction]
-
-        # Return
         return df
 
     def _prepare_classes(
@@ -270,7 +272,7 @@ def _get_row_from_img_id(img_id: int, coco: COCO, split: str) -> dict[str, Any]:
         dict: The dictionary containing the image information
     """
     # TODO: remove split arg and code after updating download script
-    path = COCO_DIR / "images" / split / coco.imgs[img_id]["file_name"]
+    path = COCO_DIR / split / coco.imgs[img_id]["file_name"]
     ann = coco.imgToAnns[img_id]
     cats = [ann["category_id"] for ann in ann]
     img_info = coco.imgs[img_id]
