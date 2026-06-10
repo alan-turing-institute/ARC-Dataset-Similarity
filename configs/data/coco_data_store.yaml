@@ -1,0 +1,5 @@
+# This config provides the COCO data store, used as an unlabelled data store in our expeirments.
+name: COCO
+kwargs:
+  split: store
+  embedding: dinov3

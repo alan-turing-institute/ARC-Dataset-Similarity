@@ -1,0 +1,7 @@
+# This config implements a task likely to transfer well to the data store
+name: COCO
+kwargs:
+  split: trainARC
+  embedding: dinov3
+  positive_class:
+  - person

@@ -1,0 +1,9 @@
+# This config implements a task unlikely to transfer well to the data store
+name: COCO
+kwargs:
+  split: testARC
+  embedding: dinov3
+  positive_class:
+  - cat
+  negative_superclass:
+  - vehicle

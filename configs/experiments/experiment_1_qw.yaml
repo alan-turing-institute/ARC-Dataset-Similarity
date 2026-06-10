@@ -1,0 +1,11 @@
+# This config implements the quick experiment comparing three example test sets against
+# the data store, using three different metrics.
+datasets:
+  - qe_test_easy
+  - qe_test_medium
+  - qe_test_hard
+store: coco_data_store
+metrics:
+  - mmd
+  - ot_exact
+  - ot_sinkhorn
