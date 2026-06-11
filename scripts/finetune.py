@@ -1,10 +1,14 @@
 import argparse
+import os
+from datetime import datetime
 from pathlib import Path
 
+import mlflow
 import numpy as np
 import optuna
 import torch
 import torch.nn.functional as F
+from dotenv import load_dotenv
 from sklearn.metrics import average_precision_score
 from torch.utils.data import random_split
 from transformers import (
@@ -15,7 +19,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
+from dataset_similarity.constants import CONFIG_DIR, MLFLOW_TRACKING_URI, PROJECT_DIR
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
 
@@ -94,6 +98,34 @@ def train_and_evaluate(
     return all_metrics
 
 
+def _log_numeric_metrics(metrics: dict, step: int | None = None) -> None:
+    mlflow.log_metrics(
+        {k: v for k, v in metrics.items() if isinstance(v, (int | float))},
+        step=step,
+    )
+
+
+def configure_mlflow(config_name: str) -> None:
+    load_dotenv(".env")
+    # override the default URI with the value from the environment variable if set
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
+
+    experiment_name = f"{config_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    mlflow.set_experiment(experiment_name)
+
+
+def get_mlflow_tags(config_name: str, trial_number: int | None = None) -> dict:
+    tags = {
+        "project": "dataset-similarity",
+        "script": "finetune.py",
+        "config": config_name,
+        "user": os.getenv("MLFLOW_TRACKING_USERNAME", "unknown"),
+    }
+    if trial_number is not None:
+        tags["trial"] = str(trial_number)
+    return tags
+
+
 def main(config_name: str) -> None:
     """
     Fine-tune an image classification model using a named YAML config.
@@ -111,100 +143,158 @@ def main(config_name: str) -> None:
     Args:
         config_name: Stem of a YAML file in ``configs/finetune/``.
     """
-    # load_config
-    config_path = FINETUNE_CONFIG_DIR / f"{config_name}.yaml"
-    config = load_yaml_from_path(config_path)
 
-    data_config: dict[str, str | dict] = load_yaml_from_path(
-        DATA_CONFIG_DIR / f"{config['data_config']}.yaml"
-    )
-    if data_config.get("kwargs") is None:
-        data_config["kwargs"] = {}
+    configure_mlflow(config_name)
 
-    # Embeddings are not used during fine-tuning; setting to None prevents
-    # load_dataset_from_config from attempting to load an embedding model.
-    data_config["kwargs"]["embedding"] = None
-    dataset = load_dataset_from_config(data_config)
-    n_eval = int(EVAL_SPLIT_RATIO * len(dataset))
-    train_dataset, eval_dataset = random_split(dataset, [len(dataset) - n_eval, n_eval])
+    with mlflow.start_run(run_name=f"Finetune {config_name}"):
+        # add mlflow tags
+        mlflow.set_tags(get_mlflow_tags(config_name))
 
-    def model_init(_):
-        return AutoModelForImageClassification.from_pretrained(**config["model_args"])
+        # load_config
+        config_path = FINETUNE_CONFIG_DIR / f"{config_name}.yaml"
+        config = load_yaml_from_path(config_path)
 
-    processor = AutoImageProcessor.from_pretrained(**config["model_args"])
+        mlflow.log_params(
+            {"config_name": config_name, "data_config": config["data_config"]}
+        )
 
-    def collate_fn(batch: list[tuple[torch.Tensor, int]]) -> dict[str, torch.Tensor]:
-        inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
-        return {**inputs, "labels": torch.tensor([item[1] for item in batch])}
+        data_config: dict[str, str | dict] = load_yaml_from_path(
+            DATA_CONFIG_DIR / f"{config['data_config']}.yaml"
+        )
+        if data_config.get("kwargs") is None:
+            data_config["kwargs"] = {}
 
-    init_training_args = config.get("training_args", {})
-    output_dir = TRAINED_MODELS_DIR / config_name
+        # Embeddings are not used during fine-tuning; setting to None prevents
+        # load_dataset_from_config from attempting to load an embedding model.
+        data_config["kwargs"]["embedding"] = None
+        dataset = load_dataset_from_config(data_config)
+        n_eval = int(EVAL_SPLIT_RATIO * len(dataset))
+        train_dataset, eval_dataset = random_split(
+            dataset, [len(dataset) - n_eval, n_eval]
+        )
 
-    if "sweep_args" in config:
-        print("Starting hyperparameter sweep with Optuna...")
-        sweep_args = config["sweep_args"]
+        def model_init(_):
+            return AutoModelForImageClassification.from_pretrained(
+                **config["model_args"]
+            )
 
-        sweep_dir = output_dir / "sweep_trials"
+        processor = AutoImageProcessor.from_pretrained(**config["model_args"])
 
-        def objective(trial):
-            trial_output_dir = sweep_dir / f"run{trial.number}"
-            sweep_parameters = {
-                name: suggest(trial, name, spec)
-                for name, spec in sweep_args["params"].items()
-            }
-            train_args = {**init_training_args, **sweep_parameters}
-            # model_init is used instead so Optuna can reinitialise weights
-            trial_trainer = Trainer(
-                model_init=model_init,
+        def collate_fn(
+            batch: list[tuple[torch.Tensor, int]],
+        ) -> dict[str, torch.Tensor]:
+            inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
+            return {**inputs, "labels": torch.tensor([item[1] for item in batch])}
+
+        init_training_args = config.get("training_args", {})
+        output_dir = TRAINED_MODELS_DIR / config_name
+
+        if "sweep_args" in config:
+            print("Starting hyperparameter sweep with Optuna...")
+            sweep_args = config["sweep_args"]
+            mlflow.log_params(
+                {
+                    "n_trials": sweep_args.get("n_trials", 20),
+                    "sweep_direction": sweep_args.get("direction", "minimize"),
+                    "sweep_objective": sweep_args.get("objective", "eval_loss"),
+                }
+            )
+
+            sweep_dir = output_dir / "sweep_trials"
+
+            def objective(trial):
+                trial_output_dir = sweep_dir / f"run{trial.number}"
+                sweep_parameters = {
+                    name: suggest(trial, name, spec)
+                    for name, spec in sweep_args["params"].items()
+                }
+                train_args = {**init_training_args, **sweep_parameters}
+
+                with mlflow.start_run(nested=True, run_name=f"trial_{trial.number}"):
+                    # log trial-level tags and params to mlflow
+                    mlflow.set_tags(get_mlflow_tags(config_name, trial.number))
+                    mlflow.log_params(sweep_parameters)
+
+                    # model_init is used instead so Optuna can reinitialise weights
+                    trial_trainer = Trainer(
+                        model_init=model_init,
+                        train_dataset=train_dataset,
+                        eval_dataset=eval_dataset,
+                        args=TrainingArguments(
+                            output_dir=str(trial_output_dir),
+                            **train_args,
+                        ),
+                        data_collator=collate_fn,
+                        compute_metrics=evaluate_model,
+                    )
+                    # log the random seeds used for this trial
+                    mlflow.log_params(
+                        {
+                            "seed": trial_trainer.args.seed,
+                            "data_seed": trial_trainer.args.data_seed
+                            or trial_trainer.args.seed,
+                        }
+                    )
+
+                    all_metrics = train_and_evaluate(
+                        trial_trainer, train_dataset, trial_output_dir
+                    )
+                    _log_numeric_metrics(all_metrics)
+
+                    objective_key = sweep_args.get("objective", "eval_loss")
+                    objective_value = all_metrics[objective_key]
+                    save_yaml_to_path(
+                        {
+                            "objective": objective_value,
+                            "sweep_params": sweep_parameters,
+                        },
+                        trial_output_dir / "sweep_result.yaml",
+                    )
+                    return objective_value
+
+            study = optuna.create_study(
+                study_name=config_name,
+                direction=sweep_args.get("direction", "minimize"),
+            )
+            study.optimize(objective, n_trials=sweep_args.get("n_trials", 20))
+            best_params = study.best_trial.params
+
+            mlflow.log_params({f"best_{k}": v for k, v in best_params.items()})
+            mlflow.log_metric("best_objective_value", study.best_trial.value)
+
+            best_path = output_dir / "optimal_hparams.yaml"
+            save_yaml_to_path(best_params, best_path)
+            print(f"Best hyperparameters saved to: {best_path}")
+
+            # symlink to best model folder
+            best_model_dir = output_dir / "best_model"
+            if best_model_dir.is_symlink() or best_model_dir.exists():
+                best_model_dir.unlink(missing_ok=True)
+            best_model_dir.symlink_to(f"sweep_trials/run{study.best_trial.number}")
+            print(f"Best model saved to: {best_model_dir}")
+
+        else:
+            mlflow.log_params(init_training_args)
+            model = model_init(None)
+            save_dir = output_dir / "trained_model"
+            trainer = Trainer(
+                model=model,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
-                args=TrainingArguments(
-                    output_dir=str(trial_output_dir),
-                    **train_args,
-                ),
+                args=TrainingArguments(output_dir=save_dir, **init_training_args),
                 data_collator=collate_fn,
                 compute_metrics=evaluate_model,
             )
-            all_metrics = train_and_evaluate(
-                trial_trainer, train_dataset, trial_output_dir
+            all_metrics = train_and_evaluate(trainer, train_dataset, save_dir)
+            _log_numeric_metrics(all_metrics)
+            mlflow.log_params(
+                {
+                    "seed": trainer.args.seed,
+                    "data_seed": trainer.args.data_seed or trainer.args.seed,
+                }
             )
-            objective_key = sweep_args.get("objective", "eval_loss")
-            objective_value = all_metrics[objective_key]
-            save_yaml_to_path(
-                {"objective": objective_value, "sweep_params": sweep_parameters},
-                trial_output_dir / "sweep_result.yaml",
-            )
-            return objective_value
 
-        study = optuna.create_study(direction=sweep_args.get("direction", "minimize"))
-        study.optimize(objective, n_trials=sweep_args.get("n_trials", 20))
-        best_params = study.best_trial.params
-
-        best_path = output_dir / "optimal_hparams.yaml"
-        save_yaml_to_path(best_params, best_path)
-        print(f"Best hyperparameters saved to: {best_path}")
-
-        # symlink to best model folder
-        best_model_dir = output_dir / "best_model"
-        if best_model_dir.is_symlink() or best_model_dir.exists():
-            best_model_dir.unlink(missing_ok=True)
-        best_model_dir.symlink_to(f"sweep_trials/run{study.best_trial.number}")
-        print(f"Best model saved to: {best_model_dir}")
-
-    else:
-        model = model_init(None)
-        save_dir = output_dir / "trained_model"
-        trainer = Trainer(
-            model=model,
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
-            args=TrainingArguments(output_dir=save_dir, **init_training_args),
-            data_collator=collate_fn,
-            compute_metrics=evaluate_model,
-        )
-        train_and_evaluate(trainer, train_dataset, save_dir)
-
-        print(f"Final model saved to: {save_dir}")
+            print(f"Final model saved to: {save_dir}")
 
 
 if __name__ == "__main__":
@@ -216,5 +306,4 @@ if __name__ == "__main__":
         help="Name of the configuration file for finetuning.",
     )
     args = parser.parse_args()
-
     main(args.config_name)

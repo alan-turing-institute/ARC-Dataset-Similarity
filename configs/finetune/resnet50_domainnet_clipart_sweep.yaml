@@ -9,7 +9,6 @@ model_args:
   device_map: auto
 
 training_args:
-  report_to: "mlflow"
   eval_strategy: epoch
   save_strategy: epoch
   save_total_limit: 1
