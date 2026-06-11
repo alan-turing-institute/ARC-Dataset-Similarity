@@ -107,11 +107,19 @@ def _log_numeric_metrics(metrics: dict, step: int | None = None) -> None:
 
 def configure_mlflow(config_name: str) -> None:
     load_dotenv(".env")
-    # override the default URI with the value from the environment variable if set
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
 
     experiment_name = f"{config_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     mlflow.set_experiment(experiment_name)
+
+    client = mlflow.tracking.MlflowClient()
+    experiment = client.get_experiment_by_name(experiment_name)
+    client.set_experiment_tag(experiment.experiment_id, "project", "dataset-similarity")
+    client.set_experiment_tag(
+        experiment.experiment_id,
+        "user",
+        os.getenv("MLFLOW_TRACKING_USERNAME", "unknown"),
+    )
 
 
 def get_mlflow_tags(config_name: str, trial_number: int | None = None) -> dict:
