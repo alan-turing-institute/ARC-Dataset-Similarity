@@ -138,6 +138,8 @@ class COCODataset(ImageDataset):
             df["label"] = df.cats.apply(
                 lambda x: int(any(cls in x for cls in self.positive_class))
             )
+        else:
+            df["label"] = -1  # dummy label for get item to work
 
         # Apply object/bbox filters to the target subset (or all rows)
         if self.filter_class is not None and "label" in df.columns:
