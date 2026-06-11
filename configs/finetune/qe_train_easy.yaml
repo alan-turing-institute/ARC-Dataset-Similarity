@@ -15,3 +15,5 @@ training_args:
   metric_for_best_model: average_precision
   greater_is_better: true
   eval_strategy: epoch
+  save_strategy: best
+  load_best_model_at_end: true

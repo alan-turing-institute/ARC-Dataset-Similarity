@@ -1,5 +1,6 @@
 import argparse
 
+import numpy as np
 import torch
 from sklearn.metrics import average_precision_score
 from transformers import (
@@ -22,7 +23,7 @@ TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
     # Convert logits to probabilities
-    probs = 1 / (1 + torch.exp(-logits))  # sigmoid for binary/multilabel
+    probs = 1 / (1 + np.exp(-logits[:, 1]))  # sigmoid for binary/multilabel
     avg_precision = average_precision_score(labels, probs)
     return {"average_precision": avg_precision}
 
@@ -35,6 +36,8 @@ def main(config_name: str):
     # load_model
     model = AutoModelForImageClassification.from_pretrained(
         **config["model_args"],
+        num_labels=2,
+        ignore_mismatched_sizes=True,
     )
     processor = AutoImageProcessor.from_pretrained(
         **config["model_args"],
