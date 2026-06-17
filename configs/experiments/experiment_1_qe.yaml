@@ -8,4 +8,4 @@ store: coco_data_store
 metrics:
   - mmd
   - ot_exact
-  - ot_sinkhorn
+  # - ot_sinkhorn
