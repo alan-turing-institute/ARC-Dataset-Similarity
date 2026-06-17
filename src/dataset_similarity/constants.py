@@ -7,5 +7,7 @@ DEFAULT_EMBEDDING_DIR = PROJECT_DIR / "embeddings"
 
 DOMAINNET_DIR = DEFAULT_DATA_ROOT / "DomainNet"
 IMAGENET_DIR = DEFAULT_DATA_ROOT / "ImageNet"
-TENSORBOARD_LOG_DIR = PROJECT_DIR / "runs" / "metrics"
 COCO_DIR = DEFAULT_DATA_ROOT / "COCO"
+MLFLOW_TRACKING_URI = (
+    "https://arc1-turing-mlflow.niceground-2b2fd95b.uksouth.azurecontainerapps.io/"
+)

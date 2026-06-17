@@ -1,9 +1,12 @@
+import os
 from pathlib import Path
 from typing import Any
 
+import mlflow
+from dotenv import load_dotenv
 from yaml import safe_dump, safe_load
 
-from dataset_similarity.constants import DEFAULT_DATA_ROOT
+from dataset_similarity.constants import DEFAULT_DATA_ROOT, MLFLOW_TRACKING_URI
 
 
 def get_embedding_path(
@@ -65,3 +68,22 @@ def save_yaml_to_path(
 
     with open(yaml_path, "w") as f:
         safe_dump(data, f)
+
+
+def configure_mlflow(experiment_name: str) -> None:
+    """
+    Configure mlflow for a given script, sets up tracking URI and logs to appropriate
+    experiment.
+
+    Args:
+        experiment_name: name of the experiment to start runs under and log metrics and
+        parameters to.
+    """
+    load_dotenv(".env")
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
+
+    mlflow.set_experiment(experiment_name)
+
+    client = mlflow.tracking.MlflowClient()
+    experiment = client.get_experiment_by_name(experiment_name)
+    client.set_experiment_tag(experiment.experiment_id, "project", "dataset-similarity")

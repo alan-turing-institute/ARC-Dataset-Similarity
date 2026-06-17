@@ -47,7 +47,7 @@ dependencies = [
     "pycocotools>=2.0.11",
     "flash-sinkhorn; sys_platform == 'linux'",
     "accelerate>=1.13.0",
-    "mlflow>=3.13.0",
+    "mlflow[auth]>=3.13.0",
     "optuna>=4.9.0",
 ]
 
