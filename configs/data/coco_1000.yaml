@@ -1,13 +1,10 @@
 name: COCO
 kwargs:
   split: val2017
-  size: 1000
+  # size: 1000
   random_seed: 42
   embedding: clip
-  target_classes:
-    - swan
-    - stairs
-    - dumbbell
-    - suitcase
-    - coffee_cup
-    - strawberry
+  positive_class:
+    - cat
+  negative_superclass:
+    - vehicle

@@ -32,7 +32,7 @@ class _EmbeddingTensorDataset(ImageDataset):
         self._tensors = torch.randn(n_samples, feature_dim)
         super().__init__(
             dataset_dir="/tmp",
-            target_classes=None,
+            keep_classes=None,
             split="train",
             size=None,
             random_seed=None,
