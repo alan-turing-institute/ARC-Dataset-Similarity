@@ -8,7 +8,6 @@ import numpy as np
 import optuna
 import torch
 import torch.nn.functional as F
-from dotenv import load_dotenv
 from sklearn.metrics import average_precision_score
 from torch.utils.data import random_split
 from transformers import (
@@ -19,14 +18,20 @@ from transformers import (
     TrainingArguments,
 )
 
-from dataset_similarity.constants import CONFIG_DIR, MLFLOW_TRACKING_URI, PROJECT_DIR
+from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.utils import load_dataset_from_config
-from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
+from dataset_similarity.utils import (
+    configure_mlflow,
+    load_yaml_from_path,
+    save_yaml_to_path,
+)
 
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 EVAL_SPLIT_RATIO = 0.2
+
+EXPERIMENT_NAME = "data-sim-finetune"
 
 
 def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
@@ -99,26 +104,16 @@ def train_and_evaluate(
 
 
 def _log_numeric_metrics(metrics: dict, step: int | None = None) -> None:
+    """
+    Log numeric metrics to MLflow.
+
+    Args:
+        metrics: A dictionary of metric names and values to log.
+        step: Optional step number to associate with the metrics.
+    """
     mlflow.log_metrics(
         {k: v for k, v in metrics.items() if isinstance(v, (int | float))},
         step=step,
-    )
-
-
-def configure_mlflow(config_name: str) -> None:
-    load_dotenv(".env")
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
-
-    experiment_name = f"{config_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    mlflow.set_experiment(experiment_name)
-
-    client = mlflow.tracking.MlflowClient()
-    experiment = client.get_experiment_by_name(experiment_name)
-    client.set_experiment_tag(experiment.experiment_id, "project", "dataset-similarity")
-    client.set_experiment_tag(
-        experiment.experiment_id,
-        "user",
-        os.getenv("MLFLOW_TRACKING_USERNAME", "unknown"),
     )
 
 
@@ -154,7 +149,9 @@ def main(config_name: str) -> None:
 
     configure_mlflow(config_name)
 
-    with mlflow.start_run(run_name=f"Finetune {config_name}"):
+    with mlflow.start_run(
+        run_name=f"{config_name}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    ):
         # add mlflow tags
         mlflow.set_tags(get_mlflow_tags(config_name))
 

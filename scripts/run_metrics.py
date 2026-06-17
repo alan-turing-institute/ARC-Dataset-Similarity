@@ -11,23 +11,26 @@ python scripts/run_metrics.py --metrics otdd_exact mmd
 """
 
 import argparse
-import json
 import logging
-import os
 from datetime import datetime
 
 import mlflow
-from dotenv import load_dotenv
 
 import dataset_similarity.metrics as metrics
-from dataset_similarity.constants import CONFIG_DIR, MLFLOW_TRACKING_URI, PROJECT_DIR
+from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
 from dataset_similarity.data.utils import load_dataset_from_config
-from dataset_similarity.utils import load_yaml_from_path
+from dataset_similarity.utils import (
+    configure_mlflow,
+    load_yaml_from_path,
+    save_yaml_to_path,
+)
 
 METRIC_CONFIG_DIR = CONFIG_DIR / "metrics"
 METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
+
+EXPERIMENT_NAME = "data-sim-metrics"
 
 
 def apply_metric(
@@ -82,9 +85,9 @@ def main(
         **metrics_results,
     }
     METRICS_RESULT_DIR.mkdir(parents=True, exist_ok=True)
-    result_path = METRICS_RESULT_DIR / f"{cfg_name}.json"
-    with open(result_path, "w") as f:
-        json.dump(results, f, indent=4)
+    result_path = METRICS_RESULT_DIR / f"{cfg_name}.yaml"
+    save_yaml_to_path(results, result_path)
+
     logger.info("Results saved to %s", result_path)
 
     mlflow.log_params(
@@ -113,12 +116,10 @@ if __name__ == "__main__":
     )
     metrics_list = experiment_cfg["metrics"]
 
-    load_dotenv(".env")
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
-    experiment_name = f"{args.config}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    mlflow.set_experiment(experiment_name)
+    configure_mlflow(experiment_name=EXPERIMENT_NAME)
 
-    with mlflow.start_run(run_name=args.config):
+    run_name = f"{args.config}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    with mlflow.start_run(run_name=run_name):
         main(
             cfg_name=args.config,
             dataset1_cfg=dataset_1_cfg,
