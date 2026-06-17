@@ -1,8 +1,13 @@
 # Project stuff — ignore root-level data folder but not src/
-/data/
+/data/*
 embeddings/
 plots/
 results/
+trained_models/
+
+
+# logging
+runs/
 
 # ignore temporary files
 .temp/

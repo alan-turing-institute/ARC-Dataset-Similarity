@@ -1,0 +1,7 @@
+metric: ot_distance
+kwargs:
+    use_flash_sinkhorn: False
+    metric: sqeuclidean
+    reg: 0.1
+    method: sinkhorn
+    debias: True

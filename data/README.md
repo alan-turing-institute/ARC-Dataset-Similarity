@@ -88,3 +88,55 @@ When constructing an `ImageNetDataset`, you can optionally pass a `target_classe
       - n01440764
       - tench
       - n01484850
+
+## COCO
+
+[COCO](https://cocodataset.org/) (Common Objects in Context) is a large-scale object detection, segmentation, and captioning benchmark. The 2017 release contains ~123 K labelled images (118 K train / 5 K val) spanning 80 object categories, plus a ~41 K-image unlabelled test set.
+
+### Downloading
+
+Use the provided helper script to download and extract the 2017 images and annotations into the expected directory layout:
+
+```bash
+python scripts/download_coco.py --split train val test
+```
+
+Alternatively, download the zip files manually from [https://cocodataset.org/#download](https://cocodataset.org/#download) and extract them into `data/COCO/`:
+
+- `train2017.zip` (~18 GB) → `images/train2017/`
+- `val2017.zip` (~1 GB) → `images/val2017/`
+- `test2017.zip` (~6 GB) → `images/test2017/`
+- `annotations_trainval2017.zip` (~240 MB) → `annotations/`
+
+### Sort Images
+
+Next, run the following to put all images from COCO together:
+
+```bash
+find data/COCO/images/train2017/ -maxdepth 1 -type f -print0 | xargs -0 -I {} mv {} data/COCO/images/
+find data/COCO/images/val2017/ -maxdepth 1 -type f -print0 | xargs -0 -I {} mv {} data/COCO/images/
+```
+
+### Create New Annotations
+
+Finally, create the ARC annotations of COCO by running the following script:
+
+```bash
+python scripts/make_coco_splits.py
+```
+
+### Directory Layout After Finishing
+
+Your directory should look as follows:
+
+.
+└── data/
+    └── COCO/
+        ├── images/
+        │   └── *.jpg
+        └── annotations/
+            ├── instances_store.json
+            ├── instances_testARC.json
+            ├── instances_trainARC.json
+            ├── instances_valARC.json
+            └── ...
