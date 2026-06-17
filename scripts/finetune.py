@@ -8,6 +8,7 @@ import numpy as np
 import optuna
 import torch
 import torch.nn.functional as F
+from dotenv import load_dotenv
 from sklearn.metrics import average_precision_score
 from torch.utils.data import random_split
 from transformers import (
@@ -20,11 +21,7 @@ from transformers import (
 
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.utils import load_dataset_from_config
-from dataset_similarity.utils import (
-    configure_mlflow,
-    load_yaml_from_path,
-    save_yaml_to_path,
-)
+from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
 
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
@@ -127,6 +124,21 @@ def get_mlflow_tags(config_name: str, trial_number: int | None = None) -> dict:
     if trial_number is not None:
         tags["trial"] = str(trial_number)
     return tags
+
+
+def configure_mlflow() -> None:
+    """
+    Configure mlflow for the script, sets up tracking URI and logs to appropriate
+    experiment.
+    """
+    load_dotenv(".env")
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
+
+    mlflow.set_experiment(EXPERIMENT_NAME)
+
+    client = mlflow.tracking.MlflowClient()
+    experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
+    client.set_experiment_tag(experiment.experiment_id, "project", "dataset-similarity")
 
 
 def main(config_name: str) -> None:

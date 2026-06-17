@@ -12,20 +12,18 @@ python scripts/run_metrics.py --metrics otdd_exact mmd
 
 import argparse
 import logging
+import os
 from datetime import datetime
 
 import mlflow
+from dotenv import load_dotenv
 
 import dataset_similarity.metrics as metrics
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
 from dataset_similarity.data.utils import load_dataset_from_config
-from dataset_similarity.utils import (
-    configure_mlflow,
-    load_yaml_from_path,
-    save_yaml_to_path,
-)
+from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
 
 METRIC_CONFIG_DIR = CONFIG_DIR / "metrics"
 METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
@@ -50,6 +48,21 @@ def apply_metric(
         raise ValueError(msg)
     logger.info("Applying metric %s.", metric_name)
     return metric_fn(ds1, ds2, **metric_cfg["kwargs"])
+
+
+def configure_mlflow() -> None:
+    """
+    Configure mlflow for the script, sets up tracking URI and logs to appropriate
+    experiment.
+    """
+    load_dotenv(".env")
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
+
+    mlflow.set_experiment(EXPERIMENT_NAME)
+
+    client = mlflow.tracking.MlflowClient()
+    experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
+    client.set_experiment_tag(experiment.experiment_id, "project", "dataset-similarity")
 
 
 def main(

@@ -9,7 +9,3 @@ EMBEDDING_DIR = PROJECT_DIR / "embeddings"
 DOMAINNET_DIR = DATA_DIR / "DomainNet"
 IMAGENET_DIR = DATA_DIR / "ImageNet"
 COCO_DIR = DATA_DIR / "COCO"
-
-MLFLOW_TRACKING_URI = (
-    "https://arc1-turing-mlflow.niceground-2b2fd95b.uksouth.azurecontainerapps.io/"
-)
