@@ -4,6 +4,6 @@ kwargs:
   size: 1000
   random_seed: 42
   embedding: clip
-  target_superclasses:
+  positive_superclass:
     - furniture
-  target_classes:
+  positive_class:
