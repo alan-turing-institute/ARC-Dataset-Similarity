@@ -1,3 +1,4 @@
+# The following is equivalent to original OTCE
 metric: otce_distance
 kwargs:
     use_wasserstein: True
