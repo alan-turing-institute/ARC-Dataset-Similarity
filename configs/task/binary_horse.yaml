@@ -1,6 +1,0 @@
-# Task
-binary: True
-kwargs:
-  positive_classes:
-    - horse
-  positive_superclasses:
