@@ -104,6 +104,7 @@ if __name__ == "__main__":
         "--config",
         type=str,
         help="The name of the config file (without .yaml) to use for evaluation.",
+        required=True,
     )
     args = parser.parse_args()
     main(args.config)
