@@ -29,14 +29,15 @@ def compute_ap(logits, labels):
 
 
 def eval(model, processor, dataset):
+    device = next(model.parameters()).device
     logits, labels = [], []
     with torch.no_grad():
-        for sample in tqdm(dataset, desc="Evaluating"):
-            image, label = sample
-            inputs = processor(image.to(model.device), return_tensors="pt")
+        for image, label in tqdm(dataset, desc="Evaluating"):
+            inputs = processor(images=image, return_tensors="pt")
+            inputs = inputs.to(device)
             pred = model(**inputs)
-            logits.append(pred["logits"].to("cpu"))
-            labels.append(label)
+            logits.append(pred["logits"].detach().cpu())
+            labels.append(int(label))
     return compute_ap(torch.cat(logits), labels)
 
 
