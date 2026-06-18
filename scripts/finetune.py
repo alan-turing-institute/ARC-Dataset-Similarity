@@ -20,11 +20,16 @@ DATA_CONFIG_DIR = CONFIG_DIR / "data"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 
 
+def softmax(x):
+    """Compute softmax values for each sets of scores in x."""
+    e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return e_x / e_x.sum(axis=1, keepdims=True)
+
+
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
-    # Convert logits to probabilities
-    probs = 1 / (1 + np.exp(-logits[:, 1]))  # sigmoid for binary/multilabel
-    avg_precision = average_precision_score(labels, probs)
+    probs = softmax(logits)
+    avg_precision = average_precision_score(labels, probs[:, 1])
     return {"average_precision": avg_precision}
 
 

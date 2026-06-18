@@ -1,7 +1,7 @@
 import argparse
 import json
 
-# import numpy as np
+import numpy as np
 import torch
 from sklearn.metrics import average_precision_score
 from tqdm import tqdm
@@ -14,6 +14,12 @@ from dataset_similarity.utils import load_yaml_from_path
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
+
+
+def softmax(x):
+    """Compute softmax values for each sets of scores in x."""
+    e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return e_x / e_x.sum(axis=1, keepdims=True)
 
 
 # TODO: extract duplicate from finetune and eval into a common fn or fns
