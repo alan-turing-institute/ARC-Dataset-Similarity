@@ -1,4 +1,4 @@
-# This config provides the COCO data store, used as an unlabelled data store in our expeirments.
+# This config provides the COCO data store, used as an unlabelled data store in our experiments.
 name: COCO
 kwargs:
   split: store

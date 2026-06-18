@@ -1,7 +1,9 @@
 metric: ot_distance
 kwargs:
-    use_flash_sinkhorn: False
-    metric: sqeuclidean
-    reg: 0.1
-    method: sinkhorn
+    use_sinkhorn: True
+    use_flash_sinkhorn: False # passed to ot_sinkhorn
+    device: cuda
     debias: True
+    blur: 0.05
+    scaling: 0.9
+    p: 2

@@ -1,4 +1,4 @@
-# This config implements a task highlyunlikely to transfer well to the data store
+# This config implements a task highly unlikely to transfer well to the data store
 name: COCO
 kwargs:
   split: valARC
