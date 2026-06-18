@@ -26,7 +26,6 @@ from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
-EVAL_SPLIT_RATIO = 0.2
 
 EXPERIMENT_NAME = "data-sim-finetune"
 
@@ -159,7 +158,7 @@ def main(config_name: str) -> None:
         config_name: Stem of a YAML file in ``configs/finetune/``.
     """
 
-    configure_mlflow(config_name)
+    configure_mlflow()
 
     with mlflow.start_run(
         run_name=f"{config_name}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -185,14 +184,14 @@ def main(config_name: str) -> None:
         # load_dataset_from_config from attempting to load an embedding model.
         data_config["kwargs"]["embedding"] = None
         dataset = load_dataset_from_config(data_config)
-        n_eval = int(EVAL_SPLIT_RATIO * len(dataset))
+        n_eval = int(config["split_ratio"] * len(dataset))
         train_dataset, eval_dataset = random_split(
             dataset, [len(dataset) - n_eval, n_eval]
         )
 
         def model_init(_):
             return AutoModelForImageClassification.from_pretrained(
-                **config["model_args"]
+                num_labels=2, ignore_mismatched_sizes=True, **config["model_args"]
             )
 
         processor = AutoImageProcessor.from_pretrained(**config["model_args"])

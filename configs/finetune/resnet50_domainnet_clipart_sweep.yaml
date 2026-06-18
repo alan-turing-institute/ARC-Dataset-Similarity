@@ -1,11 +1,10 @@
 data_config: domainnet_clipart_1000
+split_ratio: 0.2
 
 # these are passed directly to:
 # transformers.AutoModelForImageClassification.from_pretrained
 model_args:
   pretrained_model_name_or_path: "microsoft/resnet-50"
-  num_labels: 345 # This is the number of classes in DomainNet
-  ignore_mismatched_sizes: true
   device_map: auto
 
 training_args:

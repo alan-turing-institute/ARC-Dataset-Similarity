@@ -129,7 +129,7 @@ if __name__ == "__main__":
     )
     metrics_list = experiment_cfg["metrics"]
 
-    configure_mlflow(experiment_name=EXPERIMENT_NAME)
+    configure_mlflow()
 
     run_name = f"{args.config}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     with mlflow.start_run(run_name=run_name):
