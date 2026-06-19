@@ -2,11 +2,13 @@ import argparse
 
 import numpy as np
 import torch
-from sklearn.metrics import average_precision_score
+import torch.nn as nn
+from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
     AutoModelForImageClassification,
     EarlyStoppingCallback,
+    EvalPrediction,
     Trainer,
     TrainingArguments,
 )
@@ -26,11 +28,31 @@ def softmax(x):
     return e_x / e_x.sum(axis=1, keepdims=True)
 
 
-def compute_metrics(eval_pred):
+def compute_binary_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
     logits, labels = eval_pred
     probs = softmax(logits)
     avg_precision = average_precision_score(labels, probs[:, 1])
     return {"average_precision": avg_precision}
+
+
+def compute_multi_label_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
+    logits, labels = eval_pred
+    labels = labels.astype(int)
+    preds = (logits > 0).astype(int)  # sigmoid > 0.5 threshold
+    return {
+        "accuracy": accuracy_score(labels, preds),
+        "average_precision_macro": average_precision_score(
+            labels, logits, average="macro"
+        ),
+        "average_precision_micro": average_precision_score(
+            labels, logits, average="micro"
+        ),
+    }
+
+
+def multi_label_loss(outputs, labels, _num_items_in_batch=None):
+    logits = outputs.get("logits")
+    return nn.BCEWithLogitsLoss()(logits, labels.float())
 
 
 def main(config_name: str):
@@ -55,18 +77,31 @@ def main(config_name: str):
     # load_model
     model = AutoModelForImageClassification.from_pretrained(
         **config["model_args"],
-        num_labels=train_dataset.num_labels(),
+        num_labels=train_dataset.num_labels,
         ignore_mismatched_sizes=True,
     )
     processor = AutoImageProcessor.from_pretrained(
         **config["model_args"],
     )
 
-    def collate_fn(
+    def collate_binary_fn(
         batch: list[tuple[torch.Tensor, int]],
     ) -> dict[str, torch.Tensor]:
         inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
         return {**inputs, "labels": torch.tensor([item[1] for item in batch])}
+
+    def collate_multi_label_fn(
+        batch: list[tuple[torch.Tensor, torch.Tensor]],
+    ) -> dict[str, torch.Tensor]:
+        inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
+        return {**inputs, "labels": torch.stack([item[1] for item in batch])}
+
+    is_multi_label = train_data_config.get("multi_label", False)
+    collate_fn = collate_binary_fn if not is_multi_label else collate_multi_label_fn
+    compute_metrics = (
+        compute_binary_metrics if not is_multi_label else compute_multi_label_metrics
+    )
+    loss_func = multi_label_loss if is_multi_label else None
 
     # train model
     training_args = config["training_args"]
@@ -78,6 +113,7 @@ def main(config_name: str):
         args=TrainingArguments(output_dir=output_dir, **training_args),
         data_collator=collate_fn,
         compute_metrics=compute_metrics,
+        compute_loss_func=loss_func,
         callbacks=[
             EarlyStoppingCallback(
                 early_stopping_patience=3,
