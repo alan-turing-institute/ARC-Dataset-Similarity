@@ -1,0 +1,10 @@
+# This config implements a task likely to transfer well to the data store
+name: COCO
+kwargs:
+  split: testARC
+  embedding: dinov3
+  multi_label: true
+  positive_class:
+  - person
+  - cat
+  - horse
