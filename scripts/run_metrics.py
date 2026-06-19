@@ -11,7 +11,6 @@ python scripts/run_metrics.py --metrics otdd_exact mmd
 """
 
 import argparse
-import os
 from datetime import datetime
 
 import mlflow
@@ -30,6 +29,19 @@ METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
 EXPERIMENT_NAME = "data-sim-metrics"
 
 
+def configure_mlflow() -> None:
+    """
+    Configure mlflow for the script, sets up tracking URI and logs to appropriate
+    experiment.
+    """
+    load_dotenv(".env")
+    mlflow.set_workspace("dataset-similarity")
+    client = mlflow.tracking.MlflowClient()
+    client.get_experiment_by_name(EXPERIMENT_NAME)
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    mlflow.enable_system_metrics_logging()
+
+
 def apply_metric(
     metric_name: str,
     ds1: ImageDataset | DatasetMix,
@@ -41,21 +53,6 @@ def apply_metric(
         f"Applying metric {metric_name}",
     )
     return metric_fn(ds1, ds2, **metric_cfg["kwargs"])
-
-
-def configure_mlflow() -> None:
-    """
-    Configure mlflow for the script, sets up tracking URI and logs to appropriate
-    experiment.
-    """
-    load_dotenv(".env")
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
-
-    mlflow.set_experiment(EXPERIMENT_NAME)
-
-    client = mlflow.tracking.MlflowClient()
-    experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
-    client.set_experiment_tag(experiment.experiment_id, "project", "dataset-similarity")
 
 
 def main(

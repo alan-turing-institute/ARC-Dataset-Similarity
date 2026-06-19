@@ -2,13 +2,9 @@ name: DomainNet
 kwargs:
   split: train
   domains: real
-  size: 1000
+  size: 300
   random_seed: 42
-  embedding: dinov3
+  embedding: clip
   keep_classes:
-    - swan
-    - stairs
-    - dumbbell
-    - suitcase
-    - coffee_cup
     - strawberry
+    - aircraft_carrier
