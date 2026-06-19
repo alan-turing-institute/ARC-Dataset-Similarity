@@ -3,8 +3,10 @@ metric: otce_distance
 kwargs:
     use_wasserstein: False
     use_otdd: False
-    use_flash_sinkhorn: False
-    metric: sqeuclidean
-    method: sinkhorn
-    reg: 0.1
-    debias: False  # Coupling only so debiasing set to False in any case
+    use_sinkhorn: True
+    use_flash_sinkhorn: False # passed to ot_sinkhorn
+    device: cuda
+    debias: False # no point debiasing as coupling only is used
+    blur: 0.05
+    scaling: 0.9
+    p: 2

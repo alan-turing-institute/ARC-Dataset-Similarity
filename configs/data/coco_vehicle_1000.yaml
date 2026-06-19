@@ -1,9 +1,0 @@
-name: COCO
-kwargs:
-  split: val2017
-  size: 1000
-  random_seed: 42
-  embedding: clip
-  positive_superclass:
-    - vehicle
-  positive_class:

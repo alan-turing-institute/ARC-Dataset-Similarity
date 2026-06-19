@@ -3,8 +3,10 @@ metric: otce_distance
 kwargs:
     use_wasserstein: True
     use_otdd: False
-    use_flash_sinkhorn: False
+    use_sinkhorn: True
+    use_flash_sinkhorn: False # passed to ot_sinkhorn
     device: cuda
-    method: sinkhorn
-    reg: 0.1
     debias: True
+    blur: 0.05
+    scaling: 0.9
+    p: 2

@@ -18,18 +18,31 @@ from dataset_similarity.utils import load_yaml_from_path
 def main(args):
     cfg_path = CONFIG_DIR / "experiments" / f"{args.config_name}.yaml"
     experiment_config = load_yaml_from_path(cfg_path)
-    pairs = list(combinations(experiment_config["datasets"], 2))
-    pairs = [pair for pair in pairs if pair[0] != pair[1]]
-    for i, pair in enumerate(pairs):
-        dataset1, dataset2 = pair
-        cfg = {
-            "dataset1": dataset1,
-            "dataset2": dataset2,
-            "metrics": experiment_config["metrics"],
-        }
-        save_path = CONFIG_DIR / "experiments" / f"{args.config_name}_{i}.yaml"
-        with open(save_path, "w") as f:
-            yaml.dump(cfg, f)
+    if "store" not in experiment_config:
+        pairs = list(combinations(experiment_config["datasets"], 2))
+        pairs = [pair for pair in pairs if pair[0] != pair[1]]
+        for i, pair in enumerate(pairs):
+            dataset1, dataset2 = pair
+            cfg = {
+                "dataset1": dataset1,
+                "dataset2": dataset2,
+                "metrics": experiment_config["metrics"],
+            }
+            save_path = CONFIG_DIR / "experiments" / f"{args.config_name}/{i}.yaml"
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(save_path, "w") as f:
+                yaml.dump(cfg, f)
+    else:
+        for i, dataset in enumerate(experiment_config["datasets"]):
+            cfg = {
+                "dataset1": dataset,
+                "dataset2": experiment_config["store"],
+                "metrics": experiment_config["metrics"],
+            }
+            save_path = CONFIG_DIR / f"experiments/{args.config_name}/{i}.yaml"
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(save_path, "w") as f:
+                yaml.dump(cfg, f)
 
 
 if __name__ == "__main__":
