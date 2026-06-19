@@ -1,0 +1,15 @@
+name: COCO
+kwargs:
+  split: val2017
+  size:
+  multi_label: True
+  random_seed: 42
+  embedding:
+  positive_class:
+    - cat
+    - dog
+    - horse
+  positive_superclass:
+    - furniture
+  negative_superclass:
+    - vehicle

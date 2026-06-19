@@ -47,6 +47,7 @@ class ImageNetDataset(ImageDataset):
         random_seed: int | None = None,
         embedding: None | str = None,
         return_paths: bool = False,
+        multi_label: bool = False,
     ) -> None:
         # Synset = synonym set. Needs processing before calling super().__init__()
         # E.g. "n02119789" is a synset ID with name "kit_fox" and class_number 1.
@@ -93,6 +94,7 @@ class ImageNetDataset(ImageDataset):
             random_seed=random_seed,
             embedding=embedding,
             return_paths=return_paths,
+            multi_label=multi_label,
         )
 
     def _load_data(self) -> pd.DataFrame:

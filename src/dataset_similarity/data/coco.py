@@ -47,8 +47,11 @@ class COCODataset(ImageDataset):
         max_bbox_area_fraction: float | None = None,
         positive_fraction: float | None = None,
         filter_class: Literal["positive", "negative"] | None = None,
+        multi_label: bool = False,
     ) -> None:
         # Classes need to be processed before calling super.__init__
+        self.multi_label = multi_label
+
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
             dict[int, dict[str, str]],
             load_yaml_from_path(DATA_DIR / "metadata" / "coco_class_mapping.yaml"),
@@ -120,6 +123,7 @@ class COCODataset(ImageDataset):
             random_seed=random_seed,
             embedding=embedding,
             return_paths=return_paths,
+            multi_label=multi_label,
         )
 
     def _load_data(self) -> pd.DataFrame:
@@ -135,6 +139,10 @@ class COCODataset(ImageDataset):
 
         # Create binary task if requested
         if self.positive_class is not None:
+            if self.multi_label:
+                df["multi_label"] = df.cats.apply(
+                    lambda x: [int(cls in x) for cls in self.positive_class]
+                )
             df["label"] = df.cats.apply(
                 lambda x: int(any(cls in x for cls in self.positive_class))
             )

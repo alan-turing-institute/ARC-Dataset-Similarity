@@ -45,6 +45,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         random_seed: int | None,
         embedding: None | str,
         return_paths: bool,
+        multi_label: bool,
     ) -> None:
         super().__init__()
         self.dataset_dir = dataset_dir
@@ -57,6 +58,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             self.data = self.subsample_data()
         self.embedding = embedding
         self.return_paths = return_paths
+        self.multi_label = multi_label
 
     def subsample_data(self) -> DataFrame:
         """
@@ -134,6 +136,8 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             tensor = load_file(image_embedding_path)["embedding"]
         if self.return_paths:
             return tensor, image_path
+        if self.multi_label:
+            return tensor, torch.tensor(sample["multi_label"], dtype=torch.float32)
         return tensor, sample["label"]
 
     @property

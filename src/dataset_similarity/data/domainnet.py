@@ -48,6 +48,7 @@ class DomainNetDataset(ImageDataset):
         random_seed: int | None = None,
         embedding: None | str = None,
         return_paths: bool = False,
+        multi_label: bool = False,
     ) -> None:
         # Domain needs to be processed before calling super().__init__()
         if domains is None:
@@ -96,6 +97,7 @@ class DomainNetDataset(ImageDataset):
             random_seed=random_seed,
             embedding=embedding,
             return_paths=return_paths,
+            multi_label=multi_label,
         )
 
     def _load_data(self) -> pd.DataFrame:
