@@ -50,8 +50,6 @@ class COCODataset(ImageDataset):
         multi_label: bool = False,
     ) -> None:
         # Classes need to be processed before calling super.__init__
-        self.multi_label = multi_label
-
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
             dict[int, dict[str, str]],
             load_yaml_from_path(DATA_DIR / "metadata" / "coco_class_mapping.yaml"),
@@ -113,6 +111,7 @@ class COCODataset(ImageDataset):
         self.max_bbox_area_fraction = max_bbox_area_fraction
         self.positive_fraction = positive_fraction
         self.filter_class = filter_class
+        self.multi_label = multi_label
 
         # Super will use keep_classes to filter the dataset by class
         super().__init__(
@@ -125,6 +124,13 @@ class COCODataset(ImageDataset):
             return_paths=return_paths,
             multi_label=multi_label,
         )
+
+    @property
+    def num_labels(self) -> int:
+        if self.multi_label:
+            assert self.positive_class is not None
+            return len(self.positive_class)
+        return 2
 
     def _load_data(self) -> pd.DataFrame:
         ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"

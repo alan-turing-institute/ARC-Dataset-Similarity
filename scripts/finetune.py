@@ -38,16 +38,6 @@ def main(config_name: str):
     config_path = FINETUNE_CONFIG_DIR / f"{config_name}.yaml"
     config = load_yaml_from_path(config_path)
 
-    # load_model
-    model = AutoModelForImageClassification.from_pretrained(
-        **config["model_args"],
-        num_labels=2,
-        ignore_mismatched_sizes=True,
-    )
-    processor = AutoImageProcessor.from_pretrained(
-        **config["model_args"],
-    )
-
     # load train data
     train_data_config: dict[str, str | dict] = load_yaml_from_path(
         DATA_CONFIG_DIR / f"{config['train_data_config']}.yaml"
@@ -61,6 +51,16 @@ def main(config_name: str):
     )
     val_dataset = load_dataset_from_config(val_data_config)
     val_dataset.embedding = None  # remove embedding from dataset
+
+    # load_model
+    model = AutoModelForImageClassification.from_pretrained(
+        **config["model_args"],
+        num_labels=train_dataset.num_labels(),
+        ignore_mismatched_sizes=True,
+    )
+    processor = AutoImageProcessor.from_pretrained(
+        **config["model_args"],
+    )
 
     def collate_fn(
         batch: list[tuple[torch.Tensor, int]],

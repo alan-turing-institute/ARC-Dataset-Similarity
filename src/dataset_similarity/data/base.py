@@ -141,6 +141,18 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         return tensor, sample["label"]
 
     @property
+    def num_labels(self) -> int:
+        """
+        Number of distinct labels present in this split.
+        Defaults to 2 for binary classification, or the length of ``self.keep_classes``
+        for multi-label classification.
+        """
+        if self.multi_label:
+            assert self.keep_classes is not None
+            return len(self.keep_classes)
+        return 2
+
+    @property
     def num_classes(self) -> int:
         """
         Number of distinct classes present in this split.
