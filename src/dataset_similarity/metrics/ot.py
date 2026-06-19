@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+import geomloss
 import ot as pot
 import torch
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 # flash-sinkhorn is an optional dependency with Linux + CUDA requirements, so we import
 # it in a try-except block and set a flag for availability
 try:
-    from flash_sinkhorn import SamplesLoss  # pyright: ignore[reportMissingImports]
+    import flash_sinkhorn  # pyright: ignore[reportMissingImports]
 
     _FLASH_SINKHORN_AVAILABLE = True
 except ImportError:
@@ -33,7 +34,7 @@ def _resolve_weights(
     return a, b
 
 
-def flash_sinkhorn_ot(
+def sinkhorn_ot(
     data1: torch.Tensor,
     data2: torch.Tensor,
     weights1: torch.Tensor | None = None,
@@ -43,12 +44,12 @@ def flash_sinkhorn_ot(
     scaling: float = 0.9,
     debias: bool = False,
     return_coupling: bool = False,
+    use_flash_sinkhorn: bool = False,
     **kwargs: Any,
 ) -> tuple[float, torch.Tensor | None]:
     """
     Sinkhorn Optimal Transport distance between two datasets. This function acts as a
-    wrapper around flash-sinkhorn's SamplesLoss to provide a convenient interface for
-    computing OT distances and couplings between datasets.
+    wrapper around the SamplesLoss classes from either geomloss or flash-sinkhorn.
 
     Args:
         data1:                  (N, D) tensor of source samples
@@ -63,6 +64,8 @@ def flash_sinkhorn_ot(
                                     False).
         return_coupling:        if True, return the (N, M) coupling instead of the
                                     scalar cost; uses debias=False internally
+        use_flash_sinkhorn:     If True, use flash-sinkhorn backend (requires CUDA +
+                                Linux).
         **kwargs:               Additional kwargs to SamplesLoss. Note that potentials
                                     is controlled internally to the function and should
                                     not be set by the user.
@@ -71,12 +74,16 @@ def flash_sinkhorn_ot(
         Tuple of (scalar OT cost, coupling), where coupling is an (N, M) tensor
         if return_coupling=True, else None.
     """
-    if not _FLASH_SINKHORN_AVAILABLE:
-        err_msg = (
-            "flash-sinkhorn is not installed. "
-            "It requires Linux with CUDA: pip install flash-sinkhorn"
-        )
-        raise ImportError(err_msg)
+    if use_flash_sinkhorn:
+        if not _FLASH_SINKHORN_AVAILABLE:
+            err_msg = (
+                "flash-sinkhorn is not installed. "
+                "It requires Linux with CUDA: pip install flash-sinkhorn"
+            )
+            raise ImportError(err_msg)
+        SamplesLoss = flash_sinkhorn.SamplesLoss
+    else:
+        SamplesLoss = geomloss.SamplesLoss
 
     a, b = _resolve_weights(data1, data2, weights1, weights2)
 
@@ -104,7 +111,7 @@ def flash_sinkhorn_ot(
         loss.potentials = True
         F, G = loss(a, data1, b, data2)
         C = torch.cdist(data1, data2, p=p) ** p  # (N, M)
-        if loss.half_cost:  # only matches geomloss if True
+        if isinstance(loss, geomloss.SamplesLoss) or loss.half_cost:
             C = C / p
         eps = blur**p
         plan = ((F.t() + G - C) / eps).exp() * (a[:, None] * b[None, :])
@@ -166,10 +173,10 @@ def python_ot(
 def ot_distance(
     dataset1: ImageDataset,
     dataset2: ImageDataset,
-    use_flash_sinkhorn: bool = False,
+    use_sinkhorn: bool = False,
     return_coupling: bool = False,
     device: str | torch.device | None = None,
-    **method_kwargs: Any,
+    **kwargs: Any,
 ) -> float | tuple[float, torch.Tensor]:
     """
     Optimal Transport distance between two datasets.
@@ -177,10 +184,10 @@ def ot_distance(
     Args:
         dataset1:          Source ImageDataset (must have return_paths=False)
         dataset2:          Target ImageDataset (must have return_paths=False)
-        use_flash_sinkhorn: If True, use flash-sinkhorn (requires CUDA + Linux).
+        use_sinkhorn:      If True, use sinkhorn_ot as backend instead of python_ot.
         device:            Device to move tensors to before computing (e.g. "cuda",
                            "cpu"). If None, tensors stay on their current device (CPU).
-        **method_kwargs:   Passed through to the chosen backend (flash_sinkhorn_ot or
+        **kwargs:          Passed through to the chosen backend (flash_sinkhorn_ot or
                            python_ot).
 
     Returns:
@@ -194,25 +201,19 @@ def ot_distance(
         data1 = data1.to(device=device)
         data2 = data2.to(device=device)
 
-    if (
-        device is not None
-        and torch.device(device).type == "cuda"
-        and not use_flash_sinkhorn
-    ):
+    if device is not None and torch.device(device).type == "cuda" and not use_sinkhorn:
         logger.warning(
-            "CUDA device requested but use_flash_sinkhorn=False. "
+            "CUDA device requested but use_sinkhorn=False. "
             "POT-based OT may fall back to NumPy/C and not run on GPU; consider "
-            "use_flash_sinkhorn=True or passing method='geomloss' (with reg=...) to "
+            "use_sinkhorn=True or passing method='geomloss' (with reg=...) to "
             "python_ot."
         )
 
     ot_fn: Callable[..., tuple[float, torch.Tensor | None]] = (
-        flash_sinkhorn_ot if use_flash_sinkhorn else python_ot  # type: ignore[assignment]
+        sinkhorn_ot if use_sinkhorn else python_ot  # type: ignore[assignment]
     )
 
-    cost, coupling = ot_fn(
-        data1, data2, return_coupling=return_coupling, **method_kwargs
-    )
+    cost, coupling = ot_fn(data1, data2, return_coupling=return_coupling, **kwargs)
     if coupling is not None:
         return cost, coupling
     return cost

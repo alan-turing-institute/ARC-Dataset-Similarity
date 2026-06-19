@@ -9,5 +9,15 @@ datasets:
   - experiment_0_alpha_0.5
   - experiment_0_alpha_0.75
 metrics:
-  - otdd_exact
+  # Unlabelled metrics
   - mmd
+  - ot_exact
+  - ot_sinkhorn
+
+  # Labelled metrics
+  - otdd_approx
+  - otdd_exact
+  - otce_ot_sinkhorn_both
+  - otce_ot_sinkhorn_coupling
+  - otce_otdd_both
+  - otce_otdd_coupling

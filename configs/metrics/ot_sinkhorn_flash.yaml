@@ -1,12 +1,9 @@
 metric: ot_distance
 kwargs:
-    use_flash_sinkhorn: True
+    use_sinkhorn: True
+    use_flash_sinkhorn: True # passed to ot_sinkhorn
     device: cuda
     debias: True
-
-    # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence
     blur: 0.05
-    # Multiscale annealing ratio in (0, 1); higher = more accurate but slower
     scaling: 0.9
-    # Cost exponent: p=2 gives squared-Euclidean cost
     p: 2

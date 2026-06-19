@@ -11,7 +11,6 @@ python scripts/run_metrics.py --metrics otdd_exact mmd
 """
 
 import argparse
-import logging
 import os
 from datetime import datetime
 
@@ -35,18 +34,12 @@ def apply_metric(
     metric_name: str,
     ds1: ImageDataset | DatasetMix,
     ds2: ImageDataset | DatasetMix,
-    logger: logging.Logger,
 ) -> float:
     metric_cfg = load_yaml_from_path(METRIC_CONFIG_DIR / f"{metric_name}.yaml")
-    if hasattr(metrics, metric_cfg["metric"]):
-        metric_fn = getattr(metrics, metric_cfg["metric"])
-    else:
-        msg = (
-            f"Metric function {metric_cfg['metric']} not found in "
-            "`dataset_similarity.metrics`."
-        )
-        raise ValueError(msg)
-    logger.info("Applying metric %s.", metric_name)
+    metric_fn = getattr(metrics, metric_cfg["metric"])
+    print(
+        f"Applying metric {metric_name}",
+    )
     return metric_fn(ds1, ds2, **metric_cfg["kwargs"])
 
 
@@ -73,25 +66,20 @@ def main(
     dataset1_name: str,
     dataset2_name: str,
 ) -> None:
-    # Setup logger
-    logger = logging.getLogger("otdd_test_logger")
-    logger.setLevel(logging.INFO)
-
     # Instantiate datasets
-    logger.info("Loading datasets")
+    print("Loading datasets")
     ds1 = load_dataset_from_config(dataset1_cfg)
     ds2 = load_dataset_from_config(dataset2_cfg)
-    logger.info("Datasets loaded successfully")
+    print("Datasets loaded successfully")
 
     # Compute metrics between datasets
-    logger.info("Computing metrics")
+    print("Computing metrics")
     metrics_results = {
-        metric_name: apply_metric(metric_name, ds1, ds2, logger)
-        for metric_name in metrics_list
+        metric_name: apply_metric(metric_name, ds1, ds2) for metric_name in metrics_list
     }
-    logger.info("Metrics successfully computed.")
+    print("Metrics successfully computed.")
 
-    logger.info("Preparing to save results.")
+    print("Preparing to save results.")
     results = {
         "dataset1": dataset1_name,
         "dataset2": dataset2_name,
@@ -101,13 +89,12 @@ def main(
     result_path = METRICS_RESULT_DIR / f"{cfg_name}.yaml"
     save_yaml_to_path(results, result_path)
 
-    logger.info("Results saved to %s", result_path)
+    print(f"Results saved to {result_path}")
 
     mlflow.log_params(
         {"source_dataset": dataset1_name, "target_dataset": dataset2_name}
     )
     mlflow.log_metrics({k: float(v) for k, v in metrics_results.items()})
-    logger.info("MLflow run logged.")
 
 
 if __name__ == "__main__":

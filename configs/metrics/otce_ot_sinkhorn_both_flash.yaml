@@ -3,14 +3,10 @@ metric: otce_distance
 kwargs:
     use_wasserstein: True
     use_otdd: False
-    use_flash_sinkhorn: True
+    use_sinkhorn: True
+    use_flash_sinkhorn: True # passed to ot_sinkhorn
     device: cuda
-    debias: False
-
-    # Sinkhorn parameters forwarded to ot_distance
-    # Regularisation: epsilon = blur^p; smaller = sharper transport but slower convergence
+    debias: True
     blur: 0.05
-    # Multiscale annealing ratio in (0, 1); higher = more accurate but slower
     scaling: 0.9
-    # Cost exponent: p=2 gives squared-Euclidean cost
     p: 2

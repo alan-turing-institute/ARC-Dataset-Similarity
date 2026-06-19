@@ -4,6 +4,7 @@ embeddings/
 plots/
 results/
 trained_models/
+configs/experiments/*/
 
 
 # logging

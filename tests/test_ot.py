@@ -32,7 +32,7 @@ class TestOptimalTransportDistance:
         result = ot_distance(
             embedding_tensor_dataset,
             embedding_tensor_dataset_2,
-            use_flash_sinkhorn=False,
+            use_sinkhorn=False,
             method="sinkhorn",
             return_coupling=True,
         )
