@@ -38,6 +38,7 @@ class _EmbeddingTensorDataset(ImageDataset):
             random_seed=None,
             embedding=None,
             return_paths=return_paths,
+            multi_label=False,
         )
 
     def _load_data(self) -> DataFrame:
