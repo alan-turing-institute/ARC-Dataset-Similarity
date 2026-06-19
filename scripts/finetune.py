@@ -50,7 +50,7 @@ def compute_multi_label_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
     }
 
 
-def multi_label_loss(outputs, labels, _num_items_in_batch=None):
+def multi_label_loss(outputs, labels, num_items_in_batch=None):  # noqa: ARG001
     logits = outputs.get("logits")
     return nn.BCEWithLogitsLoss()(logits, labels.float())
 
@@ -96,7 +96,7 @@ def main(config_name: str):
         inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
         return {**inputs, "labels": torch.stack([item[1] for item in batch])}
 
-    is_multi_label = train_data_config.get("multi_label", False)
+    is_multi_label = train_data_config["kwargs"].get("multi_label", False)
     collate_fn = collate_binary_fn if not is_multi_label else collate_multi_label_fn
     compute_metrics = (
         compute_binary_metrics if not is_multi_label else compute_multi_label_metrics
