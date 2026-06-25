@@ -3,7 +3,6 @@ from datetime import datetime
 from pathlib import Path
 
 import mlflow
-import numpy as np
 import optuna
 import torch
 import torch.nn.functional as F
@@ -53,18 +52,8 @@ def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
 
     accuracy = (logits_t.argmax(dim=-1) == labels_t).float().mean().item()
 
-    # Compute average precision using sklearn
     probs = F.softmax(logits_t, dim=-1).numpy()
-    # Remap label values to 0-indexed positions so they can index into probs columns.
-    # Labels may be arbitrary integers (raw dataset class IDs) rather than 0..K-1.
-    unique_classes = np.unique(labels)
-    label_to_col = {c: i for i, c in enumerate(unique_classes)}
-    labels_remapped = np.vectorize(label_to_col.__getitem__)(labels)
-    cols = np.arange(len(unique_classes))
-    labels_onehot = (labels_remapped[:, None] == cols).astype(int)
-    avg_precision = average_precision_score(
-        labels_onehot, probs[:, unique_classes], average="macro"
-    )
+    avg_precision = average_precision_score(labels, probs[:, 1])
 
     return {"accuracy": accuracy, "average_precision": avg_precision}
 
@@ -331,15 +320,8 @@ def main(config_name: str) -> None:
             }
         )
 
-        all_raw_labels = sorted(
-            set(train_dataset.data["label"].tolist())
-            | set(eval_dataset.data["label"].tolist())
-        )
-        label_map = {raw: idx for idx, raw in enumerate(all_raw_labels)}
-        num_labels = len(all_raw_labels)
-
+        num_labels = 2
         mlflow.log_param("num_labels", num_labels)
-        mlflow.log_param("label_map", str(label_map))
 
         def model_init(_):
             return AutoModelForImageClassification.from_pretrained(
@@ -356,7 +338,7 @@ def main(config_name: str) -> None:
             inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
             return {
                 **inputs,
-                "labels": torch.tensor([label_map[item[1]] for item in batch]),
+                "labels": torch.tensor([item[1] for item in batch]),
             }
 
         if "sweep_args" in config:
