@@ -6,7 +6,6 @@ import mlflow
 import optuna
 import torch
 import torch.nn.functional as F
-
 from sklearn.metrics import average_precision_score
 from transformers import (
     AutoImageProcessor,
