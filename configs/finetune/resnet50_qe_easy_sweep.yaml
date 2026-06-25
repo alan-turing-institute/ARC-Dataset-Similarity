@@ -1,0 +1,38 @@
+train_data_config: qe_train_easy
+val_data_config: qe_val_easy
+test_data_config: qe_test_easy
+
+
+# these are passed directly to:
+# transformers.AutoModelForImageClassification.from_pretrained
+model_args:
+  pretrained_model_name_or_path: "microsoft/resnet-50"
+  device_map: auto
+
+training_args:
+  eval_strategy: epoch
+  save_strategy: epoch
+  save_total_limit: 1
+  load_best_model_at_end: true
+
+sweep_args:
+  n_trials: 10
+  objective: eval_average_precision
+  direction: maximize  # minimize or maximize
+  params:
+    learning_rate:
+      type: float
+      low: 0.00001   # 1e-5
+      high: 0.01     # 1e-2
+      log: true
+    per_device_train_batch_size:
+      type: categorical
+      choices: [16, 32, 64]
+    weight_decay:
+      type: float
+      low: 0.00001   # 1e-5
+      high: 0.1      # 1e-1
+      log: true
+    num_train_epochs:
+      type: categorical
+      choices: [5, 10, 20]
