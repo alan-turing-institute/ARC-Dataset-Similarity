@@ -6,7 +6,7 @@ import mlflow
 import optuna
 import torch
 import torch.nn.functional as F
-from dotenv import load_dotenv
+
 from sklearn.metrics import average_precision_score
 from transformers import (
     AutoImageProcessor,
@@ -32,7 +32,6 @@ def configure_mlflow() -> None:
     Configure mlflow for the script, sets up tracking URI and logs to appropriate
     experiment.
     """
-    load_dotenv(".env")
     mlflow.set_workspace("dataset-similarity")
     client = mlflow.tracking.MlflowClient()
     client.get_experiment_by_name(EXPERIMENT_NAME)
