@@ -34,8 +34,7 @@ def configure_mlflow() -> None:
     experiment.
     """
     mlflow.set_workspace("dataset-similarity")
-    client = mlflow.tracking.MlflowClient()
-    client.get_experiment_by_name(EXPERIMENT_NAME)
+
     mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.enable_system_metrics_logging()
 
