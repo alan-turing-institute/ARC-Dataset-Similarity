@@ -17,14 +17,15 @@ import mlflow
 from dotenv import load_dotenv
 
 import dataset_similarity.metrics as metrics
-from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
+from dataset_similarity.constants import (
+    CONFIG_DIR,
+    METRIC_CONFIG_DIR,
+    METRICS_RESULT_DIR,
+)
 from dataset_similarity.data.base import ImageDataset
 from dataset_similarity.data.mix import DatasetMix
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
-
-METRIC_CONFIG_DIR = CONFIG_DIR / "metrics"
-METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
 
 EXPERIMENT_NAME = "data-sim-metrics"
 
