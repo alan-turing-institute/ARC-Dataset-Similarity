@@ -75,9 +75,7 @@ def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
     return suggest_fn(name, **spec)
 
 
-def train_and_evaluate(
-    trainer: Trainer, train_dataset, output_dir: Path
-) -> dict[str, float]:
+def train_and_evaluate(trainer: Trainer, output_dir: Path) -> dict[str, float]:
     """
     Train a model and evaluate it on both the training and evaluation splits.
 
@@ -92,9 +90,8 @@ def train_and_evaluate(
         Merged dict of training-loop, train-eval, and eval-split metrics.
     """
     train_result = trainer.train()
-    train_predict = trainer.predict(train_dataset, metric_key_prefix="train")
     eval_metrics = trainer.evaluate()
-    all_metrics = {**train_result.metrics, **train_predict.metrics, **eval_metrics}
+    all_metrics = {**train_result.metrics, **eval_metrics}
     save_yaml_to_path(all_metrics, output_dir / "all_results.yaml")
     return all_metrics
 
@@ -163,9 +160,7 @@ def _generate_objective_fn(
                 }
             )
 
-            all_metrics = train_and_evaluate(
-                trial_trainer, train_dataset, trial_output_dir
-            )
+            all_metrics = train_and_evaluate(trial_trainer, trial_output_dir)
             _log_numeric_metrics(all_metrics, step=trial_trainer.state.global_step)
 
             objective_key = sweep_args.get("objective", "eval_loss")
@@ -200,6 +195,11 @@ def run_sweep(
 
     study = optuna.create_study(
         study_name=config_name,
+        sampler=(
+            getattr(optuna.samplers, sweep_args["sampler"])()
+            if "sampler" in sweep_args
+            else optuna.samplers.TPESampler()  # optuna default
+        ),
         direction=sweep_args.get("direction", "minimize"),
     )
     objective = _generate_objective_fn(
@@ -258,7 +258,7 @@ def run_finetune(
         data_collator=collate_fn,
         compute_metrics=evaluate_model,
     )
-    all_metrics = train_and_evaluate(trainer, train_dataset, save_dir)
+    all_metrics = train_and_evaluate(trainer, save_dir)
     _log_numeric_metrics(all_metrics)
 
     print(f"Final model saved to: {save_dir}")
