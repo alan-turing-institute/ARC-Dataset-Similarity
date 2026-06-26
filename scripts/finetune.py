@@ -17,6 +17,7 @@ from transformers import (
 
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.utils import load_dataset_from_config
+from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
 
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
@@ -259,12 +260,6 @@ def run_finetune(
     )
     all_metrics = train_and_evaluate(trainer, train_dataset, save_dir)
     _log_numeric_metrics(all_metrics)
-    mlflow.log_params(
-        {
-            "seed": trainer.args.seed,
-            "data_seed": trainer.args.data_seed or trainer.args.seed,
-        }
-    )
 
     print(f"Final model saved to: {save_dir}")
 
@@ -321,7 +316,12 @@ def main(config_name: str) -> None:
         mlflow.log_param("num_labels", num_labels)
 
         def model_init(_):
-            return AutoModelForImageClassification.from_pretrained(
+            modelCls = AutoModelForImageClassification
+            if config["model_args"]["pretrained_model_name_or_path"].startswith(
+                "facebook/dinov3"
+            ):
+                modelCls = DINOv3Classifier
+            return modelCls.from_pretrained(
                 num_labels=num_labels,
                 ignore_mismatched_sizes=True,
                 **config["model_args"],
