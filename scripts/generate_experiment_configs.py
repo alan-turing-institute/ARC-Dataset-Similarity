@@ -134,6 +134,13 @@ def main(experiment_name: str):
 
     # Generate dataset configs
     datasets = _build_dataset_cfgs(name, kwarg_options)
+    num_datasets = len(datasets)
+    if num_datasets > 1000:
+        msg = (
+            f"Slurm only supports arrays up to size 1000, but {num_datasets} tasks were"
+            "generated. Please reduce the number of tasks."
+        )
+        raise ValueError(msg)
 
     # Use each set of kwargs to create train/val/test splits
     train_paths, val_paths, test_paths = _save_dataset_cfgs(
@@ -156,13 +163,13 @@ def main(experiment_name: str):
         )
 
     # Generate slurm array job scripts for training, eval, and metrics computation
-    num_tasks = len(tasks)
+    num_datasets = num_datasets - 1  # slurm array jobs are 0 indexed inclusive
     _write_slurm_script(
-        "slurm-finetune-template.sh", experiment_name, num_tasks, "finetune"
+        "slurm-finetune-template.sh", experiment_name, num_datasets, "finetune"
     )
-    _write_slurm_script("slurm-eval-template.sh", experiment_name, num_tasks, "eval")
+    _write_slurm_script("slurm-eval-template.sh", experiment_name, num_datasets, "eval")
     _write_slurm_script(
-        "slurm-metrics-template.sh", experiment_name, num_tasks, "metrics"
+        "slurm-metrics-template.sh", experiment_name, num_datasets, "metrics"
     )
 
 
