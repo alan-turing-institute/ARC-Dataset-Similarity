@@ -13,6 +13,7 @@ class DINOv3Classifier(PreTrainedModel):  # type: ignore[misc]
         super().__init__(config)
         self.dinov3 = DINOv3ViTModel(config)
         self.num_labels = config.num_labels
+        self.num_register_tokens = self.dinov3.config.num_register_tokens
         self.classifier = (
             nn.Linear(config.hidden_size * 2, config.num_labels)
             if config.num_labels > 0
