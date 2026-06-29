@@ -137,13 +137,9 @@ class COCODataset(ImageDataset):
         self.positive_fraction = positive_fraction
         self.filter_class = filter_class
         self.multi_label = multi_label
-        if self.multi_label:
-            if self.positive_class is None:
-                msg = "`positive_class` must be specified for multi-label tasks."
-                raise ValueError(msg)
-            self.positive_class = sorted(
-                self.positive_class
-            )  # Ensure consistent order for multi-label tasks
+        if self.multi_label and self.positive_class is None:
+            msg = "`positive_class` must be specified for multi-label tasks."
+            raise ValueError(msg)
 
         # Super will use keep_classes to filter the dataset by class
         super().__init__(

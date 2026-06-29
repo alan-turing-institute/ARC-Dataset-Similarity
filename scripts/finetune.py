@@ -2,7 +2,7 @@ import argparse
 
 import numpy as np
 import torch
-import torch.nn as nn
+import torch.nn.functional as F
 from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
@@ -52,7 +52,7 @@ def compute_multi_label_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
 
 def multi_label_loss(outputs, labels, num_items_in_batch=None):  # noqa: ARG001
     logits = outputs.get("logits")
-    return nn.BCEWithLogitsLoss()(logits, labels.float())
+    return F.binary_cross_entropy_with_logits(logits, labels.float())
 
 
 def main(config_name: str):
@@ -84,20 +84,14 @@ def main(config_name: str):
         **config["model_args"],
     )
 
-    def collate_binary_fn(
-        batch: list[tuple[torch.Tensor, int]],
+    def collate_fn(
+        batch: list[tuple[torch.Tensor, torch.Tensor | int]],
     ) -> dict[str, torch.Tensor]:
         inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
-        return {**inputs, "labels": torch.tensor([item[1] for item in batch])}
+        labels = torch.stack([torch.as_tensor(item[1]) for item in batch])
+        return {**inputs, "labels": labels}
 
-    def collate_multi_label_fn(
-        batch: list[tuple[torch.Tensor, torch.Tensor]],
-    ) -> dict[str, torch.Tensor]:
-        inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
-        return {**inputs, "labels": torch.stack([item[1] for item in batch])}
-
-    is_multi_label = train_data_config["kwargs"].get("multi_label", False)
-    collate_fn = collate_binary_fn if not is_multi_label else collate_multi_label_fn
+    is_multi_label = train_dataset.multi_label
     compute_metrics = (
         compute_binary_metrics if not is_multi_label else compute_multi_label_metrics
     )
