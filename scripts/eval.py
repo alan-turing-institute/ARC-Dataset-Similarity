@@ -1,6 +1,8 @@
 import argparse
 import json
+from datetime import datetime
 
+import mlflow
 import torch
 from tqdm import tqdm
 from transformers import AutoImageProcessor, AutoModelForImageClassification
@@ -13,6 +15,13 @@ from dataset_similarity.utils import compute_binary_ap, load_yaml_from_path
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
+EXPERIMENT_NAME = "data-sim-eval"
+
+
+def configure_mlflow() -> None:
+    mlflow.set_workspace("dataset-similarity")
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    mlflow.enable_system_metrics_logging()
 
 
 def eval(
@@ -33,6 +42,15 @@ def eval(
 
 
 def main(cfg_name: str):
+    configure_mlflow()
+    with mlflow.start_run(
+        run_name=f"{cfg_name}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    ):
+        mlflow.log_param("config_name", cfg_name)
+        _run(cfg_name)
+
+
+def _run(cfg_name: str) -> None:
     # load_config
     config_path = FINETUNE_CONFIG_DIR / f"{cfg_name}.yaml"
     config = load_yaml_from_path(config_path)
@@ -86,11 +104,12 @@ def main(cfg_name: str):
 
     # output results
     results = {
-        "name": cfg_name,
         "average_precision_test": ap_test,
         "average_precision_store": ap_store,
         "difference": ap_test - ap_store,
     }
+    mlflow.log_metrics(results)
+    results["name"] = cfg_name
     save_dir = PROJECT_DIR / "results" / "eval"
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / f"{cfg_name}_results.json"
