@@ -2,7 +2,7 @@ name: COCO
 kwargs:
   split: val2017
   size:
-  multi_label: True
+  multi_label: true
   random_seed: 42
   embedding:
   positive_class:

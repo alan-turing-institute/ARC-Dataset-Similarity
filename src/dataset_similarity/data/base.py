@@ -34,6 +34,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             dataset. If ``None``, raw images are returned by ``__getitem__``.
         return_paths: If ``True``, ``__getitem__`` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a ``Path`` object.
+        multi_label: If ``True``, ``__getitem__`` returns a multi label vector over
+            ``positive_class`` instead of a binary scalar. Requires ``positive_class``
+            or ``positive_superclass``. Defaults to ``False``.
     """
 
     def __init__(
@@ -148,7 +151,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         for multi-label classification.
         """
         if self.multi_label:
-            assert self.keep_classes is not None
+            if self.keep_classes is None:
+                msg = "multi_label=True requires keep_classes to be set."
+                raise ValueError(msg)
             return len(self.keep_classes)
         return 2
 

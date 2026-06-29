@@ -35,6 +35,9 @@ class DomainNetDataset(ImageDataset):
         return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a `Path` object.
             Defaults to `False`.
+        multi_label: If `True`, `__getitem__` returns a multi label vector over
+            `positive_class` instead of a binary scalar. Not implemented for
+            DomainNet. Defaults to `False`.
     """
 
     DOMAINS = ("clipart", "infograph", "painting", "quickdraw", "real", "sketch")

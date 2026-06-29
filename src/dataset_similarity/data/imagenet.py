@@ -37,6 +37,9 @@ class ImageNetDataset(ImageDataset):
         return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a `Path` object.
             Defaults to `False`.
+        multi_label: If `True`, `__getitem__` returns a multi label vector over
+            `positive_class` instead of a binary scalar. Not implemented for
+            ImageNet. Defaults to `False`.
     """
 
     def __init__(
