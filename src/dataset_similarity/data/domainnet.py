@@ -91,6 +91,9 @@ class DomainNetDataset(ImageDataset):
             self.target_label_ids = {
                 self.class_to_label_map[cls] for cls in keep_classes
             }
+        if multi_label:
+            msg = "DomainNetDataset does not support multi-label tasks."
+            raise NotImplementedError(msg)
 
         super().__init__(
             dataset_dir=DOMAINNET_DIR,

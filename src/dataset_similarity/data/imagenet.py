@@ -88,6 +88,9 @@ class ImageNetDataset(ImageDataset):
                     )
                     raise ValueError(err_msg)
             keep_classes = resolved
+        if multi_label:
+            msg = "ImageNetDataset does not support multi-label tasks."
+            raise NotImplementedError(msg)
 
         super().__init__(
             dataset_dir=IMAGENET_DIR,
