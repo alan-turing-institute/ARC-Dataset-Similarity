@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import Any
 
+import torch.nn.functional as F
+from sklearn.metrics import average_precision_score
+from torch import Tensor
 from yaml import safe_dump, safe_load
 
 from dataset_similarity.constants import DATA_DIR, EMBEDDING_DIR
@@ -63,3 +66,8 @@ def save_yaml_to_path(
 
     with open(yaml_path, "w") as f:
         safe_dump(data, f)
+
+
+def compute_binary_ap(logits: Tensor, labels: list[int]) -> float:
+    probs = F.softmax(logits, dim=-1).numpy()
+    return float(average_precision_score(labels, probs[:, 1]))

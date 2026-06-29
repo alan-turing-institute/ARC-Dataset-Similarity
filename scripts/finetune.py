@@ -5,8 +5,6 @@ from pathlib import Path
 import mlflow
 import optuna
 import torch
-import torch.nn.functional as F
-from sklearn.metrics import average_precision_score
 from transformers import (
     AutoImageProcessor,
     AutoModelForImageClassification,
@@ -18,7 +16,11 @@ from transformers import (
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
-from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
+from dataset_similarity.utils import (
+    compute_binary_ap,
+    load_yaml_from_path,
+    save_yaml_to_path,
+)
 
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
@@ -50,8 +52,7 @@ def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
 
     accuracy = (logits_t.argmax(dim=-1) == labels_t).float().mean().item()
 
-    probs = F.softmax(logits_t, dim=-1).numpy()
-    avg_precision = average_precision_score(labels, probs[:, 1])
+    avg_precision = compute_binary_ap(logits_t, labels_t)
 
     return {"accuracy": accuracy, "average_precision": avg_precision}
 

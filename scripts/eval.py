@@ -1,34 +1,25 @@
 import argparse
 import json
 
-import numpy as np
 import torch
-from sklearn.metrics import average_precision_score
 from tqdm import tqdm
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
 from dataset_similarity.data.utils import load_dataset_from_config
-from dataset_similarity.utils import load_yaml_from_path
+from dataset_similarity.dinov3 import DINOv3Classifier
+from dataset_similarity.utils import compute_binary_ap, load_yaml_from_path
 
 FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
 DATA_CONFIG_DIR = CONFIG_DIR / "data"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 
 
-def softmax(x):
-    """Compute softmax values for each sets of scores in x."""
-    e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
-    return e_x / e_x.sum(axis=1, keepdims=True)
-
-
-# TODO: extract duplicate from finetune and eval into a common fn or fns
-def compute_ap(logits, labels):
-    probs = 1 / (1 + torch.exp(-logits[:, 1]))  # sigmoid for binary/multilabel
-    return average_precision_score(labels, probs)
-
-
-def eval(model, processor, dataset):
+def eval(
+    model: torch.nn.Module,
+    processor: AutoImageProcessor,
+    dataset: torch.utils.data.Dataset,
+) -> float:
     device = next(model.parameters()).device
     logits, labels = [], []
     with torch.no_grad():
@@ -38,7 +29,7 @@ def eval(model, processor, dataset):
             pred = model(**inputs)
             logits.append(pred["logits"].detach().cpu())
             labels.append(int(label))
-    return compute_ap(torch.cat(logits), labels)
+    return compute_binary_ap(torch.cat(logits), labels)
 
 
 def main(cfg_name: str):
@@ -52,17 +43,21 @@ def main(cfg_name: str):
     )
 
     # get trained model path
-    checkpoint_dir = TRAINED_MODELS_DIR / cfg_name
-    checkpoints = [
-        int(x.stem.split("-")[1]) for x in checkpoint_dir.glob("checkpoint-*")
-    ]
-    checkpoint_path = checkpoint_dir / f"checkpoint-{max(checkpoints)}"
+    original_model_name = config["model_args"]["pretrained_model_name_or_path"]
+    model_dir = TRAINED_MODELS_DIR / cfg_name
+    if (model_dir / "optimal_hparams.yaml").exists():
+        base_dir = model_dir / "best_model"  # symlink to winning sweep trial
+    else:
+        base_dir = model_dir / "trained_model"
+    checkpoints = [int(x.stem.split("-")[1]) for x in base_dir.glob("checkpoint-*")]
+    checkpoint_path = base_dir / f"checkpoint-{max(checkpoints)}"
     config["model_args"]["pretrained_model_name_or_path"] = checkpoint_path
 
     # load_model
-    model = AutoModelForImageClassification.from_pretrained(
-        **config["model_args"],
-    )
+    modelCls = AutoModelForImageClassification
+    if original_model_name.startswith("facebook/dinov3"):
+        modelCls = DINOv3Classifier
+    model = modelCls.from_pretrained(**config["model_args"])
     model = model.eval()
 
     # load evaluation data
