@@ -169,11 +169,9 @@ class COCODataset(ImageDataset):
         individual or superclasses are specified.
 
         Args:
-            classes (list[str] | None): _description_
-            superclasses (list[str] | None): _description_
+            classes: List of class names to include.
+            superclasses: List of supercategory class names to include.
 
-        Returns:
-            list[int] | None: _description_
         """
         if classes is None and superclasses is None:
             return None
