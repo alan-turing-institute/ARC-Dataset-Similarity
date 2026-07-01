@@ -47,6 +47,10 @@ dependencies = [
     "pycocotools>=2.0.11",
     "flash-sinkhorn; sys_platform == 'linux'",
     "accelerate>=1.13.0",
+    "mlflow[auth]>=3.13.0",
+    "optuna>=4.9.0",
+    "psutil>=7.2.2",
+    "nvidia-ml-py>=13.610.43",
 ]
 
 [dependency-groups]
