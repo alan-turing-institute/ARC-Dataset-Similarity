@@ -11,12 +11,21 @@ dataset_name: COCO
 dataset_kwargs:
   embedding: dinov3
   positive_class:
-  - cat
-  negative_superclass:
-  - null
-  - vehicle
-  max_objects_per_image: [null, 1]
+  # total percent / total N | percent single image / N
+  - person  # 54% / 23488 | 9% / 3679
+  - car # 10% / 4509 | 0% / 207
+  - book # 5% / 1975 | 0% /
+  - cat # 3% / 1499 |
+  - cake # 2% / 1033 |
+  - hot dog # 1% / 463 |
+  - parking meter # 1% / 245 |
+  negative_superclass: [null, vehicle, food]
+  max_objects_per_image: [null, 4]
+  min_bbox_area_fraction: [null, 0.5]
+  # min_bbox_area_fraction: [null, 0.01]
+  # max_bbox_area_fraction: [null, 0.6]
   filter_class: [null, positive]
+  positive_fraction: [null, 0.01, 0.05]
 
 # The following contains a fine-tuning config for the experiments. The same sweep is always used
 finetune:
