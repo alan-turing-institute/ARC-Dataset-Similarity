@@ -78,17 +78,14 @@ def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
 
 def train_and_evaluate(trainer: Trainer, output_dir: Path) -> dict[str, float]:
     """
-    Train a model and evaluate it on both the training and evaluation splits.
+    Train a model and evaluate it on the evaluation split.
 
     Args:
         trainer: A configured HuggingFace ``Trainer`` instance.
-        train_dataset: Dataset used for the training-set evaluation pass.
-            Passed separately because ``Trainer.evaluate()`` only runs on
-            ``eval_dataset``; a ``predict()`` call is needed for the train split.
         output_dir: Directory where ``all_results.yaml`` will be written.
 
     Returns:
-        Merged dict of training-loop, train-eval, and eval-split metrics.
+        Merged dict of training-loop and eval-split metrics.
     """
     train_result = trainer.train()
     eval_metrics = trainer.evaluate()

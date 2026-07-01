@@ -68,6 +68,8 @@ def save_yaml_to_path(
         safe_dump(data, f)
 
 
-def compute_binary_ap(logits: Tensor, labels: list[int]) -> float:
-    probs = F.softmax(logits, dim=-1).numpy()
+def compute_binary_ap(logits: Tensor, labels: list[int] | Tensor) -> float:
+    probs = F.softmax(logits, dim=-1).detach().cpu().numpy()
+    if isinstance(labels, Tensor):
+        labels = labels.detach().cpu().numpy()
     return float(average_precision_score(labels, probs[:, 1]))
