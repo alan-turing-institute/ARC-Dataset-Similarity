@@ -16,12 +16,6 @@ from dataset_similarity.constants import (
 from dataset_similarity.utils import load_yaml_from_path
 
 SCRIPTS_DIR = PROJECT_DIR / "scripts"
-LABEL_KEYS = [
-    "positive_class",
-    "negative_class",
-    "positive_superclass",
-    "negative_superclass",
-]
 
 
 def _build_dataset_cfgs(
@@ -29,12 +23,7 @@ def _build_dataset_cfgs(
 ) -> list[dict[str, Any]]:
     combo_dict = {}
     for kwarg, value in kwarg_options.items():
-        if kwarg in LABEL_KEYS:
-            if isinstance(value, list):
-                combo_dict[kwarg] = [[value] if value else None for value in value]
-            else:
-                combo_dict[kwarg] = [[value] if value else None]
-        elif isinstance(value, list):
+        if isinstance(value, list):
             combo_dict[kwarg] = value
         else:
             combo_dict[kwarg] = [value]
