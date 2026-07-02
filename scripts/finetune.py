@@ -14,6 +14,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+from transformers.modeling_outputs import ImageClassifierOutput
 
 from dataset_similarity.constants import (
     DATA_CONFIG_DIR,
@@ -36,6 +37,29 @@ def configure_mlflow() -> None:
 
     mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.enable_system_metrics_logging()
+
+
+def compute_loss_fn(
+    outputs: ImageClassifierOutput,
+    labels: torch.Tensor,
+    num_items_in_batch: torch.Tensor | int,
+) -> torch.Tensor:
+    """
+    Compute the loss for a batch of outputs and labels.
+
+    From: https://github.com/huggingface/transformers/blob/main/docs/source/en/trainer_recipes.md
+
+    Args:
+        outputs: The model outputs (logits).
+        labels: The true labels.
+        num_items_in_batch: The number of items in the batch.
+
+    Returns:
+        The computed loss value.
+    """
+    logits = outputs["logits"]
+    loss = F.cross_entropy(logits, labels, reduction="sum")
+    return loss / num_items_in_batch
 
 
 def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
@@ -135,6 +159,7 @@ def _generate_objective_fn(
             # model_init is used instead so Optuna can reinitialise weights
             trial_trainer = Trainer(
                 model_init=model_init,
+                compute_loss_func=compute_loss_fn,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
                 args=TrainingArguments(
@@ -224,22 +249,6 @@ def run_sweep(
     best_model_dir.unlink(missing_ok=True)
     best_model_dir.symlink_to(f"sweep_trials/run{study.best_trial.number}")
     print(f"Best model saved to: {best_model_dir}")
-
-
-def compute_loss_fn(outputs, labels, num_items_in_batch):
-    """
-    Compute the loss for a batch of outputs and labels.
-
-    Args:
-        outputs: The model outputs (logits).
-        labels: The true labels.
-        num_items_in_batch: The number of items in the batch.
-
-    Returns:
-        The computed loss value.
-    """
-    loss = F.cross_entropy(outputs, labels, reduction="sum")
-    return loss / num_items_in_batch
 
 
 def run_finetune(
