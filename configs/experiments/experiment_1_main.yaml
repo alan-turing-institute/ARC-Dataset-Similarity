@@ -35,6 +35,8 @@ finetune:
     eval_strategy: epoch
     save_strategy: no
     save_total_limit: 1
+    dataloader_num_workers: 8
+    dataloader_persistent_workers: true
     num_train_epochs: 1
     per_device_train_batch_size: 128
     per_device_eval_batch_size: 128
