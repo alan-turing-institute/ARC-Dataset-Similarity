@@ -14,7 +14,6 @@ import argparse
 from datetime import datetime
 
 import mlflow
-from dotenv import load_dotenv
 
 import dataset_similarity.metrics as metrics
 from dataset_similarity.constants import (
@@ -35,10 +34,8 @@ def configure_mlflow() -> None:
     Configure mlflow for the script, sets up tracking URI and logs to appropriate
     experiment.
     """
-    load_dotenv(".env")
     mlflow.set_workspace("dataset-similarity")
-    client = mlflow.tracking.MlflowClient()
-    client.get_experiment_by_name(EXPERIMENT_NAME)
+
     mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.enable_system_metrics_logging()
 

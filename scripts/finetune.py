@@ -6,7 +6,6 @@ import mlflow
 import optuna
 import torch
 import torch.nn.functional as F
-from dotenv import load_dotenv
 from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
@@ -22,6 +21,7 @@ from dataset_similarity.constants import (
     TRAINED_MODELS_DIR,
 )
 from dataset_similarity.data.utils import load_dataset_from_config
+from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
 
 EXPERIMENT_NAME = "data-sim-finetune"
@@ -32,10 +32,8 @@ def configure_mlflow() -> None:
     Configure mlflow for the script, sets up tracking URI and logs to appropriate
     experiment.
     """
-    load_dotenv(".env")
     mlflow.set_workspace("dataset-similarity")
-    client = mlflow.tracking.MlflowClient()
-    client.get_experiment_by_name(EXPERIMENT_NAME)
+
     mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.enable_system_metrics_logging()
 
@@ -75,9 +73,7 @@ def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
     return suggest_fn(name, **spec)
 
 
-def train_and_evaluate(
-    trainer: Trainer, train_dataset, output_dir: Path
-) -> dict[str, float]:
+def train_and_evaluate(trainer: Trainer, output_dir: Path) -> dict[str, float]:
     """
     Train a model and evaluate it on both the training and evaluation splits.
 
@@ -92,9 +88,8 @@ def train_and_evaluate(
         Merged dict of training-loop, train-eval, and eval-split metrics.
     """
     train_result = trainer.train()
-    train_predict = trainer.predict(train_dataset, metric_key_prefix="train")
     eval_metrics = trainer.evaluate()
-    all_metrics = {**train_result.metrics, **train_predict.metrics, **eval_metrics}
+    all_metrics = {**train_result.metrics, **eval_metrics}
     save_yaml_to_path(all_metrics, output_dir / "all_results.yaml")
     return all_metrics
 
@@ -163,9 +158,7 @@ def _generate_objective_fn(
                 }
             )
 
-            all_metrics = train_and_evaluate(
-                trial_trainer, train_dataset, trial_output_dir
-            )
+            all_metrics = train_and_evaluate(trial_trainer, trial_output_dir)
             _log_numeric_metrics(all_metrics, step=trial_trainer.state.global_step)
 
             objective_key = sweep_args.get("objective", "eval_loss")
@@ -200,6 +193,11 @@ def run_sweep(
 
     study = optuna.create_study(
         study_name=config_name,
+        sampler=(
+            getattr(optuna.samplers, sweep_args["sampler"])()
+            if "sampler" in sweep_args
+            else optuna.samplers.TPESampler()  # optuna default
+        ),
         direction=sweep_args.get("direction", "minimize"),
     )
     objective = _generate_objective_fn(
@@ -274,14 +272,8 @@ def run_finetune(
         data_collator=collate_fn,
         compute_metrics=evaluate_model,
     )
-    all_metrics = train_and_evaluate(trainer, train_dataset, save_dir)
+    all_metrics = train_and_evaluate(trainer, save_dir)
     _log_numeric_metrics(all_metrics)
-    mlflow.log_params(
-        {
-            "seed": trainer.args.seed,
-            "data_seed": trainer.args.data_seed or trainer.args.seed,
-        }
-    )
 
     print(f"Final model saved to: {save_dir}")
 
@@ -334,18 +326,16 @@ def main(config_name: str) -> None:
             }
         )
 
-        all_raw_labels = sorted(
-            set(train_dataset.data["label"].tolist())
-            | set(eval_dataset.data["label"].tolist())
-        )
-        label_map = {raw: idx for idx, raw in enumerate(all_raw_labels)}
-        num_labels = len(all_raw_labels) - 1  # zero-indexed labelså
-
+        num_labels = 1  # TODO update for multilabel classification
         mlflow.log_param("num_labels", num_labels)
-        mlflow.log_param("label_map", str(label_map))
 
         def model_init(_):
-            return AutoModelForImageClassification.from_pretrained(
+            modelCls = AutoModelForImageClassification
+            if config["model_args"]["pretrained_model_name_or_path"].startswith(
+                "facebook/dinov3"
+            ):
+                modelCls = DINOv3Classifier
+            return modelCls.from_pretrained(
                 num_labels=num_labels,
                 ignore_mismatched_sizes=True,
                 **config["model_args"],
@@ -359,7 +349,7 @@ def main(config_name: str) -> None:
             inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
             return {
                 **inputs,
-                "labels": torch.tensor([label_map[item[1]] for item in batch]),
+                "labels": torch.tensor([item[1] for item in batch]),
             }
 
         if "sweep_args" in config:
