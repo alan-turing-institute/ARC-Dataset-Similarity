@@ -98,7 +98,7 @@ class COCODataset(ImageDataset):
             keep_labels = (self.positive_class or []) + self.negative_class
             keep_classes = [
                 cls
-                for cls, _ in self.class_to_label_map.items()
+                for cls, label in self.class_to_label_map.items()
                 if label in keep_labels
             ]
         self.keep_labels = keep_labels

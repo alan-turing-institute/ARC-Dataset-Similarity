@@ -3,12 +3,11 @@ from datetime import datetime
 from pathlib import Path
 
 import mlflow
-import numpy as np
 import optuna
 import torch
 import torch.nn.functional as F
 from dotenv import load_dotenv
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
     AutoModelForImageClassification,
@@ -47,26 +46,14 @@ def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
     Compatible with the Trainer ``compute_metrics`` callback, and can also be
     called directly on the output of ``trainer.predict(dataset)``.
     """
-    logits, labels = eval_pred.predictions, eval_pred.label_ids
-    logits_t = torch.from_numpy(logits)
-    labels_t = torch.from_numpy(labels)
-
-    accuracy = (logits_t.argmax(dim=-1) == labels_t).float().mean().item()
-
-    # Compute average precision using sklearn
-    probs = F.softmax(logits_t, dim=-1).numpy()
-    # Remap label values to 0-indexed positions so they can index into probs columns.
-    # Labels may be arbitrary integers (raw dataset class IDs) rather than 0..K-1.
-    unique_classes = np.unique(labels)
-    label_to_col = {c: i for i, c in enumerate(unique_classes)}
-    labels_remapped = np.vectorize(label_to_col.__getitem__)(labels)
-    cols = np.arange(len(unique_classes))
-    labels_onehot = (labels_remapped[:, None] == cols).astype(int)
-    avg_precision = average_precision_score(
-        labels_onehot, probs[:, unique_classes], average="macro"
-    )
-
-    return {"accuracy": accuracy, "average_precision": avg_precision}
+    # TODO: for this PR, everything is binary classification, but we will support
+    # multi-label in the future
+    logits = torch.from_numpy(eval_pred.predictions)
+    labels = eval_pred.label_ids
+    probs = logits.sigmoid()
+    accuracy = accuracy_score(y_true=labels, y_pred=(probs > 0.5).int())
+    ap = average_precision_score(y_true=labels, y_score=probs, average="samples")
+    return {"accuracy": accuracy, "average_precision": ap}
 
 
 def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
@@ -241,6 +228,22 @@ def run_sweep(
     print(f"Best model saved to: {best_model_dir}")
 
 
+def compute_loss_fn(outputs, labels, num_items_in_batch):
+    """
+    Compute the loss for a batch of outputs and labels.
+
+    Args:
+        outputs: The model outputs (logits).
+        labels: The true labels.
+        num_items_in_batch: The number of items in the batch.
+
+    Returns:
+        The computed loss value.
+    """
+    loss = F.cross_entropy(outputs, labels, reduction="sum")
+    return loss / num_items_in_batch
+
+
 def run_finetune(
     config,
     config_name,
@@ -253,10 +256,10 @@ def run_finetune(
     output_dir = TRAINED_MODELS_DIR / config_name
 
     mlflow.log_params(init_training_args)
-    model = model_init(None)
     save_dir = output_dir / "trained_model"
     trainer = Trainer(
-        model=model,
+        model=model_init,
+        compute_loss_func=compute_loss_fn,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         args=TrainingArguments(
@@ -336,7 +339,7 @@ def main(config_name: str) -> None:
             | set(eval_dataset.data["label"].tolist())
         )
         label_map = {raw: idx for idx, raw in enumerate(all_raw_labels)}
-        num_labels = len(all_raw_labels)
+        num_labels = len(all_raw_labels) - 1  # zero-indexed labelså
 
         mlflow.log_param("num_labels", num_labels)
         mlflow.log_param("label_map", str(label_map))
