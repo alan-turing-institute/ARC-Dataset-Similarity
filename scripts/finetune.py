@@ -307,6 +307,7 @@ def main(config_name: str) -> None:
                 "config_name": config_name,
                 "train_data_config": config["train_data_config"],
                 "val_data_config": config["val_data_config"],
+                "model": config["model_args"]["pretrained_model_name_or_path"]
             }
         )
 

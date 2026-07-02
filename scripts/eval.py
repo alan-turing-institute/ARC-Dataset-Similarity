@@ -46,7 +46,6 @@ def main(cfg_name: str):
     with mlflow.start_run(
         run_name=f"{cfg_name}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     ):
-        mlflow.log_param("config_name", cfg_name)
         _run(cfg_name)
 
 
@@ -54,6 +53,15 @@ def _run(cfg_name: str) -> None:
     # load_config
     config_path = FINETUNE_CONFIG_DIR / f"{cfg_name}.yaml"
     config = load_yaml_from_path(config_path)
+
+    mlflow.log_params(
+            {
+                "config_name": cfg_name,
+                "train_data_config": config["train_data_config"],
+                "val_data_config": config["val_data_config"],
+                "model": config["model_args"]["pretrained_model_name_or_path"]
+            }
+        )
 
     # Load processor
     processor = AutoImageProcessor.from_pretrained(
