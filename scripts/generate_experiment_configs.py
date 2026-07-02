@@ -109,13 +109,19 @@ def _write_metrics_cfg(
 
 
 def _write_slurm_script(
-    template: str, experiment_name: str, num_tasks: int, tasktype: str
+    template: str,
+    experiment_name: str,
+    num_tasks: int,
+    tasktype: str,
+    time: str,
+    root: str | None = None,
 ):
     template_dir = SCRIPTS_DIR / "templates"
     environment = Environment(loader=FileSystemLoader(template_dir))
     template = environment.get_template(template)
+    root = (root if root.endswith("/") else root + "/") if root is not None else ""
     script_content = template.render(
-        experiment_name=experiment_name, num_tasks=num_tasks
+        time=time, experiment_name=experiment_name, num_tasks=num_tasks, root=root
     )
     save_path = SCRIPTS_DIR / f"{experiment_name}/{tasktype}.sh"
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,7 +129,7 @@ def _write_slurm_script(
         f.write(script_content)
 
 
-def main(experiment_name: str):
+def main(experiment_name: str, root: str | None):
     # Load top-level config
     CFG_PATH = EXPERIMENT_CONFIG_DIR / f"{experiment_name}.yaml"
     top_cfg = load_yaml_from_path(CFG_PATH)
@@ -165,16 +171,34 @@ def main(experiment_name: str):
     # Generate slurm array job scripts for training, eval, and metrics computation
     num_datasets = num_datasets - 1  # slurm array jobs are 0 indexed inclusive
     _write_slurm_script(
-        "slurm-finetune-template.sh", experiment_name, num_datasets, "finetune"
+        template="slurm-finetune-template.sh",
+        experiment_name=experiment_name,
+        num_tasks=num_datasets,
+        tasktype="finetune",
+        time=top_cfg["train_time"],
+        root=root,
     )
-    _write_slurm_script("slurm-eval-template.sh", experiment_name, num_datasets, "eval")
     _write_slurm_script(
-        "slurm-metrics-template.sh", experiment_name, num_datasets, "metrics"
+        template="slurm-eval-template.sh",
+        experiment_name=experiment_name,
+        num_tasks=num_datasets,
+        tasktype="eval",
+        time=top_cfg["eval_time"],
+        root=root,
+    )
+    _write_slurm_script(
+        template="slurm-metrics-template.sh",
+        experiment_name=experiment_name,
+        num_tasks=num_datasets,
+        tasktype="metrics",
+        time=top_cfg["metrics_time"],
+        root=root,
     )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
+    parser.add_argument("--root", type=str, default=None)
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, args.root)

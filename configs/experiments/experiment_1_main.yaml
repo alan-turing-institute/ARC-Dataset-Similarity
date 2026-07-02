@@ -4,28 +4,29 @@ train_split: trainARC
 val_split: valARC
 test_split: testARC
 
+train_time: "01:40:00"
+eval_time: "00:10:00"
+metrics_time: "00:20:00"
+
 data_store: coco_data_store
 
 # The following used to generate combinations of datasets for the experiment
 dataset_name: COCO
 dataset_kwargs:
   embedding: dinov3
+  random_seed: 42
   positive_class:
   # total percent / total N | percent single image / N
   - [person]  # 54% / 23488 | 9% / 3679
   - [car] # 10% / 4509 | 0% / 207
   - [book] # 5% / 1975 | 0% /
-  - [cat] # 3% / 1499 |
-  - [cake] # 2% / 1033 |
-  - [hot dog] # 1% / 463 |
-  - [parking meter] # 1% / 245 |
   negative_superclass: [null, [vehicle], [food]]
   max_objects_per_image: [null, 4]
-  min_bbox_area_fraction: [null, 0.5]
+  min_bbox_area_fraction: [null, 0.3]
   # min_bbox_area_fraction: [null, 0.01]
   # max_bbox_area_fraction: [null, 0.6]
   filter_class: [null, positive]
-  positive_fraction: [null, 0.01, 0.05, .1]
+  positive_fraction: [null, 0.05, .1, .2, .3, .4, .5]
 
 # The following contains a fine-tuning config for the experiments. The same sweep is always used
 finetune:
@@ -35,11 +36,14 @@ finetune:
 
   training_args:
     eval_strategy: epoch
-    save_strategy: epoch
+    save_strategy: no
     save_total_limit: 1
-    load_best_model_at_end: true
+    num_train_epochs: 1
+    per_device_train_batch_size: 128
+    per_device_eval_batch_size: 128
 
   sweep_args:
+    sampler: RandomSampler
     n_trials: 10
     objective: eval_average_precision
     direction: maximize  # minimize or maximize
@@ -47,19 +51,13 @@ finetune:
       learning_rate:
         type: float
         low: 0.00001   # 1e-5
-        high: 0.01     # 1e-2
+        high: 0.001     # 1e-3
         log: true
-      per_device_train_batch_size:
-        type: categorical
-        choices: [16, 32, 64]
       weight_decay:
         type: float
         low: 0.00001   # 1e-5
-        high: 0.1      # 1e-1
+        high: 0.001      # 1e-3
         log: true
-      num_train_epochs:
-        type: categorical
-        choices: [5, 10, 20]
 
 # The following contains the metrics to be used in the experiment
 metrics:
