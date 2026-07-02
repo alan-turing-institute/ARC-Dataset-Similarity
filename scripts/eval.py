@@ -1,3 +1,5 @@
+import os
+
 import argparse
 import json
 from datetime import datetime
@@ -56,10 +58,11 @@ def _run(cfg_name: str) -> None:
 
     mlflow.log_params(
             {
-                "config_name": cfg_name,
+                "config_name": config_name,
                 "train_data_config": config["train_data_config"],
                 "val_data_config": config["val_data_config"],
-                "model": config["model_args"]["pretrained_model_name_or_path"]
+                "model": config["model_args"]["pretrained_model_name_or_path"],
+                "slurm_job_id": os.getenv("SLURM_JOB_ID")
             }
         )
 
