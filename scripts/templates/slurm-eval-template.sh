@@ -3,6 +3,7 @@
 #SBATCH --time={{time}}         # hours minutes seconds
 #SBATCH --gpus=1
 #SBATCH --output {{root}}DatasetSimilarity/slurm_cave/logs/eval/{{experiment_name}}-%A_%a.out
+#SBATCH --error {{root}}DatasetSimilarity/slurm_cave/logs/eval/{{experiment_name}}-%A_%a.err
 #SBATCH --array=0-{{num_tasks}}
 
 echo "--- MLFLOW ENVIRONMENT ---"
