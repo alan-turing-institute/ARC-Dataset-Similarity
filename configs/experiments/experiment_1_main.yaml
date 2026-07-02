@@ -21,7 +21,7 @@ dataset_kwargs:
   - [car] # 10% / 4509 | 0% / 207
   - [book] # 5% / 1975 | 0% /
   negative_superclass: [null, [vehicle], [food]]
-  max_objects_per_images: [null, 4]
+  max_objects_per_image: [null, 4]
   filter_class: [null, positive]
   positive_fraction: [null, 0.05, .1, .2, .3, .4, .5]
 

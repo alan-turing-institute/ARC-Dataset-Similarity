@@ -252,11 +252,12 @@ def run_finetune(
 ):
     init_training_args = config.get("training_args", {})
     output_dir = TRAINED_MODELS_DIR / config_name
+    model = model_init(None)
 
     mlflow.log_params(init_training_args)
     save_dir = output_dir / "trained_model"
     trainer = Trainer(
-        model=model_init,
+        model=model,
         compute_loss_func=compute_loss_fn,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
