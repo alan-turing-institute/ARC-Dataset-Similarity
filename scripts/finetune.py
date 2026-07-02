@@ -347,6 +347,7 @@ def main(config_name: str) -> None:
                 modelCls = DINOv3Classifier
             return modelCls.from_pretrained(
                 num_labels=num_labels,
+                problem_type="multi_label_classification",
                 ignore_mismatched_sizes=True,
                 **config["model_args"],
             )
