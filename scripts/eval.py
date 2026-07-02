@@ -1,7 +1,6 @@
-import os
-
 import argparse
 import json
+import os
 from datetime import datetime
 
 import mlflow
@@ -57,14 +56,14 @@ def _run(cfg_name: str) -> None:
     config = load_yaml_from_path(config_path)
 
     mlflow.log_params(
-            {
-                "config_name": config_name,
-                "train_data_config": config["train_data_config"],
-                "val_data_config": config["val_data_config"],
-                "model": config["model_args"]["pretrained_model_name_or_path"],
-                "slurm_job_id": os.getenv("SLURM_JOB_ID")
-            }
-        )
+        {
+            "config_name": cfg_name,
+            "train_data_config": config["train_data_config"],
+            "val_data_config": config["val_data_config"],
+            "model": config["model_args"]["pretrained_model_name_or_path"],
+            "slurm_job_id": os.getenv("SLURM_JOB_ID"),
+        }
+    )
 
     # Load processor
     processor = AutoImageProcessor.from_pretrained(
