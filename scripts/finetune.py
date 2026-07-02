@@ -58,7 +58,7 @@ def compute_loss_fn(
         The computed loss value.
     """
     logits = outputs["logits"].squeeze(-1)
-    loss = F.binary_cross_entropy_with_logits(logits, labels, reduction="sum")
+    loss = F.binary_cross_entropy_with_logits(logits, labels.float(), reduction="sum")
     return loss / num_items_in_batch
 
 
