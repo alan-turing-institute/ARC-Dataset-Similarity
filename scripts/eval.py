@@ -8,14 +8,16 @@ import torch
 from tqdm import tqdm
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 
-from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
+from dataset_similarity.constants import (
+    DATA_CONFIG_DIR,
+    FINETUNE_CONFIG_DIR,
+    PROJECT_DIR,
+    TRAINED_MODELS_DIR,
+)
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import compute_binary_ap, load_yaml_from_path
 
-FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
-DATA_CONFIG_DIR = CONFIG_DIR / "data"
-TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 EXPERIMENT_NAME = "data-sim-eval"
 
 
