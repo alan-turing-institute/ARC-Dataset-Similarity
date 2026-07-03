@@ -17,6 +17,6 @@ source $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/.venv/bin/activate
 
 echo "Running the metrics script"
 python $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/scripts/run_metrics.py \
-    --config {{experiment_name}}/${SLURM_ARRAY_TASK_ID}
+    --config {{experiment_name}}/metrics_${SLURM_ARRAY_TASK_ID}
 echo "Finished running the metrics script"
 date

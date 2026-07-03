@@ -17,6 +17,6 @@ source $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/.venv/bin/activate
 
 echo "Running the evaluation script"
 python $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/scripts/eval.py \
-    --config {{experiment_name}}/${SLURM_ARRAY_TASK_ID}
+    --config {{experiment_name}}/eval_${SLURM_ARRAY_TASK_ID}
 echo "Finished running the evaluation script"
 date

@@ -17,6 +17,6 @@ source $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/.venv/bin/activate
 
 echo "Running the fine-tuning script"
 python $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/scripts/finetune.py \
-    --config {{experiment_name}}/${SLURM_ARRAY_TASK_ID}
+    --config {{experiment_name}}/finetune_${SLURM_ARRAY_TASK_ID}
 echo "Finished running the fine-tuning script"
 date
