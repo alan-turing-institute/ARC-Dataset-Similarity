@@ -144,7 +144,7 @@ def main(experiment_name: str, root: str | None):
     if num_datasets > 1000:
         msg = (
             f"Slurm only supports arrays up to size 1000, but {num_datasets} tasks were"
-            "generated. Please reduce the number of tasks."
+            " generated. Please reduce the number of tasks."
         )
         raise ValueError(msg)
 

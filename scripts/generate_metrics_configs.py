@@ -2,7 +2,7 @@
 Example use:
 
 ```bash
-python scripts/generate_experiment_configs.py --config_name experiment_0
+python scripts/generate_metrics_configs.py --config_name experiment_0
 ```
 """
 
@@ -51,6 +51,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--config_name",
+        required=True,
         help="Name of the configuration file in configs/experiments/ to generate from.",
     )
     args = parser.parse_args()

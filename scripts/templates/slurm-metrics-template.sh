@@ -12,6 +12,13 @@ echo MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI
 echo "Server Status: $(curl -s $MLFLOW_TRACKING_URI/health)"
 echo "Authenticated User: $(curl -s $MLFLOW_TRACKING_URI/api/2.0/mlflow/users/get?username=$MLFLOW_TRACKING_USERNAME -u "$MLFLOW_TRACKING_USERNAME:$MLFLOW_TRACKING_PASSWORD")"
 
+echo "--- KEOPS ---"  # Only needed if using GeomLoss on large samples
+module load cudatoolkit
+module load PrgEnv-gnu
+export CUDA_PATH=$CUDA_HOME
+export CXX=g++
+export KEOPS_CACHE_FOLDER=$SCRATCH/keops_cache/$(uname -m)
+
 echo "Activating the Python Environment"
 source $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/.venv/bin/activate
 
