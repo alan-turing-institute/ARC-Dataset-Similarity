@@ -5,6 +5,7 @@ from datetime import datetime
 
 import mlflow
 import torch
+from sklearn.metrics import average_precision_score
 from tqdm import tqdm
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 
@@ -16,7 +17,7 @@ from dataset_similarity.constants import (
 )
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
-from dataset_similarity.utils import compute_binary_ap, load_yaml_from_path
+from dataset_similarity.utils import load_yaml_from_path
 
 EXPERIMENT_NAME = "data-sim-eval"
 
@@ -41,7 +42,9 @@ def eval(
             pred = model(**inputs)
             logits.append(pred["logits"].detach().cpu())
             labels.append(int(label))
-    return compute_binary_ap(torch.cat(logits), labels)
+
+    probs = torch.tensor(logits).sigmoid()
+    return average_precision_score(y_true=labels, y_score=probs, average="samples")
 
 
 def main(cfg_name: str):
