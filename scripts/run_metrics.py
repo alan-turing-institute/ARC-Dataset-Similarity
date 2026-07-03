@@ -80,8 +80,8 @@ def main(
         "dataset2": dataset2_name,
         **metrics_results,
     }
-    METRICS_RESULT_DIR.mkdir(parents=True, exist_ok=True)
     result_path = METRICS_RESULT_DIR / f"{cfg_name}.yaml"
+    result_path.parent.mkdir(parents=True, exist_ok=True)
     save_yaml_to_path(results, result_path)
 
     print(f"Results saved to {result_path}")
