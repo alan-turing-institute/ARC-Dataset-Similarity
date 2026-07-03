@@ -10,6 +10,7 @@ from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
     AutoModelForImageClassification,
+    EarlyStoppingCallback,
     EvalPrediction,
     Trainer,
     TrainingArguments,
@@ -156,6 +157,12 @@ def _generate_objective_fn(
             mlflow.log_params(sweep_parameters)
             mlflow.log_param("trial_number", trial.number)
 
+            callbacks = (
+                [EarlyStoppingCallback(**config["early_stopping_args"])]
+                if "early_stopping_args" in config
+                else None
+            )
+
             # model_init is used instead so Optuna can reinitialise weights
             trial_trainer = Trainer(
                 model_init=model_init,
@@ -173,6 +180,7 @@ def _generate_objective_fn(
                 ),
                 data_collator=collate_fn,
                 compute_metrics=evaluate_model,
+                callbacks=callbacks,
             )
             # log the random seeds used for this trial
             mlflow.log_params(
@@ -263,6 +271,12 @@ def run_finetune(
     output_dir = TRAINED_MODELS_DIR / config_name
     model = model_init(None)
 
+    callbacks = (
+        [EarlyStoppingCallback(**config["early_stopping_args"])]
+        if "early_stopping_args" in config
+        else None
+    )
+
     mlflow.log_params(init_training_args)
     save_dir = output_dir / "trained_model"
     trainer = Trainer(
@@ -281,6 +295,7 @@ def run_finetune(
         ),
         data_collator=collate_fn,
         compute_metrics=evaluate_model,
+        callbacks=callbacks,
     )
     all_metrics = train_and_evaluate(trainer, save_dir)
     _log_numeric_metrics(all_metrics)
