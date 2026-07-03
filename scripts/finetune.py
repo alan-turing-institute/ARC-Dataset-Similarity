@@ -286,7 +286,8 @@ def run_finetune(
         eval_dataset=eval_dataset,
         args=TrainingArguments(
             **{
-                "logging_strategy": "epoch",
+                "logging_strategy": "steps",
+                "logging_steps": 0.1,
                 "eval_strategy": "epoch",
                 **init_training_args,
                 "output_dir": str(save_dir),
@@ -402,10 +403,10 @@ def main(config_name: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Finetune a model on a dataset.")
     parser.add_argument(
-        "--config-name",
+        "--config",
         type=str,
         required=True,
         help="Name of the configuration file for finetuning.",
     )
     args = parser.parse_args()
-    main(args.config_name)
+    main(args.config)
