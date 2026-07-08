@@ -6,23 +6,25 @@ import mlflow
 import optuna
 import torch
 import torch.nn.functional as F
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
     AutoModelForImageClassification,
+    EarlyStoppingCallback,
     EvalPrediction,
     Trainer,
     TrainingArguments,
 )
+from transformers.modeling_outputs import ImageClassifierOutput
 
-from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
+from dataset_similarity.constants import (
+    DATA_CONFIG_DIR,
+    FINETUNE_CONFIG_DIR,
+    TRAINED_MODELS_DIR,
+)
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
-
-FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
-DATA_CONFIG_DIR = CONFIG_DIR / "data"
-TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
 
 EXPERIMENT_NAME = "data-sim-finetune"
 
@@ -38,22 +40,43 @@ def configure_mlflow() -> None:
     mlflow.enable_system_metrics_logging()
 
 
+def compute_loss_fn(
+    outputs: ImageClassifierOutput,
+    labels: torch.Tensor,
+    num_items_in_batch: torch.Tensor | int,
+) -> torch.Tensor:
+    """
+    Compute the loss for a batch of outputs and labels.
+
+    From: https://github.com/huggingface/transformers/blob/main/docs/source/en/trainer_recipes.md
+
+    Args:
+        outputs: The model outputs (logits).
+        labels: The true labels.
+        num_items_in_batch: The number of items in the batch.
+
+    Returns:
+        The computed loss value.
+    """
+    logits = outputs["logits"].squeeze(-1)  # (N, 1) -> (N,)
+    loss = F.binary_cross_entropy_with_logits(logits, labels.float(), reduction="sum")
+    return loss / num_items_in_batch
+
+
 def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
     """Compute Accuracy, Loss, and Average Precision from Trainer predictions.
 
     Compatible with the Trainer ``compute_metrics`` callback, and can also be
     called directly on the output of ``trainer.predict(dataset)``.
     """
-    logits, labels = eval_pred.predictions, eval_pred.label_ids
-    logits_t = torch.from_numpy(logits)
-    labels_t = torch.from_numpy(labels)
-
-    accuracy = (logits_t.argmax(dim=-1) == labels_t).float().mean().item()
-
-    probs = F.softmax(logits_t, dim=-1).numpy()
-    avg_precision = average_precision_score(labels, probs[:, 1])
-
-    return {"accuracy": accuracy, "average_precision": avg_precision}
+    # TODO: for this PR, everything is binary classification, but we will support
+    # multi-label in the future
+    logits = torch.from_numpy(eval_pred.predictions)
+    labels = eval_pred.label_ids
+    probs = logits.sigmoid()
+    accuracy = accuracy_score(y_true=labels, y_pred=(probs > 0.5).int())
+    ap = average_precision_score(y_true=labels, y_score=probs, average="samples")
+    return {"accuracy": accuracy, "average_precision": ap}
 
 
 def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
@@ -134,9 +157,16 @@ def _generate_objective_fn(
             mlflow.log_params(sweep_parameters)
             mlflow.log_param("trial_number", trial.number)
 
+            callbacks = (
+                [EarlyStoppingCallback(**config["early_stopping_args"])]
+                if "early_stopping_args" in config
+                else None
+            )
+
             # model_init is used instead so Optuna can reinitialise weights
             trial_trainer = Trainer(
                 model_init=model_init,
+                compute_loss_func=compute_loss_fn,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
                 args=TrainingArguments(
@@ -150,6 +180,7 @@ def _generate_objective_fn(
                 ),
                 data_collator=collate_fn,
                 compute_metrics=evaluate_model,
+                callbacks=callbacks,
             )
             # log the random seeds used for this trial
             mlflow.log_params(
@@ -238,17 +269,25 @@ def run_finetune(
 ):
     init_training_args = config.get("training_args", {})
     output_dir = TRAINED_MODELS_DIR / config_name
+    model = model_init(None)
+
+    callbacks = (
+        [EarlyStoppingCallback(**config["early_stopping_args"])]
+        if "early_stopping_args" in config
+        else None
+    )
 
     mlflow.log_params(init_training_args)
-    model = model_init(None)
     save_dir = output_dir / "trained_model"
     trainer = Trainer(
         model=model,
+        compute_loss_func=compute_loss_fn,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         args=TrainingArguments(
             **{
-                "logging_strategy": "epoch",
+                "logging_strategy": "steps",
+                "logging_steps": 0.1,
                 "eval_strategy": "epoch",
                 **init_training_args,
                 "output_dir": str(save_dir),
@@ -257,6 +296,7 @@ def run_finetune(
         ),
         data_collator=collate_fn,
         compute_metrics=evaluate_model,
+        callbacks=callbacks,
     )
     all_metrics = train_and_evaluate(trainer, save_dir)
     _log_numeric_metrics(all_metrics)
@@ -312,7 +352,7 @@ def main(config_name: str) -> None:
             }
         )
 
-        num_labels = 2
+        num_labels = 1  # TODO update for multilabel classification
         mlflow.log_param("num_labels", num_labels)
 
         def model_init(_):
@@ -323,6 +363,7 @@ def main(config_name: str) -> None:
                 modelCls = DINOv3Classifier
             return modelCls.from_pretrained(
                 num_labels=num_labels,
+                problem_type="multi_label_classification",
                 ignore_mismatched_sizes=True,
                 **config["model_args"],
             )
@@ -362,10 +403,10 @@ def main(config_name: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Finetune a model on a dataset.")
     parser.add_argument(
-        "--config-name",
+        "--config",
         type=str,
         required=True,
         help="Name of the configuration file for finetuning.",
     )
     args = parser.parse_args()
-    main(args.config_name)
+    main(args.config)
