@@ -17,6 +17,8 @@ module load cudatoolkit
 module load PrgEnv-gnu
 export CUDA_PATH=$CUDA_HOME
 export CXX=g++
+export LIBRARY_PATH=$CUDA_HOME/lib64:$LIBRARY_PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 export KEOPS_CACHE_FOLDER=$SCRATCH/keops_cache/$(uname -m)
 
 echo "Activating the Python Environment"

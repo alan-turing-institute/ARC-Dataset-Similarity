@@ -12,6 +12,16 @@ echo MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI
 echo "Server Status: $(curl -s $MLFLOW_TRACKING_URI/health)"
 echo "Authenticated User: $(curl -s $MLFLOW_TRACKING_URI/api/2.0/mlflow/users/get?username=$MLFLOW_TRACKING_USERNAME -u "$MLFLOW_TRACKING_USERNAME:$MLFLOW_TRACKING_PASSWORD")"
 
+echo "Warming MLflow container..."
+for i in $(seq 1 20); do
+  if curl -s -o /dev/null --max-time 60 "$MLFLOW_TRACKING_URI/health"; then
+    echo "MLflow is awake."
+    break
+  fi
+  echo "  attempt $i: still cold, retrying..."
+  sleep 5
+done
+
 echo "Activating the Python Environment"
 source $PROJECTDIR/DatasetSimilarity/ARC-Dataset-Similarity/.venv/bin/activate
 
