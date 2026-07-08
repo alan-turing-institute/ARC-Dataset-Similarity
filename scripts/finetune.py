@@ -228,12 +228,15 @@ def run_sweep(
 
     sweep_dir = output_dir / "sweep_trials"
 
+    optuna_seed = None
+    if "sweep_seed" in sweep_args:
+        optuna_seed = sweep_args["sweep_seed"]
     study = optuna.create_study(
         study_name=config_name,
         sampler=(
-            getattr(optuna.samplers, sweep_args["sampler"])()
+            getattr(optuna.samplers, sweep_args["sampler"])(seed=optuna_seed)
             if "sampler" in sweep_args
-            else optuna.samplers.TPESampler()  # optuna default
+            else optuna.samplers.TPESampler(seed=optuna_seed)  # optuna default
         ),
         direction=sweep_args.get("direction", "minimize"),
     )

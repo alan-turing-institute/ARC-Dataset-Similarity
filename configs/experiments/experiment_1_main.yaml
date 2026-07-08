@@ -43,6 +43,7 @@ finetune:
 
   sweep_args:
     sampler: RandomSampler
+    sweep_seed: 42
     n_trials: 10
     objective: eval_average_precision
     direction: maximize  # minimize or maximize
