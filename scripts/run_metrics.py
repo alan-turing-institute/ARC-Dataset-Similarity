@@ -14,6 +14,7 @@ import argparse
 from datetime import datetime
 
 import mlflow
+from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
 
 import dataset_similarity.metrics as metrics
 from dataset_similarity.constants import (
@@ -27,6 +28,11 @@ from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
 
 EXPERIMENT_NAME = "data-sim-metrics"
+
+# MLflow's workspace-support probe hardcodes a 3s/0-retry call to
+# /api/3.0/mlflow/server-info, which times out against our server.
+# Our server runs --enable-workspaces, so the answer is always True.
+WorkspaceRestStoreMixin._probe_workspace_support = lambda self, *a, **k: True  # noqa: ARG005
 
 
 def configure_mlflow() -> None:

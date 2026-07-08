@@ -5,6 +5,7 @@ from datetime import datetime
 
 import mlflow
 import torch
+from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
 from sklearn.metrics import average_precision_score
 from tqdm import tqdm
 from transformers import AutoImageProcessor, AutoModelForImageClassification
@@ -20,6 +21,11 @@ from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import load_yaml_from_path
 
 EXPERIMENT_NAME = "data-sim-eval"
+
+# MLflow's workspace-support probe hardcodes a 3s/0-retry call to
+# /api/3.0/mlflow/server-info, which times out against our server.
+# Our server runs --enable-workspaces, so the answer is always True.
+WorkspaceRestStoreMixin._probe_workspace_support = lambda self, *a, **k: True  # noqa: ARG005
 
 
 def configure_mlflow() -> None:

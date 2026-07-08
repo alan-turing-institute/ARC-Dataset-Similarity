@@ -7,6 +7,7 @@ import mlflow
 import optuna
 import torch
 import torch.nn.functional as F
+from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
 from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
@@ -32,6 +33,11 @@ from dataset_similarity.utils import (
 )
 
 EXPERIMENT_NAME = "data-sim-finetune"
+
+# MLflow's workspace-support probe hardcodes a 3s/0-retry call to
+# /api/3.0/mlflow/server-info, which times out against our server.
+# Our server runs --enable-workspaces, so the answer is always True.
+WorkspaceRestStoreMixin._probe_workspace_support = lambda self, *a, **k: True  # noqa: ARG005
 
 
 def configure_mlflow() -> None:
