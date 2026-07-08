@@ -25,7 +25,11 @@ from dataset_similarity.constants import (
 )
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
-from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path, FixCheckpointPermissionsCallback
+from dataset_similarity.utils import (
+    FixCheckpointPermissionsCallback,
+    load_yaml_from_path,
+    save_yaml_to_path,
+)
 
 EXPERIMENT_NAME = "data-sim-finetune"
 
