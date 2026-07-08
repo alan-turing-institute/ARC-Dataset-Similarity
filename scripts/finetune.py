@@ -25,7 +25,7 @@ from dataset_similarity.constants import (
 )
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
-from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
+from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path, FixCheckpointPermissionsCallback
 
 EXPERIMENT_NAME = "data-sim-finetune"
 
@@ -153,11 +153,9 @@ def _generate_objective_fn(
             mlflow.log_params(sweep_parameters)
             mlflow.log_param("trial_number", trial.number)
 
-            callbacks = (
-                [EarlyStoppingCallback(**config["early_stopping_args"])]
-                if "early_stopping_args" in config
-                else None
-            )
+            callbacks = [FixCheckpointPermissionsCallback()]
+            if "early_stopping_args" in config:
+                callbacks.append(EarlyStoppingCallback(**config["early_stopping_args"]))
 
             # model_init is used instead so Optuna can reinitialise weights
             trial_trainer = Trainer(
@@ -267,11 +265,9 @@ def run_finetune(
     output_dir = TRAINED_MODELS_DIR / config_name
     model = model_init(None)
 
-    callbacks = (
-        [EarlyStoppingCallback(**config["early_stopping_args"])]
-        if "early_stopping_args" in config
-        else None
-    )
+    callbacks = [FixCheckpointPermissionsCallback()]
+    if "early_stopping_args" in config:
+        callbacks.append(EarlyStoppingCallback(**config["early_stopping_args"]))
 
     mlflow.log_params(init_training_args)
     save_dir = output_dir / "trained_model"

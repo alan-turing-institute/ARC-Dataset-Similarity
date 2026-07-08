@@ -1,10 +1,9 @@
 from pathlib import Path
 from typing import Any
-
 from yaml import safe_dump, safe_load
-
 from dataset_similarity.constants import DATA_DIR, EMBEDDING_DIR
-
+import stat
+from transformers import TrainerCallback
 
 def get_embedding_path(
     image_path: Path,
@@ -63,3 +62,11 @@ def save_yaml_to_path(
 
     with open(yaml_path, "w") as f:
         safe_dump(data, f)
+
+
+class FixCheckpointPermissionsCallback(TrainerCallback):
+    def on_save(self, args, state, control, **kwargs):
+        model_file = Path(args.output_dir) / f"checkpoint-{state.global_step}" / "model.safetensors"
+        if model_file.exists():
+            model_file.chmod(model_file.stat().st_mode | stat.S_IRGRP)
+        return control
