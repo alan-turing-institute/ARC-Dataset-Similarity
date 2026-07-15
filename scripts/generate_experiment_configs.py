@@ -91,7 +91,7 @@ def _build_finetune_cfg(
         "train_data_config": _get_name_from_path(task[0]),
         "val_data_config": _get_name_from_path(task[1]),
         "test_data_config": _get_name_from_path(task[2]),
-        **top_cfg["finetune"],
+        **deepcopy(top_cfg["finetune"]),
     }
     # Avoid always sampling the same hyperparameters while remaining replicable
     if "sweep_args" in cfg and "sweep_seed" in cfg["sweep_args"]:
