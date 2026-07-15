@@ -122,6 +122,10 @@ class COCODataset(ImageDataset):
             return_paths=return_paths,
         )
 
+        # Subample data will not be called by the super if size is None
+        if self.size is None and self.positive_fraction is not None:
+            self.data = self.subsample_data()
+
     def _load_data(self) -> pd.DataFrame:
         ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
         coco = COCO(str(ann_file))
@@ -202,23 +206,25 @@ class COCODataset(ImageDataset):
             The new ``self.data`` DataFrame after resampling.
         """
         self._strip_single_classes_from_samples()
+        new_data = self.data.copy()
 
         if self.positive_fraction is not None:
-            self._balance_classes()
+            new_data = self._balance_classes()
 
-        _, new_data = train_test_split(
-            self.data,
-            test_size=self.size,
-            stratify=self.data["label"] if self.positive_class is not None else None,
-            random_state=self.random_seed,
-        )
+        if self.size is not None:
+            _, new_data = train_test_split(
+                new_data,
+                test_size=self.size,
+                stratify=new_data["label"] if self.positive_class is not None else None,
+                random_state=self.random_seed,
+            )
 
         return new_data.reset_index(drop=True)
 
-    def _balance_classes(self) -> None:
+    def _balance_classes(self) -> pd.DataFrame:
         """Downsample the majority class to achieve ``positive_fraction``."""
         if self.positive_fraction is None or not (0 < self.positive_fraction < 1):
-            return
+            return None
         pos_df = self.data[self.data["label"] == 1]
         neg_df = self.data[self.data["label"] == 0]
         n_pos, n_neg = len(pos_df), len(neg_df)
@@ -232,16 +238,12 @@ class COCODataset(ImageDataset):
         elif target_pos <= n_pos:
             pos_df = pos_df.sample(n=target_pos, random_state=self.random_seed)
 
-        # deterministically shuffle the combined set
-        self.data = (
+        # shuffle the combined set
+        return (
             pd.concat([pos_df, neg_df])
             .sample(frac=1, random_state=self.random_seed)
             .reset_index(drop=True)
         )
-
-    def _filter(self) -> None:
-        # df.category_id.apply(lambda row: positive_class in row)
-        return None
 
 
 def _get_row_from_img_id(img_id: int, coco: COCO) -> dict[str, Any]:
