@@ -3,12 +3,12 @@
 train_split: trainARC
 val_split: valARC
 test_split: testARC
-
-train_time: "02:00:00"
-eval_time: "00:10:00"
-metrics_time: "00:20:00"
-
 data_store: coco_data_store
+
+# Slurm job times
+train_time: "02:00:00"
+eval_time: "01:00:00"
+metrics_time: "00:20:00"
 
 # The following used to generate combinations of datasets for the experiment
 dataset_name: COCO
@@ -24,6 +24,9 @@ dataset_kwargs:
   max_objects_per_image: [null, 4]
   filter_class: [null, positive]
   positive_fraction: [null, 0.05, .1, .2, .3, .4, .5]
+
+# If specified, the following overwrites dataset_kwargs for train and val splits
+overwrite: null
 
 # The following contains a fine-tuning config for the experiments. The same sweep is always used
 finetune:
