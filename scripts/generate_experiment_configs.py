@@ -93,6 +93,11 @@ def _build_finetune_cfg(
         "test_data_config": _get_name_from_path(task[2]),
         **top_cfg["finetune"],
     }
+    # Avoid always sampling the same hyperparameters while remaining replicable
+    if "sweep_args" in cfg and "sweep_seed" in cfg["sweep_args"]:
+        cfg["sweep_args"]["sweep_seed"] = int(
+            str(cfg["sweep_args"]["sweep_seed"]) + str(i)
+        )
     save_dir = FINETUNE_CONFIG_DIR / experiment_name
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / f"finetune_{i}.yaml"
