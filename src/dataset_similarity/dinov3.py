@@ -7,9 +7,26 @@ from transformers.models.dinov3_vit.modeling_dinov3_vit import DINOv3ViTModel
 
 
 class DINOv3Classifier(PreTrainedModel):  # type: ignore[misc]
+    """
+    Image classification model built on top of DINOv3ViTModel.
+
+    Combines the CLS token and the mean of the patch tokens into a single
+    representation, then passes it through a linear classifier head. This
+    mirrors the evaluation head used in the original DINOv3 paper and is
+    compatible with the HuggingFace ``Trainer`` API.
+    """
+
     config_class = DINOv3ViTConfig
 
     def __init__(self, config: DINOv3ViTConfig):
+        """
+        Initialise the classifier.
+
+        Args:
+            config: A ``DINOv3ViTConfig`` instance. ``config.num_labels`` controls
+                the output size of the classification head; when it is 0 or negative
+                the head is replaced with an ``nn.Identity``.
+        """
         super().__init__(config)
         self.dinov3 = DINOv3ViTModel(config)
         self.num_labels = config.num_labels
@@ -29,6 +46,27 @@ class DINOv3Classifier(PreTrainedModel):  # type: ignore[misc]
         output_hidden_states: bool | None = None,
         return_dict: bool | None = None,
     ) -> ImageClassifierOutput | tuple[torch.Tensor, ...]:
+        """
+        Run a forward pass through the DINOv3 backbone and classification head.
+
+        The representation fed to the classifier is the concatenation of the CLS
+        token and the mean-pooled patch tokens, giving a vector of size
+        ``2 * hidden_size``.
+
+        Args:
+            pixel_values: Batch of pre-processed images with shape ``[N, C, H, W]``.
+            labels: Integer class indices with shape ``[N]``. When provided, a
+                cross-entropy loss is computed and included in the output.
+            output_attentions: Whether to return attention weights from the backbone.
+            output_hidden_states: Whether to return all hidden states from the backbone.
+            return_dict: If ``False``, returns a plain tuple instead of an
+                ``ImageClassifierOutput`` dataclass.
+
+        Returns:
+            An ``ImageClassifierOutput`` (or a flat tuple when ``return_dict=False``)
+            containing the optional loss, logits, and optionally hidden states and
+            attentions.
+        """
         outputs = self.dinov3(
             pixel_values,
             output_attentions=output_attentions,
@@ -45,8 +83,8 @@ class DINOv3Classifier(PreTrainedModel):  # type: ignore[misc]
         if labels is not None:
             loss = nn.functional.cross_entropy(logits, labels)
         if return_dict is False:
-            output = (logits,) + outputs[1:]
-            return (loss, output) if loss is not None else output
+            output = (logits, *outputs[1:])
+            return (loss, *output) if loss is not None else output
         return ImageClassifierOutput(
             loss=loss,
             logits=logits,

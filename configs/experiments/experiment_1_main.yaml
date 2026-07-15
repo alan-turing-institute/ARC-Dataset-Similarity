@@ -4,7 +4,7 @@ train_split: trainARC
 val_split: valARC
 test_split: testARC
 
-train_time: "01:40:00"
+train_time: "02:00:00"
 eval_time: "00:10:00"
 metrics_time: "00:20:00"
 
@@ -43,6 +43,7 @@ finetune:
 
   sweep_args:
     sampler: RandomSampler
+    sweep_seed: 42
     n_trials: 10
     objective: eval_average_precision
     direction: maximize  # minimize or maximize

@@ -1,4 +1,5 @@
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -6,6 +7,7 @@ import mlflow
 import optuna
 import torch
 import torch.nn.functional as F
+from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
 from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
@@ -24,9 +26,18 @@ from dataset_similarity.constants import (
 )
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
-from dataset_similarity.utils import load_yaml_from_path, save_yaml_to_path
+from dataset_similarity.utils import (
+    FixCheckpointPermissionsCallback,
+    load_yaml_from_path,
+    save_yaml_to_path,
+)
 
 EXPERIMENT_NAME = "data-sim-finetune"
+
+# MLflow's workspace-support probe hardcodes a 3s/0-retry call to
+# /api/3.0/mlflow/server-info, which times out against our server.
+# Our server runs --enable-workspaces, so the answer is always True.
+WorkspaceRestStoreMixin._probe_workspace_support = lambda self, *a, **k: True  # noqa: ARG005
 
 
 def configure_mlflow() -> None:
@@ -69,8 +80,6 @@ def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
     Compatible with the Trainer ``compute_metrics`` callback, and can also be
     called directly on the output of ``trainer.predict(dataset)``.
     """
-    # TODO: for this PR, everything is binary classification, but we will support
-    # multi-label in the future
     logits = torch.from_numpy(eval_pred.predictions)
     labels = eval_pred.label_ids
     probs = logits.sigmoid()
@@ -100,17 +109,14 @@ def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
 
 def train_and_evaluate(trainer: Trainer, output_dir: Path) -> dict[str, float]:
     """
-    Train a model and evaluate it on both the training and evaluation splits.
+    Train a model and evaluate it on the evaluation split.
 
     Args:
         trainer: A configured HuggingFace ``Trainer`` instance.
-        train_dataset: Dataset used for the training-set evaluation pass.
-            Passed separately because ``Trainer.evaluate()`` only runs on
-            ``eval_dataset``; a ``predict()`` call is needed for the train split.
         output_dir: Directory where ``all_results.yaml`` will be written.
 
     Returns:
-        Merged dict of training-loop, train-eval, and eval-split metrics.
+        Merged dict of training-loop and eval-split metrics.
     """
     train_result = trainer.train()
     eval_metrics = trainer.evaluate()
@@ -157,11 +163,9 @@ def _generate_objective_fn(
             mlflow.log_params(sweep_parameters)
             mlflow.log_param("trial_number", trial.number)
 
-            callbacks = (
-                [EarlyStoppingCallback(**config["early_stopping_args"])]
-                if "early_stopping_args" in config
-                else None
-            )
+            callbacks = [FixCheckpointPermissionsCallback()]
+            if "early_stopping_args" in config:
+                callbacks.append(EarlyStoppingCallback(**config["early_stopping_args"]))
 
             # model_init is used instead so Optuna can reinitialise weights
             trial_trainer = Trainer(
@@ -224,12 +228,15 @@ def run_sweep(
 
     sweep_dir = output_dir / "sweep_trials"
 
+    optuna_seed = None
+    if "sweep_seed" in sweep_args:
+        optuna_seed = sweep_args["sweep_seed"]
     study = optuna.create_study(
         study_name=config_name,
         sampler=(
-            getattr(optuna.samplers, sweep_args["sampler"])()
+            getattr(optuna.samplers, sweep_args["sampler"])(seed=optuna_seed)
             if "sampler" in sweep_args
-            else optuna.samplers.TPESampler()  # optuna default
+            else optuna.samplers.TPESampler(seed=optuna_seed)  # optuna default
         ),
         direction=sweep_args.get("direction", "minimize"),
     )
@@ -271,11 +278,9 @@ def run_finetune(
     output_dir = TRAINED_MODELS_DIR / config_name
     model = model_init(None)
 
-    callbacks = (
-        [EarlyStoppingCallback(**config["early_stopping_args"])]
-        if "early_stopping_args" in config
-        else None
-    )
+    callbacks = [FixCheckpointPermissionsCallback()]
+    if "early_stopping_args" in config:
+        callbacks.append(EarlyStoppingCallback(**config["early_stopping_args"]))
 
     mlflow.log_params(init_training_args)
     save_dir = output_dir / "trained_model"
@@ -349,6 +354,8 @@ def main(config_name: str) -> None:
                 "config_name": config_name,
                 "train_data_config": config["train_data_config"],
                 "val_data_config": config["val_data_config"],
+                "model": config["model_args"]["pretrained_model_name_or_path"],
+                "slurm_job_id": os.getenv("SLURM_JOB_ID"),
             }
         )
 
