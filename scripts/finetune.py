@@ -8,7 +8,6 @@ import optuna
 import torch
 import torch.nn.functional as F
 from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
-from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
     AutoModelForImageClassification,
@@ -28,6 +27,7 @@ from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import (
     FixCheckpointPermissionsCallback,
+    eval_metrics,
     load_yaml_from_path,
     save_yaml_to_path,
 )
@@ -37,7 +37,9 @@ EXPERIMENT_NAME = "data-sim-finetune"
 # MLflow's workspace-support probe hardcodes a 3s/0-retry call to
 # /api/3.0/mlflow/server-info, which times out against our server.
 # Our server runs --enable-workspaces, so the answer is always True.
-WorkspaceRestStoreMixin._probe_workspace_support = lambda self, *a, **k: True  # noqa: ARG005
+WorkspaceRestStoreMixin._probe_workspace_support = (
+    lambda self, *a, **k: True  # noqa: ARG005
+)
 
 
 def configure_mlflow() -> None:
@@ -82,10 +84,7 @@ def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
     """
     logits = torch.from_numpy(eval_pred.predictions)
     labels = eval_pred.label_ids
-    probs = logits.sigmoid()
-    accuracy = accuracy_score(y_true=labels, y_pred=(probs > 0.5).int())
-    ap = average_precision_score(y_true=labels, y_score=probs, average="samples")
-    return {"accuracy": accuracy, "average_precision": ap}
+    return eval_metrics(logits, labels)
 
 
 def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
