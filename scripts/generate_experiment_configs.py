@@ -36,10 +36,16 @@ def _build_dataset_cfgs(
 
 
 def _save_dataset_cfg(
-    save_dir: Path, split: str, dataset: dict[str, Any], i: int
+    save_dir: Path,
+    split: str,
+    dataset: dict[str, Any],
+    i: int,
+    overwrite: None | dict = None,
 ) -> Path:
     dataset_cfg = deepcopy(dataset)
     dataset_cfg["kwargs"]["split"] = split
+    if overwrite is not None:
+        dataset_cfg["kwargs"].update(overwrite)
     save_path = save_dir / f"{split}_{i}.yaml"
     with open(save_path, "w") as f:
         yaml.dump(dataset_cfg, f)
@@ -52,19 +58,20 @@ def _save_dataset_cfgs(
     train_split: str,
     val_split: str,
     test_split: str,
+    overwrite: None | dict = None,
 ) -> tuple[list[Path], list[Path], list[Path]]:
     save_dir = DATA_CONFIG_DIR / experiment_name
     save_dir.mkdir(parents=True, exist_ok=True)
     train_paths = [
-        _save_dataset_cfg(save_dir, train_split, dataset, i)
+        _save_dataset_cfg(save_dir, train_split, dataset, i, overwrite)
         for i, dataset in enumerate(datasets)
     ]
     val_paths = [
-        _save_dataset_cfg(save_dir, val_split, dataset, i)
+        _save_dataset_cfg(save_dir, val_split, dataset, i, overwrite)
         for i, dataset in enumerate(datasets)
     ]
     test_paths = [
-        _save_dataset_cfg(save_dir, test_split, dataset, i)
+        _save_dataset_cfg(save_dir, test_split, dataset, i, None)
         for i, dataset in enumerate(datasets)
     ]
     return train_paths, val_paths, test_paths
@@ -155,6 +162,7 @@ def main(experiment_name: str, root: str | None):
         train_split=top_cfg["train_split"],
         val_split=top_cfg["val_split"],
         test_split=top_cfg["test_split"],
+        overwrite=top_cfg["overwrite"],
     )
 
     # Generate finetune configs for each dataset config

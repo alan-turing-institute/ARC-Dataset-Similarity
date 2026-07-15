@@ -18,5 +18,7 @@ IMAGENET_DIR = DATA_DIR / "ImageNet"
 COCO_DIR = DATA_DIR / "COCO"
 
 # Output directories
-METRICS_RESULT_DIR = PROJECT_DIR / "results" / "metrics"
+RESULT_DIR = PROJECT_DIR / "results"
+EVAL_RESULT_DIR = RESULT_DIR / "eval"
+METRICS_RESULT_DIR = RESULT_DIR / "metrics"
 TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
