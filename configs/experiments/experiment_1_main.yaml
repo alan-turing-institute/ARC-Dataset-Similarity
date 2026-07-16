@@ -8,7 +8,7 @@ data_store: coco_data_store
 # Slurm job times
 train_time: "02:00:00"
 eval_time: "01:00:00"
-metrics_time: "00:20:00"
+metrics_time: "00:30:00"
 
 # The following used to generate combinations of datasets for the experiment
 dataset_name: COCO
@@ -64,6 +64,13 @@ finetune:
 
 # The following contains the metrics to be used in the experiment
 metrics:
+  # Unlabelled metrics
   - mmd
   - ot_exact
   - ot_sinkhorn
+
+  # Labelled metrics
+  - otdd_approx
+  - otdd_exact
+  - otce_ot_sinkhorn_coupling
+  - otce_otdd_coupling
