@@ -54,7 +54,7 @@ def eval(
             logits.append(pred["logits"].detach().cpu())
             labels.append(int(label))
 
-    return eval_metrics(torch.tensor(logits), labels)
+    return eval_metrics(torch.cat(logits), labels)
 
 
 def main(cfg_name: str):

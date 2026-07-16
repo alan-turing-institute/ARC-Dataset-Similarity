@@ -100,14 +100,21 @@ class FixCheckpointPermissionsCallback(TrainerCallback):  # type: ignore[misc]
 
 
 def eval_metrics(logits: torch.Tensor, labels: list[int]) -> dict[str, float]:
-    probs = logits.sigmoid()
-    accuracy = accuracy_score(y_true=labels, y_pred=(probs > 0.5).int())
+    # single-logit models (num_labels=1) report a positive-class probability via
+    # sigmoid; older two-logit models (num_labels=2) report it via softmax.
+    if logits.shape[-1] == 1:
+        probs = logits.squeeze(-1).sigmoid().numpy()
+    else:
+        probs = logits.softmax(dim=-1)[:, 1].numpy()
+
+    preds = (probs > 0.5).astype(int)
+    accuracy = accuracy_score(y_true=labels, y_pred=preds)
     ap = average_precision_score(y_true=labels, y_score=probs)
 
     # additional metrics for binary classification
-    precision = precision_score(y_true=labels, y_pred=(probs > 0.5).int())
-    recall = recall_score(y_true=labels, y_pred=(probs > 0.5).int())
-    f1 = f1_score(y_true=labels, y_pred=(probs > 0.5).int())
+    precision = precision_score(y_true=labels, y_pred=preds)
+    recall = recall_score(y_true=labels, y_pred=preds)
+    f1 = f1_score(y_true=labels, y_pred=preds)
     roc_auc = roc_auc_score(y_true=labels, y_score=probs)
 
     return {
