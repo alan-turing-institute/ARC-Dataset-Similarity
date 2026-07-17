@@ -110,7 +110,8 @@ def _write_metrics_cfg(
 ) -> None:
     cfg = {
         "dataset1": _get_name_from_path(test_path),
-        "dataset2": data_store,
+        "dataset2": data_store,  # This MUST be second to correctly copy the labels
+        "copy_label_scheme": True,
         "metrics": metrics,
     }
     save_dir = EXPERIMENT_CONFIG_DIR / experiment_name

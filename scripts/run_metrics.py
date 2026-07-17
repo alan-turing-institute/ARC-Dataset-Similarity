@@ -66,7 +66,7 @@ def main(
     metrics_list: list[str],
     dataset1_name: str,
     dataset2_name: str,
-    copy_label_scheme: bool = False,
+    copy_label_scheme: bool,
 ) -> None:
     # Instantiate datasets
     print("Loading datasets")
@@ -136,4 +136,5 @@ if __name__ == "__main__":
             metrics_list=metrics_list,
             dataset1_name=experiment_cfg["dataset1"],
             dataset2_name=experiment_cfg["dataset2"],
+            copy_label_scheme=experiment_cfg["copy_label_scheme"],
         )
