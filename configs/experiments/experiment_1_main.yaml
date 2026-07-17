@@ -72,4 +72,3 @@ metrics:
   # Labelled metrics
   - otdd_approx
   - otce_ot_sinkhorn_coupling
-  - otce_otdd_coupling
