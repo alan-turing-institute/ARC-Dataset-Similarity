@@ -275,4 +275,5 @@ def _get_row_from_img_id(img_id: int, coco: COCO) -> dict[str, Any]:
         "min_bbox_frac": min(areas) / img_area if len(areas) > 0 else 0,
         "max_bbox_frac": max(areas) / img_area if len(areas) > 0 else 0,
         "areas": areas,
+        "bbox_fractions": [area / img_area for area in areas],
     }

@@ -1,0 +1,79 @@
+# This config implements the quick experiment comparing three example test sets against
+# the data store, using three different metrics.
+train_split: trainARC
+val_split: valARC
+test_split: testARC
+
+train_time: "02:00:00"
+eval_time: "01:00:00"
+metrics_time: "00:30:00"
+
+data_store: coco_data_store
+
+# The following used to generate combinations of datasets for the experiment
+dataset_name: COCO
+dataset_kwargs:
+  embedding: dinov3
+  random_seed: 42
+  positive_class:
+  # total percent / total N / ratio of mean class object fraction to mean image fraction
+  - [person]  # 54% / 23488 / 0.68
+  - [car] # 10% / 4509 / 0.42
+  - [dining table] # 10% / 4344 / 2.32
+  - [bottle] # 7% / 3113 / 0.19
+  - [backpack] # 5% / 2089 / 0.40
+  - [book] # 5% / 1975 / 0.21
+  - [umbrella] # 3% / 1431 / 0.67
+  - [bus] # 3% / 1429 / 2.31
+  - [spoon] # 3% / 1251 / 0.09
+  negative_superclass: [null, [vehicle], [food], [accessory]]
+  positive_fraction: [null, .1, .3, .5]
+
+# If specified, the following overwrites dataset_kwargs for train and val splits
+overwrite:
+  positive_fraction: 0.5
+
+# The following contains a fine-tuning config for the experiments. The same sweep is always used
+finetune:
+  model_args:
+    pretrained_model_name_or_path: "facebook/dinov3-vitl16-pretrain-lvd1689m"
+    device_map: auto
+
+  training_args:
+    eval_strategy: epoch
+    save_strategy: epoch
+    save_total_limit: 1
+    dataloader_num_workers: 8
+    dataloader_persistent_workers: true
+    num_train_epochs: 1
+    per_device_train_batch_size: 128
+    per_device_eval_batch_size: 128
+
+  sweep_args:
+    sampler: RandomSampler
+    sweep_seed: 42
+    n_trials: 10
+    objective: eval_average_precision
+    direction: maximize  # minimize or maximize
+    params:
+      learning_rate:
+        type: float
+        low: 0.00001   # 1e-5
+        high: 0.001     # 1e-3
+        log: true
+      weight_decay:
+        type: float
+        low: 0.00001   # 1e-5
+        high: 0.001      # 1e-3
+        log: true
+
+# The following contains the metrics to be used in the experiment
+metrics:
+  # Unlabelled metrics
+  - mmd
+  - ot_exact
+  - ot_sinkhorn
+
+  # Labelled metrics
+  - otdd_approx
+  - otce_ot_sinkhorn_coupling
