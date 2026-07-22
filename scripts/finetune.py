@@ -77,8 +77,9 @@ def compute_loss_fn(
 
 
 def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
-    """Compute Accuracy, Loss, and Average Precision from Trainer predictions.
+    """Compute classification metrics from Trainer predictions.
 
+    Returns accuracy, average precision, precision, recall, F1, and ROC AUC.
     Compatible with the Trainer ``compute_metrics`` callback, and can also be
     called directly on the output of ``trainer.predict(dataset)``.
     """
