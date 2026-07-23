@@ -168,6 +168,8 @@ def _generate_objective_fn(
     eval_dataset,
     model_init,
     collate_fn,
+    loss_fn,
+    compute_metrics_fn,
 ) -> callable:
     init_training_args = config.get("training_args", {})
     sweep_args = config["sweep_args"]
@@ -192,7 +194,7 @@ def _generate_objective_fn(
             # model_init is used instead so Optuna can reinitialise weights
             trial_trainer = Trainer(
                 model_init=model_init,
-                compute_loss_func=compute_loss_fn,
+                compute_loss_func=loss_fn,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
                 args=TrainingArguments(
@@ -205,7 +207,7 @@ def _generate_objective_fn(
                     }
                 ),
                 data_collator=collate_fn,
-                compute_metrics=evaluate_model,
+                compute_metrics=compute_metrics_fn,
                 callbacks=callbacks,
             )
             # log the random seeds used for this trial
@@ -241,6 +243,8 @@ def run_sweep(
     eval_dataset,
     collate_fn,
     model_init,
+    loss_fn,
+    compute_metrics_fn,
 ):
     print("Starting hyperparameter sweep with Optuna...")
     sweep_args = config["sweep_args"]
@@ -269,6 +273,8 @@ def run_sweep(
         eval_dataset,
         model_init,
         collate_fn,
+        loss_fn,
+        compute_metrics_fn,
     )
 
     study.optimize(objective, n_trials=sweep_args.get("n_trials", 20))
@@ -295,6 +301,8 @@ def run_finetune(
     eval_dataset,
     collate_fn,
     model_init,
+    loss_fn,
+    compute_metrics_fn,
 ):
     init_training_args = config.get("training_args", {})
     output_dir = TRAINED_MODELS_DIR / config_name
@@ -308,7 +316,7 @@ def run_finetune(
     save_dir = output_dir / "trained_model"
     trainer = Trainer(
         model=model,
-        compute_loss_func=compute_loss_fn,
+        compute_loss_func=loss_fn,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         args=TrainingArguments(
@@ -322,7 +330,7 @@ def run_finetune(
             }
         ),
         data_collator=collate_fn,
-        compute_metrics=evaluate_model,
+        compute_metrics=compute_metrics_fn,
         callbacks=callbacks,
     )
     all_metrics = train_and_evaluate(trainer, save_dir)
@@ -380,8 +388,12 @@ def main(config_name: str) -> None:
                 "slurm_job_id": os.getenv("SLURM_JOB_ID"),
             }
         )
-
-        num_labels = 1  # TODO update for multilabel classification
+        # get dataset dependent params and log them to mlflow
+        num_labels = train_dataset.num_labels if train_dataset.multi_label else 1
+        loss_fn = multi_label_loss if train_dataset.multi_label else compute_loss_fn
+        compute_metrics_fn = (
+            compute_multi_label_metrics if train_dataset.multi_label else evaluate_model
+        )
         mlflow.log_param("num_labels", num_labels)
 
         def model_init(_):
@@ -405,7 +417,7 @@ def main(config_name: str) -> None:
             inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
             return {
                 **inputs,
-                "labels": torch.tensor([item[1] for item in batch]),
+                "labels": torch.stack([torch.as_tensor(item[1]) for item in batch]),
             }
 
         if "sweep_args" in config:
@@ -416,6 +428,8 @@ def main(config_name: str) -> None:
                 eval_dataset,
                 collate_fn,
                 model_init,
+                loss_fn,
+                compute_metrics_fn,
             )
 
         else:
@@ -426,6 +440,8 @@ def main(config_name: str) -> None:
                 eval_dataset,
                 collate_fn,
                 model_init,
+                loss_fn,
+                compute_metrics_fn,
             )
 
 
