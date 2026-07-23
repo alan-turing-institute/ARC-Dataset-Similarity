@@ -2,6 +2,15 @@ import stat
 from pathlib import Path
 from typing import Any
 
+import torch
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from transformers import (
     TrainerCallback,
     TrainerControl,
@@ -73,6 +82,10 @@ def save_yaml_to_path(
 
 
 class FixCheckpointPermissionsCallback(TrainerCallback):  # type: ignore[misc]
+    """
+    Trainer Callback which fixes permissions of the model safetensors file
+    """
+
     def on_save(
         self,
         args: TrainingArguments,
@@ -88,3 +101,46 @@ class FixCheckpointPermissionsCallback(TrainerCallback):  # type: ignore[misc]
         if model_file.exists():
             model_file.chmod(model_file.stat().st_mode | stat.S_IRGRP)
         return control
+
+
+def eval_metrics(logits: torch.Tensor, labels: list[int]) -> dict[str, float]:
+    """
+    Compute classification metrics from Trainer predictions. Metrics include accuracy,
+    average precision, precision, recall, F1 score, and ROC AUC.
+
+    Args:
+        logits: The model logits. Can be a 1D tensor (for single-logit models) or a
+            2D tensor (for two-logit models).
+        labels: The true labels.
+
+    Returns:
+        A dictionary containing the computed metrics.
+    """
+    # single-logit models (num_labels=1) report a positive-class probability via
+    # sigmoid — whether still shaped (N, 1) or already squeezed to (N,); older
+    # two-logit models (num_labels=2) report it via softmax over (N, 2).
+    if logits.ndim == 1:
+        probs = logits.sigmoid().numpy()
+    elif logits.shape[-1] == 1:
+        probs = logits.squeeze(-1).sigmoid().numpy()
+    else:
+        probs = logits.softmax(dim=-1)[:, 1].numpy()
+
+    preds = (probs > 0.5).astype(int)
+    accuracy = accuracy_score(y_true=labels, y_pred=preds)
+    ap = average_precision_score(y_true=labels, y_score=probs)
+
+    # additional metrics for binary classification
+    precision = precision_score(y_true=labels, y_pred=preds)
+    recall = recall_score(y_true=labels, y_pred=preds)
+    f1 = f1_score(y_true=labels, y_pred=preds)
+    roc_auc = roc_auc_score(y_true=labels, y_score=probs)
+
+    return {
+        "accuracy": accuracy,
+        "average_precision": ap,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "roc_auc": roc_auc,
+    }

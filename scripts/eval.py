@@ -6,7 +6,6 @@ from datetime import datetime
 import mlflow
 import torch
 from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
-from sklearn.metrics import average_precision_score
 from tqdm import tqdm
 from transformers import (
     AutoImageProcessor,
@@ -22,7 +21,7 @@ from dataset_similarity.constants import (
 )
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
-from dataset_similarity.utils import load_yaml_from_path
+from dataset_similarity.utils import eval_metrics, load_yaml_from_path
 
 EXPERIMENT_NAME = "data-sim-eval"
 
@@ -44,7 +43,7 @@ def eval(
     model: PreTrainedModel,
     processor: AutoImageProcessor,
     dataset: torch.utils.data.Dataset,
-) -> float:
+) -> dict[str, float]:
     device = next(model.parameters()).device
     logits, labels = [], []
     with torch.no_grad():
@@ -55,8 +54,7 @@ def eval(
             logits.append(pred["logits"].detach().cpu())
             labels.append(int(label))
 
-    probs = torch.tensor(logits).sigmoid()
-    return average_precision_score(y_true=labels, y_score=probs)
+    return eval_metrics(torch.cat(logits), labels)
 
 
 def main(cfg_name: str):
@@ -126,15 +124,20 @@ def _run(cfg_name: str) -> None:
     data_store.embedding = None  # remove embedding from dataset
 
     # evaluate model
-    ap_test = eval(model, processor, eval_dataset)
-    ap_store = eval(model, processor, data_store)
+    eval_test = eval(model, processor, eval_dataset)
+    eval_store = eval(model, processor, data_store)
 
     # output results
-    results = {
-        "average_precision_test": ap_test,
-        "average_precision_store": ap_store,
-        "difference": ap_test - ap_store,
-    }
+    results = {}
+    for metric_name in eval_test:
+        results.update(
+            {
+                f"{metric_name}_test": eval_test[metric_name],
+                f"{metric_name}_store": eval_store[metric_name],
+                f"{metric_name}_difference": eval_test[metric_name]
+                - eval_store[metric_name],
+            }
+        )
     mlflow.log_metrics(results)
     results["name"] = cfg_name
     save_dir = PROJECT_DIR / "results" / "eval"

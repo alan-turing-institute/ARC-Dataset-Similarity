@@ -8,7 +8,6 @@ import optuna
 import torch
 import torch.nn.functional as F
 from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
-from sklearn.metrics import accuracy_score, average_precision_score
 from transformers import (
     AutoImageProcessor,
     AutoModelForImageClassification,
@@ -28,6 +27,7 @@ from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import (
     FixCheckpointPermissionsCallback,
+    eval_metrics,
     load_yaml_from_path,
     save_yaml_to_path,
 )
@@ -97,17 +97,15 @@ def compute_loss_fn(
 
 
 def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
-    """Compute Accuracy, Loss, and Average Precision from Trainer predictions.
+    """Compute classification metrics from Trainer predictions.
 
+    Returns accuracy, average precision, precision, recall, F1, and ROC AUC.
     Compatible with the Trainer ``compute_metrics`` callback, and can also be
     called directly on the output of ``trainer.predict(dataset)``.
     """
     logits = torch.from_numpy(eval_pred.predictions)
     labels = eval_pred.label_ids
-    probs = logits.sigmoid()
-    accuracy = accuracy_score(y_true=labels, y_pred=(probs > 0.5).int())
-    ap = average_precision_score(y_true=labels, y_score=probs, average="samples")
-    return {"accuracy": accuracy, "average_precision": ap}
+    return eval_metrics(logits, labels)
 
 
 def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
