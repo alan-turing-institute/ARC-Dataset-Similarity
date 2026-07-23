@@ -1,0 +1,10 @@
+name: DomainNet
+kwargs:
+  split: test
+  domains: real
+  size: 50
+  random_seed: 42
+  embedding: clip
+  keep_classes:
+    - strawberry
+    - swan

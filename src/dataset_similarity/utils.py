@@ -1,7 +1,14 @@
+import stat
 from pathlib import Path
 from typing import Any
 
-from yaml import safe_load
+from transformers import (
+    TrainerCallback,
+    TrainerControl,
+    TrainerState,
+    TrainingArguments,
+)
+from yaml import safe_dump, safe_load
 
 from dataset_similarity.constants import DATA_DIR, EMBEDDING_DIR
 
@@ -47,3 +54,37 @@ def load_yaml_from_path(
 
     with open(yaml_path) as f:
         return dict(safe_load(f))
+
+
+def save_yaml_to_path(
+    data: dict[str, Any],
+    yaml_path: str | Path,
+) -> None:
+    """
+    Helper function to save a dictionary as a YAML file to a specified path.
+
+    Args:
+        data: The dictionary to be saved as YAML.
+        yaml_path: The path where the YAML file should be saved.
+    """
+
+    with open(yaml_path, "w") as f:
+        safe_dump(data, f)
+
+
+class FixCheckpointPermissionsCallback(TrainerCallback):  # type: ignore[misc]
+    def on_save(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs: dict[str, Any],
+    ) -> TrainerControl:
+        model_file = (
+            Path(args.output_dir)
+            / f"checkpoint-{state.global_step}"
+            / "model.safetensors"
+        )
+        if model_file.exists():
+            model_file.chmod(model_file.stat().st_mode | stat.S_IRGRP)
+        return control

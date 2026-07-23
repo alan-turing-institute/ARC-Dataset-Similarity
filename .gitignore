@@ -4,7 +4,12 @@ embeddings/
 plots/
 results/
 trained_models/
+configs/data/*/
 configs/experiments/*/
+configs/finetune/*/
+scripts/*/
+!scripts/templates/
+.claude/
 
 
 # logging

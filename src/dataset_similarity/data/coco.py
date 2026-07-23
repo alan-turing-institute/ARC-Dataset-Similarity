@@ -124,7 +124,7 @@ class COCODataset(ImageDataset):
             keep_labels = (self.positive_class or []) + self.negative_class
             keep_classes = [
                 cls
-                for cls, _ in self.class_to_label_map.items()
+                for cls, label in self.class_to_label_map.items()
                 if label in keep_labels
             ]
         self.keep_labels = keep_labels
@@ -210,11 +210,9 @@ class COCODataset(ImageDataset):
         individual or superclasses are specified.
 
         Args:
-            classes (list[str] | None): _description_
-            superclasses (list[str] | None): _description_
+            classes: List of class names to include.
+            superclasses: List of supercategory class names to include.
 
-        Returns:
-            list[int] | None: _description_
         """
         if classes is None and superclasses is None:
             return None

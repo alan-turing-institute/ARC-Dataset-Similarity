@@ -1,34 +1,50 @@
 import argparse
 import json
+import os
+from datetime import datetime
 
-import numpy as np
+import mlflow
 import torch
+from mlflow.store.workspace_rest_store_mixin import WorkspaceRestStoreMixin
 from sklearn.metrics import average_precision_score
 from tqdm import tqdm
-from transformers import AutoImageProcessor, AutoModelForImageClassification
+from transformers import (
+    AutoImageProcessor,
+    AutoModelForImageClassification,
+    PreTrainedModel,
+)
 
-from dataset_similarity.constants import CONFIG_DIR, PROJECT_DIR
+from dataset_similarity.constants import (
+    DATA_CONFIG_DIR,
+    FINETUNE_CONFIG_DIR,
+    PROJECT_DIR,
+    TRAINED_MODELS_DIR,
+)
 from dataset_similarity.data.utils import load_dataset_from_config
+from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import load_yaml_from_path
 
-FINETUNE_CONFIG_DIR = CONFIG_DIR / "finetune"
-DATA_CONFIG_DIR = CONFIG_DIR / "data"
-TRAINED_MODELS_DIR = PROJECT_DIR / "trained_models"
+EXPERIMENT_NAME = "data-sim-eval"
+
+# MLflow's workspace-support probe hardcodes a 3s/0-retry call to
+# /api/3.0/mlflow/server-info, which times out against our server.
+# Our server runs --enable-workspaces, so the answer is always True.
+WorkspaceRestStoreMixin._probe_workspace_support = (
+    lambda self, *a, **k: True  # noqa: ARG005
+)
 
 
-def softmax(x):
-    """Compute softmax values for each sets of scores in x."""
-    e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
-    return e_x / e_x.sum(axis=1, keepdims=True)
+def configure_mlflow() -> None:
+    mlflow.set_workspace("dataset-similarity")
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    mlflow.enable_system_metrics_logging()
 
 
-# TODO: extract duplicate from finetune and eval into a common fn or fns
-def compute_ap(logits, labels):
-    probs = 1 / (1 + torch.exp(-logits[:, 1]))  # sigmoid for binary/multilabel
-    return average_precision_score(labels, probs)
-
-
-def eval(model, processor, dataset):
+def eval(
+    model: PreTrainedModel,
+    processor: AutoImageProcessor,
+    dataset: torch.utils.data.Dataset,
+) -> float:
     device = next(model.parameters()).device
     logits, labels = [], []
     with torch.no_grad():
@@ -38,13 +54,33 @@ def eval(model, processor, dataset):
             pred = model(**inputs)
             logits.append(pred["logits"].detach().cpu())
             labels.append(int(label))
-    return compute_ap(torch.cat(logits), labels)
+
+    probs = torch.tensor(logits).sigmoid()
+    return average_precision_score(y_true=labels, y_score=probs)
 
 
 def main(cfg_name: str):
+    configure_mlflow()
+    with mlflow.start_run(
+        run_name=f"{cfg_name}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    ):
+        _run(cfg_name)
+
+
+def _run(cfg_name: str) -> None:
     # load_config
     config_path = FINETUNE_CONFIG_DIR / f"{cfg_name}.yaml"
     config = load_yaml_from_path(config_path)
+
+    mlflow.log_params(
+        {
+            "config_name": cfg_name,
+            "train_data_config": config["train_data_config"],
+            "val_data_config": config["val_data_config"],
+            "model": config["model_args"]["pretrained_model_name_or_path"],
+            "slurm_job_id": os.getenv("SLURM_JOB_ID"),
+        }
+    )
 
     # Load processor
     processor = AutoImageProcessor.from_pretrained(
@@ -52,17 +88,21 @@ def main(cfg_name: str):
     )
 
     # get trained model path
-    checkpoint_dir = TRAINED_MODELS_DIR / cfg_name
-    checkpoints = [
-        int(x.stem.split("-")[1]) for x in checkpoint_dir.glob("checkpoint-*")
-    ]
-    checkpoint_path = checkpoint_dir / f"checkpoint-{max(checkpoints)}"
+    original_model_name = config["model_args"]["pretrained_model_name_or_path"]
+    model_dir = TRAINED_MODELS_DIR / cfg_name
+    if (model_dir / "optimal_hparams.yaml").exists():
+        base_dir = model_dir / "best_model"  # symlink to winning sweep trial
+    else:
+        base_dir = model_dir / "trained_model"
+    checkpoints = [int(x.stem.split("-")[1]) for x in base_dir.glob("checkpoint-*")]
+    checkpoint_path = base_dir / f"checkpoint-{max(checkpoints)}"
     config["model_args"]["pretrained_model_name_or_path"] = checkpoint_path
 
     # load_model
-    model = AutoModelForImageClassification.from_pretrained(
-        **config["model_args"],
-    )
+    modelCls = AutoModelForImageClassification
+    if original_model_name.startswith("facebook/dinov3"):
+        modelCls = DINOv3Classifier
+    model = modelCls.from_pretrained(**config["model_args"])
     model = model.eval()
 
     # load evaluation data
@@ -91,11 +131,12 @@ def main(cfg_name: str):
 
     # output results
     results = {
-        "name": cfg_name,
         "average_precision_test": ap_test,
         "average_precision_store": ap_store,
         "difference": ap_test - ap_store,
     }
+    mlflow.log_metrics(results)
+    results["name"] = cfg_name
     save_dir = PROJECT_DIR / "results" / "eval"
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / f"{cfg_name}_results.json"
