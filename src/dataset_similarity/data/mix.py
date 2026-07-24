@@ -22,6 +22,7 @@ class DatasetMix(Dataset):  # type: ignore[misc]
         self.datasets: tuple[ImageDataset, ImageDataset] = (dataset1, dataset2)
         self.alpha = alpha
         self.data = self._mix_datasets(dataset1, dataset2, self.alpha)
+        self.multi_label = dataset1.multi_label or dataset2.multi_label
 
     def __len__(self) -> int:
         return len(self.data)

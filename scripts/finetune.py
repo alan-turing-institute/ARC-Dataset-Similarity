@@ -1,6 +1,7 @@
 import argparse
 import os
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import mlflow
@@ -23,6 +24,8 @@ from dataset_similarity.constants import (
     FINETUNE_CONFIG_DIR,
     TRAINED_MODELS_DIR,
 )
+from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.mix import DatasetMix
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import (
@@ -53,21 +56,6 @@ def configure_mlflow() -> None:
     mlflow.enable_system_metrics_logging()
 
 
-def compute_multi_label_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
-    logits, labels = eval_pred
-    labels = labels.astype(int)
-    preds = (logits > 0).astype(int)  # sigmoid > 0.5 threshold
-    return {
-        "accuracy": accuracy_score(labels, preds),
-        "average_precision_macro": average_precision_score(
-            labels, logits, average="macro"
-        ),
-        "average_precision_micro": average_precision_score(
-            labels, logits, average="micro"
-        ),
-    }
-
-
 def multi_label_loss(outputs, labels, num_items_in_batch=None):  # noqa: ARG001
     logits = outputs.get("logits")
     return F.binary_cross_entropy_with_logits(logits, labels.float())
@@ -96,7 +84,9 @@ def compute_loss_fn(
     return loss / num_items_in_batch
 
 
-def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
+def evaluate_model(
+    eval_pred: EvalPrediction, multi_label: bool = False
+) -> dict[str, float]:
     """Compute classification metrics from Trainer predictions.
 
     Returns accuracy, average precision, precision, recall, F1, and ROC AUC.
@@ -105,7 +95,9 @@ def evaluate_model(eval_pred: EvalPrediction) -> dict[str, float]:
     """
     logits = torch.from_numpy(eval_pred.predictions)
     labels = eval_pred.label_ids
-    return eval_metrics(logits, labels)
+    metrics = eval_metrics(logits, labels, multi_label=multi_label)
+    print(f"Evaluation metrics: {metrics}")
+    return metrics
 
 
 def suggest(trial: optuna.Trial, name: str, spec: dict) -> float | int | str:
@@ -160,14 +152,13 @@ def _log_numeric_metrics(metrics: dict, step: int | None = None) -> None:
 
 
 def _generate_objective_fn(
-    config: dict,
+    config: dict[str, str | dict],
     sweep_dir: Path,
-    train_dataset,
-    eval_dataset,
-    model_init,
-    collate_fn,
-    loss_fn,
-    compute_metrics_fn,
+    train_dataset: ImageDataset | DatasetMix,
+    eval_dataset: ImageDataset | DatasetMix,
+    model_init: callable,
+    collate_fn: callable,
+    loss_fn: callable,
 ) -> callable:
     init_training_args = config.get("training_args", {})
     sweep_args = config["sweep_args"]
@@ -205,7 +196,9 @@ def _generate_objective_fn(
                     }
                 ),
                 data_collator=collate_fn,
-                compute_metrics=compute_metrics_fn,
+                compute_metrics=partial(
+                    evaluate_model, multi_label=train_dataset.multi_label
+                ),
                 callbacks=callbacks,
             )
             # log the random seeds used for this trial
@@ -235,14 +228,13 @@ def _generate_objective_fn(
 
 
 def run_sweep(
-    config,
-    config_name,
-    train_dataset,
-    eval_dataset,
-    collate_fn,
-    model_init,
-    loss_fn,
-    compute_metrics_fn,
+    config: dict[str, str | dict],
+    config_name: str,
+    train_dataset: ImageDataset | DatasetMix,
+    eval_dataset: ImageDataset | DatasetMix,
+    collate_fn: callable,
+    model_init: callable,
+    loss_fn: callable,
 ):
     print("Starting hyperparameter sweep with Optuna...")
     sweep_args = config["sweep_args"]
@@ -272,7 +264,6 @@ def run_sweep(
         model_init,
         collate_fn,
         loss_fn,
-        compute_metrics_fn,
     )
 
     study.optimize(objective, n_trials=sweep_args.get("n_trials", 20))
@@ -293,14 +284,13 @@ def run_sweep(
 
 
 def run_finetune(
-    config,
-    config_name,
-    train_dataset,
-    eval_dataset,
-    collate_fn,
-    model_init,
-    loss_fn,
-    compute_metrics_fn,
+    config: dict[str, str | dict],
+    config_name: str,
+    train_dataset: ImageDataset | DatasetMix,
+    eval_dataset: ImageDataset | DatasetMix,
+    collate_fn: callable,
+    model_init: callable,
+    loss_fn: callable,
 ):
     init_training_args = config.get("training_args", {})
     output_dir = TRAINED_MODELS_DIR / config_name
@@ -328,7 +318,7 @@ def run_finetune(
             }
         ),
         data_collator=collate_fn,
-        compute_metrics=compute_metrics_fn,
+        compute_metrics=partial(evaluate_model, multi_label=train_dataset.multi_label),
         callbacks=callbacks,
     )
     all_metrics = train_and_evaluate(trainer, save_dir)
@@ -389,9 +379,6 @@ def main(config_name: str) -> None:
         # get dataset dependent params and log them to mlflow
         num_labels = train_dataset.num_labels if train_dataset.multi_label else 1
         loss_fn = multi_label_loss if train_dataset.multi_label else compute_loss_fn
-        compute_metrics_fn = (
-            compute_multi_label_metrics if train_dataset.multi_label else evaluate_model
-        )
         mlflow.log_param("num_labels", num_labels)
 
         def model_init(_):
@@ -427,7 +414,6 @@ def main(config_name: str) -> None:
                 collate_fn,
                 model_init,
                 loss_fn,
-                compute_metrics_fn,
             )
 
         else:
@@ -439,7 +425,6 @@ def main(config_name: str) -> None:
                 collate_fn,
                 model_init,
                 loss_fn,
-                compute_metrics_fn,
             )
 
 

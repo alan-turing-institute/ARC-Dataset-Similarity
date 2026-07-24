@@ -19,6 +19,8 @@ from dataset_similarity.constants import (
     PROJECT_DIR,
     TRAINED_MODELS_DIR,
 )
+from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.mix import DatasetMix
 from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.dinov3 import DINOv3Classifier
 from dataset_similarity.utils import eval_metrics, load_yaml_from_path
@@ -42,7 +44,7 @@ def configure_mlflow() -> None:
 def eval(
     model: PreTrainedModel,
     processor: AutoImageProcessor,
-    dataset: torch.utils.data.Dataset,
+    dataset: ImageDataset | DatasetMix,
 ) -> dict[str, float]:
     device = next(model.parameters()).device
     logits, labels = [], []
@@ -52,9 +54,11 @@ def eval(
             inputs = inputs.to(device)
             pred = model(**inputs)
             logits.append(pred["logits"].detach().cpu())
-            labels.append(int(label))
+            labels.append(label if dataset.multi_label else int(label))
 
-    return eval_metrics(torch.cat(logits), labels)
+    if dataset.multi_label:
+        labels = torch.stack(labels).numpy()
+    return eval_metrics(torch.cat(logits), labels, dataset.multi_label)
 
 
 def main(cfg_name: str):
@@ -120,6 +124,7 @@ def _run(cfg_name: str) -> None:
     data_store_config["kwargs"]["positive_class"] = [
         label_to_class_map[label] for label in eval_dataset.positive_class
     ]
+    data_store_config["kwargs"]["multi_label"] = eval_dataset.multi_label
     data_store = load_dataset_from_config(data_store_config)
     data_store.embedding = None  # remove embedding from dataset
 
