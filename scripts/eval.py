@@ -133,16 +133,18 @@ def _run(cfg_name: str) -> None:
     eval_store = eval(model, processor, data_store)
 
     # output results
-    results = {}
-    for metric_name in eval_test:
-        results.update(
-            {
-                f"{metric_name}_test": eval_test[metric_name],
-                f"{metric_name}_store": eval_store[metric_name],
-                f"{metric_name}_difference": eval_test[metric_name]
-                - eval_store[metric_name],
-            }
+    results = {
+        k: v
+        for metric_name in eval_test
+        for k, v in (
+            (f"{metric_name}_test", eval_test[metric_name]),
+            (f"{metric_name}_store", eval_store[metric_name]),
+            (
+                f"{metric_name}_difference",
+                eval_test[metric_name] - eval_store[metric_name],
+            ),
         )
+    }
     mlflow.log_metrics(results)
     results["name"] = cfg_name
     save_dir = PROJECT_DIR / "results" / "eval"

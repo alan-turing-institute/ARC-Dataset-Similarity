@@ -169,14 +169,11 @@ def _binary_eval(
         A dictionary containing the computed metrics.
     """
     # single-logit models (num_labels=1) report a positive-class probability via
-    # sigmoid — whether still shaped (N, 1) or already squeezed to (N,); older
-    # two-logit models (num_labels=2) report it via softmax over (N, 2).
+    # sigmoid — whether still shaped (N, 1) or already squeezed to (N,).
     if logits.ndim == 1:
         probs = logits.sigmoid().numpy()
-    elif logits.shape[-1] == 1:
-        probs = logits.squeeze(-1).sigmoid().numpy()
     else:
-        probs = logits.softmax(dim=-1)[:, 1].numpy()
+        probs = logits.squeeze(-1).sigmoid().numpy()
 
     preds = (probs > 0.5).astype(int)
     return {

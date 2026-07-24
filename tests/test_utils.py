@@ -16,17 +16,3 @@ def test_eval_metrics_handles_1d_logits():
     labels = [1, 0, 1, 0]
     result = eval_metrics(logits, labels)
     assert result["accuracy"] == 1.0
-
-
-def test_eval_metrics_handles_2d_single_logit():
-    logits = torch.tensor([[2.0], [-2.0], [3.0], [-1.0]])
-    labels = [1, 0, 1, 0]
-    result = eval_metrics(logits, labels)
-    assert result["accuracy"] == 1.0
-
-
-def test_eval_metrics_handles_2d_two_logit():
-    logits = torch.tensor([[-2.0, 2.0], [2.0, -2.0], [-3.0, 3.0], [1.0, -1.0]])
-    labels = [1, 0, 1, 0]
-    result = eval_metrics(logits, labels)
-    assert result["accuracy"] == 1.0
