@@ -109,22 +109,18 @@ def eval_metrics(logits: torch.Tensor, labels: list[int]) -> dict[str, float]:
     average precision, precision, recall, F1 score, and ROC AUC.
 
     Args:
-        logits: The model logits. Can be a 1D tensor (for single-logit models) or a
-            2D tensor (for two-logit models).
+        logits: The model logits, shaped (N,) or (N, 1) for single-logit models.
         labels: The true labels.
 
     Returns:
         A dictionary containing the computed metrics.
     """
     # single-logit models (num_labels=1) report a positive-class probability via
-    # sigmoid — whether still shaped (N, 1) or already squeezed to (N,); older
-    # two-logit models (num_labels=2) report it via softmax over (N, 2).
+    # sigmoid — whether still shaped (N, 1) or already squeezed to (N,).
     if logits.ndim == 1:
         probs = logits.sigmoid().numpy()
-    elif logits.shape[-1] == 1:
-        probs = logits.squeeze(-1).sigmoid().numpy()
     else:
-        probs = logits.softmax(dim=-1)[:, 1].numpy()
+        probs = logits.squeeze(-1).sigmoid().numpy()
 
     preds = (probs > 0.5).astype(int)
     accuracy = accuracy_score(y_true=labels, y_pred=preds)
