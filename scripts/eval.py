@@ -58,7 +58,12 @@ def eval(
 
     if dataset.multi_label:
         labels = torch.stack(labels).numpy()
-    return eval_metrics(torch.cat(logits), labels, dataset.multi_label)
+    return eval_metrics(
+        torch.cat(logits),
+        labels,
+        dataset.multi_label,
+        additional_metrics=True,
+    )
 
 
 def main(cfg_name: str):

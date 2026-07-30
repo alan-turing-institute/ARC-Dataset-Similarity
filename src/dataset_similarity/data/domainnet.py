@@ -49,9 +49,8 @@ class DomainNetDataset(ImageDataset):
         split: Literal["train", "test"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
-        embedding: None | str = None,
+        embedding: str | None = None,
         return_paths: bool = False,
-        multi_label: bool = False,
     ) -> None:
         # Domain needs to be processed before calling super().__init__()
         if domains is None:
@@ -91,9 +90,6 @@ class DomainNetDataset(ImageDataset):
             self.target_label_ids = {
                 self.class_to_label_map[cls] for cls in keep_classes
             }
-        if multi_label:
-            msg = "DomainNetDataset does not support multi-label tasks."
-            raise NotImplementedError(msg)
 
         super().__init__(
             dataset_dir=DOMAINNET_DIR,
@@ -103,7 +99,7 @@ class DomainNetDataset(ImageDataset):
             random_seed=random_seed,
             embedding=embedding,
             return_paths=return_paths,
-            multi_label=multi_label,
+            multi_label=False,
         )
 
     def _load_data(self) -> pd.DataFrame:

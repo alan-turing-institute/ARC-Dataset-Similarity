@@ -56,18 +56,14 @@ def configure_mlflow() -> None:
     mlflow.enable_system_metrics_logging()
 
 
-def multi_label_loss(outputs, labels, num_items_in_batch=None):  # noqa: ARG001
-    logits = outputs.get("logits")
-    return F.binary_cross_entropy_with_logits(logits, labels.float())
-
-
-def compute_loss_fn(
+def binary_cross_entropy_loss(
     outputs: ImageClassifierOutput,
     labels: torch.Tensor,
     num_items_in_batch: torch.Tensor | int,
 ) -> torch.Tensor:
     """
-    Compute the loss for a batch of outputs and labels.
+    Compute the loss for a batch of outputs and labels for binary and multilabel
+    classification.
 
     From: https://github.com/huggingface/transformers/blob/main/docs/source/en/trainer_recipes.md
 
@@ -79,7 +75,9 @@ def compute_loss_fn(
     Returns:
         The computed loss value.
     """
-    logits = outputs["logits"].squeeze(-1)  # (N, 1) -> (N,)
+    logits = outputs["logits"]
+    if logits.shape[1] == 1:
+        logits = logits.squeeze(-1)  # (N, 1) -> (N,)
     loss = F.binary_cross_entropy_with_logits(logits, labels.float(), reduction="sum")
     return loss / num_items_in_batch
 
@@ -95,7 +93,12 @@ def evaluate_model(
     """
     logits = torch.from_numpy(eval_pred.predictions)
     labels = eval_pred.label_ids
-    metrics = eval_metrics(logits, labels, multi_label=multi_label)
+    metrics = eval_metrics(
+        logits,
+        labels,
+        multi_label=multi_label,
+        additional_metrics=False,
+    )
     print(f"Evaluation metrics: {metrics}")
     return metrics
 
@@ -158,7 +161,6 @@ def _generate_objective_fn(
     eval_dataset: ImageDataset | DatasetMix,
     model_init: callable,
     collate_fn: callable,
-    loss_fn: callable,
 ) -> callable:
     init_training_args = config.get("training_args", {})
     sweep_args = config["sweep_args"]
@@ -183,7 +185,7 @@ def _generate_objective_fn(
             # model_init is used instead so Optuna can reinitialise weights
             trial_trainer = Trainer(
                 model_init=model_init,
-                compute_loss_func=loss_fn,
+                compute_loss_func=binary_cross_entropy_loss,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
                 args=TrainingArguments(
@@ -234,7 +236,6 @@ def run_sweep(
     eval_dataset: ImageDataset | DatasetMix,
     collate_fn: callable,
     model_init: callable,
-    loss_fn: callable,
 ):
     print("Starting hyperparameter sweep with Optuna...")
     sweep_args = config["sweep_args"]
@@ -263,7 +264,7 @@ def run_sweep(
         eval_dataset,
         model_init,
         collate_fn,
-        loss_fn,
+        binary_cross_entropy_loss,
     )
 
     study.optimize(objective, n_trials=sweep_args.get("n_trials", 20))
@@ -290,7 +291,6 @@ def run_finetune(
     eval_dataset: ImageDataset | DatasetMix,
     collate_fn: callable,
     model_init: callable,
-    loss_fn: callable,
 ):
     init_training_args = config.get("training_args", {})
     output_dir = TRAINED_MODELS_DIR / config_name
@@ -304,7 +304,7 @@ def run_finetune(
     save_dir = output_dir / "trained_model"
     trainer = Trainer(
         model=model,
-        compute_loss_func=loss_fn,
+        compute_loss_func=binary_cross_entropy_loss,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         args=TrainingArguments(
@@ -378,7 +378,6 @@ def main(config_name: str) -> None:
         )
         # get dataset dependent params and log them to mlflow
         num_labels = train_dataset.num_labels if train_dataset.multi_label else 1
-        loss_fn = multi_label_loss if train_dataset.multi_label else compute_loss_fn
         mlflow.log_param("num_labels", num_labels)
 
         def model_init(_):
@@ -413,7 +412,6 @@ def main(config_name: str) -> None:
                 eval_dataset,
                 collate_fn,
                 model_init,
-                loss_fn,
             )
 
         else:
@@ -424,7 +422,6 @@ def main(config_name: str) -> None:
                 eval_dataset,
                 collate_fn,
                 model_init,
-                loss_fn,
             )
 
 

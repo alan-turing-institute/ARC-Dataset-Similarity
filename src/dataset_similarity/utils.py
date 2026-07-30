@@ -1,5 +1,4 @@
 import stat
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -105,22 +104,10 @@ class FixCheckpointPermissionsCallback(TrainerCallback):  # type: ignore[misc]
         return control
 
 
-def _safe_score(metric_fn: Any, *args: Any, **kwargs: Any) -> float:
-    """
-    Call metric_fn, returning 0.0 if undefined for the given inputs instead of
-    raising (ValueError) or warning and returning NaN (UserWarning).
-    This is useful in tests to avoid failure on warnings.
-    """
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", UserWarning)
-            return float(metric_fn(*args, **kwargs))
-    except (ValueError, UserWarning):
-        return 0.0
-
-
 def _multi_label_eval(
-    logits: torch.Tensor, labels: list[int] | np.ndarray
+    logits: torch.Tensor,
+    labels: list[int] | np.ndarray,
+    additional_metrics: bool = False,
 ) -> dict[str, float]:
     """
     Compute multi-label classification metrics from Trainer predictions.
@@ -136,31 +123,45 @@ def _multi_label_eval(
     preds = (probs > 0.5).astype(int)
     labels = np.asarray(labels).astype(int)
 
-    return {
+    base_metrics = {
         "accuracy": accuracy_score(labels, preds),
-        "average_precision_macro": _safe_score(
-            average_precision_score, labels, probs, average="macro"
+        "average_precision_macro": average_precision_score(
+            labels, probs, average="macro"
         ),
-        "average_precision_micro": _safe_score(
-            average_precision_score, labels, probs, average="micro"
+        "average_precision_micro": average_precision_score(
+            labels, probs, average="micro"
         ),
-        "precision_macro": precision_score(
-            labels, preds, average="macro", zero_division=0
-        ),
-        "precision_micro": precision_score(
-            labels, preds, average="micro", zero_division=0
-        ),
-        "recall_macro": recall_score(labels, preds, average="macro", zero_division=0),
-        "recall_micro": recall_score(labels, preds, average="micro", zero_division=0),
-        "f1_macro": f1_score(labels, preds, average="macro", zero_division=0),
-        "f1_micro": f1_score(labels, preds, average="micro", zero_division=0),
-        "roc_auc_macro": _safe_score(roc_auc_score, labels, probs, average="macro"),
-        "roc_auc_micro": _safe_score(roc_auc_score, labels, probs, average="micro"),
     }
+
+    return (
+        base_metrics
+        | {
+            "precision_macro": precision_score(
+                labels, preds, average="macro", zero_division=0
+            ),
+            "precision_micro": precision_score(
+                labels, preds, average="micro", zero_division=0
+            ),
+            "recall_macro": recall_score(
+                labels, preds, average="macro", zero_division=0
+            ),
+            "recall_micro": recall_score(
+                labels, preds, average="micro", zero_division=0
+            ),
+            "f1_macro": f1_score(labels, preds, average="macro", zero_division=0),
+            "f1_micro": f1_score(labels, preds, average="micro", zero_division=0),
+            "roc_auc_macro": roc_auc_score(labels, probs, average="macro"),
+            "roc_auc_micro": roc_auc_score(labels, probs, average="micro"),
+        }
+        if additional_metrics
+        else base_metrics
+    )
 
 
 def _binary_eval(
-    logits: torch.Tensor, labels: list[int] | np.ndarray
+    logits: torch.Tensor,
+    labels: list[int] | np.ndarray,
+    additional_metrics: bool = False,
 ) -> dict[str, float]:
     """
     Compute binary classification metrics from Trainer predictions.
@@ -183,20 +184,28 @@ def _binary_eval(
         probs = logits.squeeze(-1).sigmoid().numpy()
 
     preds = (probs > 0.5).astype(int)
-    return {
+    base_metrics = {
         "accuracy": accuracy_score(y_true=labels, y_pred=preds),
         "average_precision": average_precision_score(y_true=labels, y_score=probs),
-        "precision": precision_score(y_true=labels, y_pred=preds),
-        "recall": recall_score(y_true=labels, y_pred=preds),
-        "f1": f1_score(y_true=labels, y_pred=preds),
-        "roc_auc": roc_auc_score(y_true=labels, y_score=probs),
     }
+    return (
+        base_metrics
+        | {
+            "precision": precision_score(y_true=labels, y_pred=preds),
+            "recall": recall_score(y_true=labels, y_pred=preds),
+            "f1": f1_score(y_true=labels, y_pred=preds),
+            "roc_auc": roc_auc_score(y_true=labels, y_score=probs),
+        }
+        if additional_metrics
+        else base_metrics
+    )
 
 
 def eval_metrics(
     logits: torch.Tensor,
     labels: list[int] | np.ndarray,
     multi_label: bool = False,
+    additional_metrics: bool = False,
 ) -> dict[str, float]:
     """
     Compute classification metrics from Trainer predictions. Metrics include accuracy,
@@ -224,6 +233,6 @@ def eval_metrics(
         A dictionary containing the computed metrics.
     """
     if multi_label:
-        return _multi_label_eval(logits, labels)
+        return _multi_label_eval(logits, labels, additional_metrics)
 
-    return _binary_eval(logits, labels)
+    return _binary_eval(logits, labels, additional_metrics)

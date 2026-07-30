@@ -46,7 +46,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         split: str,
         size: float | int | None,
         random_seed: int | None,
-        embedding: None | str,
+        embedding: str | None,
         return_paths: bool,
         multi_label: bool,
     ) -> None:
