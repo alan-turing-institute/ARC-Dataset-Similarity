@@ -122,7 +122,7 @@ class COCODataset(ImageDataset):
             return_paths=return_paths,
         )
 
-        # Subample data will not be called by the super if size is None
+        # Subsample data will not be called by the super if size is None
         if self.size is None and self.positive_fraction is not None:
             self.data = self.subsample_data()
 
