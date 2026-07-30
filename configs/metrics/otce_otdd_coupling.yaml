@@ -26,9 +26,9 @@ kwargs:
     λ_y: 1.0
 
     ## Inner OT (label to label) problem arguments
-    inner_ot_method: gaussian_approx #changed from gaussian_approx
+    inner_ot_method: gaussian_approx
     inner_ot_loss: sinkhorn
-    inner_ot_debiased: False #changed from False
+    inner_ot_debiased: False
     inner_ot_p: 2
     inner_ot_entreg: 0.1
 
@@ -51,4 +51,4 @@ kwargs:
 
     # dist.distance() args
     # https://github.com/alan-turing-institute/arc-otdd/blob/main/otdd/pytorch/distance.py#L622
-    max_samples: 10000
+    maxsamples: 10000

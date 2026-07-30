@@ -79,6 +79,9 @@ class COCODataset(ImageDataset):
                 " specified."
             )
             raise ValueError(msg)
+        if positive_fraction is not None and not (0 < positive_fraction < 1):
+            msg = "`positive_fraction` must be in the range (0, 1)."
+            raise ValueError(msg)
 
         # Define classes
         self.positive_class = self._prepare_classes(positive_class, positive_superclass)
@@ -223,15 +226,15 @@ class COCODataset(ImageDataset):
 
     def _balance_classes(self) -> pd.DataFrame:
         """Downsample the majority class to achieve ``positive_fraction``."""
-        if self.positive_fraction is None or not (0 < self.positive_fraction < 1):
-            return None
+        positive_fraction = self.positive_fraction  # this & below line for mypy reasons
+        assert positive_fraction is not None
         pos_df = self.data[self.data["label"] == 1]
         neg_df = self.data[self.data["label"] == 0]
         n_pos, n_neg = len(pos_df), len(neg_df)
 
         # Downsample whichever class is over-represented
-        target_neg = int(n_pos * (1 - self.positive_fraction) / self.positive_fraction)
-        target_pos = int(n_neg * self.positive_fraction / (1 - self.positive_fraction))
+        target_neg = int(n_pos * (1 - positive_fraction) / positive_fraction)
+        target_pos = int(n_neg * positive_fraction / (1 - positive_fraction))
 
         if target_neg <= n_neg:
             neg_df = neg_df.sample(n=target_neg, random_state=self.random_seed)
