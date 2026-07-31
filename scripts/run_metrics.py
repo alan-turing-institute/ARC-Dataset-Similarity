@@ -66,10 +66,18 @@ def main(
     metrics_list: list[str],
     dataset1_name: str,
     dataset2_name: str,
+    copy_label_scheme: bool,
 ) -> None:
     # Instantiate datasets
     print("Loading datasets")
     ds1 = load_dataset_from_config(dataset1_cfg)
+    if copy_label_scheme:
+        label_to_class_map = {
+            label: cat for cat, label in ds1.class_to_label_map.items()
+        }
+        dataset2_cfg["kwargs"]["positive_class"] = [
+            label_to_class_map[label] for label in ds1.positive_class
+        ]
     ds2 = load_dataset_from_config(dataset2_cfg)
     print("Datasets loaded successfully")
 
@@ -128,4 +136,5 @@ if __name__ == "__main__":
             metrics_list=metrics_list,
             dataset1_name=experiment_cfg["dataset1"],
             dataset2_name=experiment_cfg["dataset2"],
+            copy_label_scheme=experiment_cfg["copy_label_scheme"],
         )
