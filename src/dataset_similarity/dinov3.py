@@ -16,6 +16,7 @@ class DINOv3Classifier(PreTrainedModel):  # type: ignore[misc]
     compatible with the HuggingFace ``Trainer`` API.
     """
 
+    base_model_prefix = "dinov3"
     config_class = DINOv3ViTConfig
 
     def __init__(self, config: DINOv3ViTConfig):

@@ -15,8 +15,8 @@ from transformers import (
 
 from dataset_similarity.constants import (
     DATA_CONFIG_DIR,
+    EVAL_RESULT_DIR,
     FINETUNE_CONFIG_DIR,
-    PROJECT_DIR,
     TRAINED_MODELS_DIR,
 )
 from dataset_similarity.data.base import ImageDataset
@@ -152,9 +152,8 @@ def _run(cfg_name: str) -> None:
     }
     mlflow.log_metrics(results)
     results["name"] = cfg_name
-    save_dir = PROJECT_DIR / "results" / "eval"
-    save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = save_dir / f"{cfg_name}_results.json"
+    save_path = EVAL_RESULT_DIR / f"{cfg_name}_results.json"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
     with open(save_path, "w") as f:
         json.dump(results, f, indent=4)
 

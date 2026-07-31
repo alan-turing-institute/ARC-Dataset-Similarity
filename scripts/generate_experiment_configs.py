@@ -36,10 +36,16 @@ def _build_dataset_cfgs(
 
 
 def _save_dataset_cfg(
-    save_dir: Path, split: str, dataset: dict[str, Any], i: int
+    save_dir: Path,
+    split: str,
+    dataset: dict[str, Any],
+    i: int,
+    overwrite: None | dict = None,
 ) -> Path:
     dataset_cfg = deepcopy(dataset)
     dataset_cfg["kwargs"]["split"] = split
+    if overwrite is not None:
+        dataset_cfg["kwargs"].update(overwrite)
     save_path = save_dir / f"{split}_{i}.yaml"
     with open(save_path, "w") as f:
         yaml.dump(dataset_cfg, f)
@@ -52,19 +58,20 @@ def _save_dataset_cfgs(
     train_split: str,
     val_split: str,
     test_split: str,
+    overwrite: None | dict = None,
 ) -> tuple[list[Path], list[Path], list[Path]]:
     save_dir = DATA_CONFIG_DIR / experiment_name
     save_dir.mkdir(parents=True, exist_ok=True)
     train_paths = [
-        _save_dataset_cfg(save_dir, train_split, dataset, i)
+        _save_dataset_cfg(save_dir, train_split, dataset, i, overwrite)
         for i, dataset in enumerate(datasets)
     ]
     val_paths = [
-        _save_dataset_cfg(save_dir, val_split, dataset, i)
+        _save_dataset_cfg(save_dir, val_split, dataset, i, overwrite)
         for i, dataset in enumerate(datasets)
     ]
     test_paths = [
-        _save_dataset_cfg(save_dir, test_split, dataset, i)
+        _save_dataset_cfg(save_dir, test_split, dataset, i, None)
         for i, dataset in enumerate(datasets)
     ]
     return train_paths, val_paths, test_paths
@@ -84,8 +91,13 @@ def _build_finetune_cfg(
         "train_data_config": _get_name_from_path(task[0]),
         "val_data_config": _get_name_from_path(task[1]),
         "test_data_config": _get_name_from_path(task[2]),
-        **top_cfg["finetune"],
+        **deepcopy(top_cfg["finetune"]),
     }
+    # Avoid always sampling the same hyperparameters while remaining replicable
+    if "sweep_args" in cfg and "sweep_seed" in cfg["sweep_args"]:
+        cfg["sweep_args"]["sweep_seed"] = int(
+            str(cfg["sweep_args"]["sweep_seed"]) + str(i)
+        )
     save_dir = FINETUNE_CONFIG_DIR / experiment_name
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / f"finetune_{i}.yaml"
@@ -98,7 +110,8 @@ def _write_metrics_cfg(
 ) -> None:
     cfg = {
         "dataset1": _get_name_from_path(test_path),
-        "dataset2": data_store,
+        "dataset2": data_store,  # This MUST be second to correctly copy the labels
+        "copy_label_scheme": True,
         "metrics": metrics,
     }
     save_dir = EXPERIMENT_CONFIG_DIR / experiment_name
@@ -155,6 +168,7 @@ def main(experiment_name: str, root: str | None):
         train_split=top_cfg["train_split"],
         val_split=top_cfg["val_split"],
         test_split=top_cfg["test_split"],
+        overwrite=top_cfg["overwrite"],
     )
 
     # Generate finetune configs for each dataset config
