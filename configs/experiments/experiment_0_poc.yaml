@@ -6,6 +6,7 @@ datasets:
   - experiment_0_alpha_0.25
   - experiment_0_alpha_0.5
   - experiment_0_alpha_0.75
+copy_label_scheme: false  # should only be true for COCO
 metrics:
   # Unlabelled metrics
   - mmd
