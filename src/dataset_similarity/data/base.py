@@ -34,6 +34,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             dataset. If ``None``, raw images are returned by ``__getitem__``.
         return_paths: If ``True``, ``__getitem__`` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a ``Path`` object.
+        multi_label: If ``True``, ``__getitem__`` returns a multi label vector over
+            ``positive_class`` instead of a binary scalar. Requires ``positive_class``
+            or ``positive_superclass``. Defaults to ``False``.
     """
 
     def __init__(
@@ -43,8 +46,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         split: str,
         size: float | int | None,
         random_seed: int | None,
-        embedding: None | str,
+        embedding: str | None,
         return_paths: bool,
+        multi_label: bool,
     ) -> None:
         super().__init__()
         self.dataset_dir = dataset_dir
@@ -57,6 +61,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             self.data = self.subsample_data()
         self.embedding = embedding
         self.return_paths = return_paths
+        self.multi_label = multi_label
 
     def subsample_data(self) -> DataFrame:
         """
@@ -107,7 +112,9 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         """
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, np.int64 | str | Path]:
+    def __getitem__(
+        self, idx: int
+    ) -> tuple[torch.Tensor, torch.Tensor | np.int64 | str | Path]:
         """
         Get a sample from the dataset. If ``self.embedding`` is ``None``, the first
         element of the returned tuple is an image tensor of shape (C x H x W).
@@ -134,7 +141,23 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             tensor = load_file(image_embedding_path)["embedding"]
         if self.return_paths:
             return tensor, image_path
+        if self.multi_label:
+            return tensor, torch.tensor(sample["multi_label"], dtype=torch.float32)
         return tensor, sample["label"]
+
+    @property
+    def num_labels(self) -> int:
+        """
+        Number of distinct labels present in this split.
+        Defaults to 2 for binary classification, or the length of ``self.keep_classes``
+        for multi-label classification.
+        """
+        if self.multi_label:
+            if self.keep_classes is None:
+                msg = "multi_label=True requires keep_classes to be set."
+                raise ValueError(msg)
+            return len(self.keep_classes)
+        return 2
 
     @property
     def num_classes(self) -> int:

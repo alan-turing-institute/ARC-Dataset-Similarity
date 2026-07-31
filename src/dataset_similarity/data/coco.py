@@ -14,20 +14,45 @@ class COCODataset(ImageDataset):
     PyTorch dataset for `MS COCO <https://cocodataset.org/>`_.
 
     Args:
-        split: Dataset split identifier. Any of "train2017", "val2017", "trainARC",
-            "valARC", "testARC", or "store". Defaults to "train2017".
-        size: If a float in `(0, 1)`, the fraction of samples to retain.
-            If a positive integer, the exact number of samples to retain. If
-            `None`, no subsampling is performed and the full dataset is used. Defaults
-            to `None`.
+        split: Dataset split identifier. Any of ``"train2017"``, ``"val2017"``,
+            ``"trainARC"``, ``"valARC"``, ``"testARC"``, or ``"store"``. Defaults to
+            ``"trainARC"``.
+        size: If a float in ``(0, 1)``, the fraction of samples to retain. If a
+            positive integer, the exact number of samples to retain. If ``None``, no
+            subsampling is performed and the full dataset is used. Defaults to ``None``.
         random_seed: Seed for the random number generator, for reproducibility. If
-            `None`, the result is non-deterministic. Defaults to `None`.
-        embedding: If not `None`, the name of the embedding model to use for this
-            dataset. If `None`, raw images are returned by `__getitem__`. Defaults to
-            `None`.
-        return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
-            instead of (tensor, label). The path is returned as a `Path` object.
-            Defaults to `False`.
+            ``None``, the result is non-deterministic. Defaults to ``None``.
+        embedding: Name of the embedding model whose pre-computed features to load. If
+            ``None``, raw images are returned by ``__getitem__``. Defaults to ``None``.
+        return_paths: If ``True``, ``__getitem__`` returns ``(tensor, path)`` instead
+            of ``(tensor, label)``, where ``path`` is a :class:`pathlib.Path`. Defaults
+            to ``False``.
+        positive_class: COCO category names whose images are labelled ``1`` (positive).
+            If ``None``, no binary labelling is applied. Defaults to ``None``.
+        positive_superclass: COCO supercategory names whose member categories are
+            treated as positive. Merged with ``positive_class``. Defaults to ``None``.
+        negative_class: COCO category names whose images are labelled ``0`` (negative).
+            Requires ``positive_class`` or ``positive_superclass`` to be set. Defaults
+            to ``None``.
+        negative_superclass: COCO supercategory names whose member categories are
+            treated as negative. Merged with ``negative_class``. Defaults to ``None``.
+        min_objects_per_image: Minimum number of annotated objects an image must
+            contain to be included. Defaults to ``None`` (no lower bound).
+        max_objects_per_image: Maximum number of annotated objects an image may
+            contain to be included. Defaults to ``None`` (no upper bound).
+        min_bbox_area_fraction: Minimum fraction of image area that the smallest
+            bounding box in the image must cover. Defaults to ``None`` (no lower bound).
+        max_bbox_area_fraction: Maximum fraction of image area that the largest
+            bounding box in the image may cover. Defaults to ``None`` (no upper bound).
+        positive_fraction: Target fraction of positive samples after subsampling (e.g.
+            ``0.5`` for a balanced dataset). Requires ``positive_class`` or
+            ``positive_superclass``. Defaults to ``None`` (no rebalancing).
+        filter_class: If ``"positive"``, object/bbox filters are applied only to
+            positive-labelled images; if ``"negative"``, only to negative-labelled
+            images; if ``None``, filters apply to all images. Defaults to ``None``.
+        multi_label: If ``True``, ``__getitem__`` returns a multi label vector over
+            ``positive_class`` instead of a binary scalar. Requires ``positive_class``
+            or ``positive_superclass``. Defaults to ``False``.
     """
 
     def __init__(
@@ -47,6 +72,7 @@ class COCODataset(ImageDataset):
         max_bbox_area_fraction: float | None = None,
         positive_fraction: float | None = None,
         filter_class: Literal["positive", "negative"] | None = None,
+        multi_label: bool = False,
     ) -> None:
         # Classes need to be processed before calling super.__init__
         self.label_to_meta_map: dict[int, dict[str, str]] = cast(
@@ -113,6 +139,10 @@ class COCODataset(ImageDataset):
         self.max_bbox_area_fraction = max_bbox_area_fraction
         self.positive_fraction = positive_fraction
         self.filter_class = filter_class
+        self.multi_label = multi_label
+        if self.multi_label and self.positive_class is None:
+            msg = "`positive_class` must be specified for multi-label tasks."
+            raise ValueError(msg)
 
         # Super will use keep_classes to filter the dataset by class
         super().__init__(
@@ -123,11 +153,18 @@ class COCODataset(ImageDataset):
             random_seed=random_seed,
             embedding=embedding,
             return_paths=return_paths,
+            multi_label=multi_label,
         )
 
         # Subsample data will not be called by the super if size is None
         if self.size is None and self.positive_fraction is not None:
             self.data = self.subsample_data()
+
+    @property
+    def num_labels(self) -> int:
+        if self.multi_label and self.positive_class is not None:
+            return len(self.positive_class)
+        return 2
 
     def _load_data(self) -> pd.DataFrame:
         ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
@@ -142,6 +179,10 @@ class COCODataset(ImageDataset):
 
         # Create binary task if requested
         if self.positive_class is not None:
+            if self.multi_label:
+                df["multi_label"] = df.cats.apply(
+                    lambda x: [int(cls in x) for cls in self.positive_class]
+                )
             df["label"] = df.cats.apply(
                 lambda x: int(any(cls in x for cls in self.positive_class))
             )

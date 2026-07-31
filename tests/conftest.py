@@ -38,6 +38,7 @@ class _EmbeddingTensorDataset(ImageDataset):
             random_seed=None,
             embedding=None,
             return_paths=return_paths,
+            multi_label=False,
         )
 
     def _load_data(self) -> DataFrame:
@@ -51,7 +52,9 @@ class _EmbeddingTensorDataset(ImageDataset):
     def __getitem__(self, idx: int) -> tuple:
         if self.return_paths:
             return self._tensors[idx], self.data.iloc[idx]["path"]
-        return self._tensors[idx], self.data.iloc[idx]["label"]
+        return self._tensors[idx], torch.tensor(
+            self.data.iloc[idx]["label"], dtype=torch.int64
+        )
 
 
 @pytest.fixture()

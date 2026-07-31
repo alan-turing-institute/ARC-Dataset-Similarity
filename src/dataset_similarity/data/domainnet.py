@@ -35,6 +35,9 @@ class DomainNetDataset(ImageDataset):
         return_paths: If `True`, `__getitem__` returns a tuple of (tensor, path)
             instead of (tensor, label). The path is returned as a `Path` object.
             Defaults to `False`.
+        multi_label: If `True`, `__getitem__` returns a multi label vector over
+            `positive_class` instead of a binary scalar. Not implemented for
+            DomainNet. Defaults to `False`.
     """
 
     DOMAINS = ("clipart", "infograph", "painting", "quickdraw", "real", "sketch")
@@ -46,7 +49,7 @@ class DomainNetDataset(ImageDataset):
         split: Literal["train", "test"] = "train",
         size: float | int | None = None,
         random_seed: int | None = None,
-        embedding: None | str = None,
+        embedding: str | None = None,
         return_paths: bool = False,
     ) -> None:
         # Domain needs to be processed before calling super().__init__()
@@ -96,6 +99,7 @@ class DomainNetDataset(ImageDataset):
             random_seed=random_seed,
             embedding=embedding,
             return_paths=return_paths,
+            multi_label=False,
         )
 
     def _load_data(self) -> pd.DataFrame:

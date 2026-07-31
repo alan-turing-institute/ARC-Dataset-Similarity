@@ -2,6 +2,7 @@ import stat
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 from sklearn.metrics import (
     accuracy_score,
@@ -103,13 +104,73 @@ class FixCheckpointPermissionsCallback(TrainerCallback):  # type: ignore[misc]
         return control
 
 
-def eval_metrics(logits: torch.Tensor, labels: list[int]) -> dict[str, float]:
+def _multi_label_eval(
+    logits: torch.Tensor,
+    labels: list[int] | np.ndarray,
+    additional_metrics: bool = False,
+) -> dict[str, float]:
     """
-    Compute classification metrics from Trainer predictions. Metrics include accuracy,
-    average precision, precision, recall, F1 score, and ROC AUC.
+    Compute multi-label classification metrics from Trainer predictions.
 
     Args:
-        logits: The model logits, shaped (N,) or (N, 1) for single-logit models.
+        logits: The model logits, shape ``(N, C)``.
+        labels: The true labels, shape ``(N, C)``.
+
+    Returns:
+        A dictionary containing the computed metrics.
+    """
+    probs = logits.sigmoid().numpy()
+    preds = (probs > 0.5).astype(int)
+    labels = np.asarray(labels).astype(int)
+
+    base_metrics = {
+        "accuracy": accuracy_score(labels, preds),
+        "average_precision_macro": average_precision_score(
+            labels, probs, average="macro"
+        ),
+        "average_precision_micro": average_precision_score(
+            labels, probs, average="micro"
+        ),
+    }
+
+    return (
+        base_metrics
+        | {
+            "precision_macro": precision_score(
+                labels, preds, average="macro", zero_division=0
+            ),
+            "precision_micro": precision_score(
+                labels, preds, average="micro", zero_division=0
+            ),
+            "recall_macro": recall_score(
+                labels, preds, average="macro", zero_division=0
+            ),
+            "recall_micro": recall_score(
+                labels, preds, average="micro", zero_division=0
+            ),
+            "f1_macro": f1_score(labels, preds, average="macro", zero_division=0),
+            "f1_micro": f1_score(labels, preds, average="micro", zero_division=0),
+            "roc_auc_macro": roc_auc_score(labels, probs, average="macro"),
+            "roc_auc_micro": roc_auc_score(labels, probs, average="micro"),
+        }
+        if additional_metrics
+        else base_metrics
+    )
+
+
+def _binary_eval(
+    logits: torch.Tensor,
+    labels: list[int] | np.ndarray,
+    additional_metrics: bool = False,
+) -> dict[str, float]:
+    """
+    Compute binary classification metrics from Trainer predictions.
+
+    Args:
+        logits: The model logits. Either a 1D tensor or a 2D tensor with last
+            dim 1 (single-logit models, positive-class probability via sigmoid),
+            or a 2D tensor with last dim 2 (older two-logit models, positive-class
+            probability via softmax).
         labels: The true labels.
 
     Returns:
@@ -123,20 +184,55 @@ def eval_metrics(logits: torch.Tensor, labels: list[int]) -> dict[str, float]:
         probs = logits.squeeze(-1).sigmoid().numpy()
 
     preds = (probs > 0.5).astype(int)
-    accuracy = accuracy_score(y_true=labels, y_pred=preds)
-    ap = average_precision_score(y_true=labels, y_score=probs)
-
-    # additional metrics for binary classification
-    precision = precision_score(y_true=labels, y_pred=preds)
-    recall = recall_score(y_true=labels, y_pred=preds)
-    f1 = f1_score(y_true=labels, y_pred=preds)
-    roc_auc = roc_auc_score(y_true=labels, y_score=probs)
-
-    return {
-        "accuracy": accuracy,
-        "average_precision": ap,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "roc_auc": roc_auc,
+    base_metrics = {
+        "accuracy": accuracy_score(y_true=labels, y_pred=preds),
+        "average_precision": average_precision_score(y_true=labels, y_score=probs),
     }
+    return (
+        base_metrics
+        | {
+            "precision": precision_score(y_true=labels, y_pred=preds),
+            "recall": recall_score(y_true=labels, y_pred=preds),
+            "f1": f1_score(y_true=labels, y_pred=preds),
+            "roc_auc": roc_auc_score(y_true=labels, y_score=probs),
+        }
+        if additional_metrics
+        else base_metrics
+    )
+
+
+def eval_metrics(
+    logits: torch.Tensor,
+    labels: list[int] | np.ndarray,
+    multi_label: bool = False,
+    additional_metrics: bool = False,
+) -> dict[str, float]:
+    """
+    Compute classification metrics from Trainer predictions. Metrics include accuracy,
+    average precision, precision, recall, F1 score, and ROC AUC.
+
+    Whether ``logits`` represents a multi-label problem cannot be inferred from its
+    shape alone: a two-column tensor is equally consistent with a two-logit binary
+    model (softmax, mutually-exclusive classes) or a two-label multi-label model
+    (sigmoid, independent labels), so the caller must state which applies via
+    ``multi_label``.
+
+    For multi-label inputs, macro and micro averages are reported for all metrics.
+    For binary inputs, a single scalar is reported per metric plus ROC AUC.
+
+    Args:
+        logits: The model logits. For binary inputs, a 1D tensor (single-logit
+            models) or a 2D tensor with last dim 1 (single-logit) or 2 (older
+            two-logit models). For multi-label inputs, a 2D tensor of shape
+            ``(N, C)``.
+        labels: The true labels. A 1D list/array for binary, or a 2D array of shape
+            ``(N, C)`` for multi-label.
+        multi_label: Whether ``logits``/``labels`` represent a multi-label problem.
+
+    Returns:
+        A dictionary containing the computed metrics.
+    """
+    if multi_label:
+        return _multi_label_eval(logits, labels, additional_metrics)
+
+    return _binary_eval(logits, labels, additional_metrics)
