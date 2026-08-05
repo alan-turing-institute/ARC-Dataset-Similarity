@@ -1,4 +1,0 @@
-name: "DomainNet"
-kwargs:
-  domains: ["infograph", "painting", "quickdraw", "sketch"]
-  keep_classes: ['crocodile', 'apple', 'banana', 'rabbit', 'violin']
