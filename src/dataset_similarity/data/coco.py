@@ -139,8 +139,7 @@ class COCODataset(ImageDataset):
         self.max_bbox_area_fraction = max_bbox_area_fraction
         self.positive_fraction = positive_fraction
         self.filter_class = filter_class
-        self.multi_label = multi_label
-        if self.multi_label and self.positive_class is None:
+        if multi_label and self.positive_class is None:
             msg = "`positive_class` must be specified for multi-label tasks."
             raise ValueError(msg)
 
@@ -162,9 +161,8 @@ class COCODataset(ImageDataset):
 
     @property
     def num_labels(self) -> int:
-        if self.multi_label and self.positive_class is not None:
-            return len(self.positive_class)
-        return 2
+        assert self.positive_class is not None, "This dataset has no labels defined."
+        return len(self.positive_class)
 
     def _load_data(self) -> pd.DataFrame:
         ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
