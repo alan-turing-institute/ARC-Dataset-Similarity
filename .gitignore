@@ -178,3 +178,6 @@ Thumbs.db
 
 # VScode
 .vscode/
+
+# Agents
+.claude
