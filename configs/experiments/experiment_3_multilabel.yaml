@@ -72,7 +72,3 @@ metrics:
   - mmd
   - ot_exact
   - ot_sinkhorn
-
-  # Labelled metrics
-  - otdd_approx
-  - otce_ot_sinkhorn_coupling
