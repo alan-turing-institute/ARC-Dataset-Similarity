@@ -32,7 +32,9 @@ EXPERIMENT_NAME = "data-sim-metrics"
 # MLflow's workspace-support probe hardcodes a 3s/0-retry call to
 # /api/3.0/mlflow/server-info, which times out against our server.
 # Our server runs --enable-workspaces, so the answer is always True.
-WorkspaceRestStoreMixin._probe_workspace_support = lambda self, *a, **k: True  # noqa: ARG005
+WorkspaceRestStoreMixin._probe_workspace_support = (
+    lambda self, *a, **k: True  # noqa: ARG005
+)
 
 
 def configure_mlflow() -> None:
@@ -67,6 +69,7 @@ def main(
     dataset1_name: str,
     dataset2_name: str,
     copy_label_scheme: bool,
+    store_size: int | None = None,
 ) -> None:
     # Instantiate datasets
     print("Loading datasets")
@@ -78,6 +81,11 @@ def main(
         dataset2_cfg["kwargs"]["positive_class"] = [
             label_to_class_map[label] for label in ds1.positive_class
         ]
+
+    if store_size is not None:
+        dataset2_cfg["kwargs"]["size"] = store_size
+        cfg_name = f"{cfg_name}_store_size_{store_size}"
+
     ds2 = load_dataset_from_config(dataset2_cfg)
     print("Datasets loaded successfully")
 
@@ -95,6 +103,10 @@ def main(
         **metrics_results,
     }
     result_path = METRICS_RESULT_DIR / f"{cfg_name}.yaml"
+    if result_path.exists():
+        err_msg = f"Results file {result_path} already exists."
+        raise FileExistsError(err_msg)
+
     result_path.parent.mkdir(parents=True, exist_ok=True)
     save_yaml_to_path(results, result_path)
 
@@ -112,6 +124,12 @@ if __name__ == "__main__":
         "--config",
         required=True,
         help="Name of config file inside configs/experiments/.",
+    )
+    parser.add_argument(
+        "--store_size",
+        type=int,
+        default=None,
+        help="If provided, will override the size of the second dataset.",
     )
     args = parser.parse_args()
     experiment_cfg = load_yaml_from_path(
