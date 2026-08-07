@@ -27,6 +27,7 @@ def main(args):
                 "dataset1": dataset1,
                 "dataset2": dataset2,
                 "metrics": experiment_config["metrics"],
+                "copy_label_scheme": experiment_config["copy_label_scheme"],
             }
             save_path = CONFIG_DIR / "experiments" / f"{args.config_name}/{i}.yaml"
             save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -38,6 +39,7 @@ def main(args):
                 "dataset1": dataset,
                 "dataset2": experiment_config["store"],
                 "metrics": experiment_config["metrics"],
+                "copy_label_scheme": experiment_config["copy_label_scheme"],
             }
             save_path = CONFIG_DIR / f"experiments/{args.config_name}/{i}.yaml"
             save_path.parent.mkdir(parents=True, exist_ok=True)

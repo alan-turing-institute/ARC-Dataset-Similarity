@@ -264,7 +264,6 @@ def run_sweep(
         eval_dataset,
         model_init,
         collate_fn,
-        binary_cross_entropy_loss,
     )
 
     study.optimize(objective, n_trials=sweep_args.get("n_trials", 20))

@@ -54,6 +54,7 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
         self.dataset_dir = dataset_dir
         self.split = split
         self.keep_classes = keep_classes
+        self.multi_label = multi_label
         self.data = self._load_data()
         self.size = size
         self.random_seed = random_seed
@@ -61,7 +62,6 @@ class ImageDataset(ABC, Dataset):  # type: ignore[misc]
             self.data = self.subsample_data()
         self.embedding = embedding
         self.return_paths = return_paths
-        self.multi_label = multi_label
 
     def subsample_data(self) -> DataFrame:
         """
