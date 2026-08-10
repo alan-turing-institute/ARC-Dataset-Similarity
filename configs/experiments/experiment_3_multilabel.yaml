@@ -52,7 +52,7 @@ finetune:
     sampler: RandomSampler
     sweep_seed: 42
     n_trials: 10
-    objective: eval_average_precision
+    objective: eval_average_precision_macro
     direction: maximize  # minimize or maximize
     params:
       learning_rate:
