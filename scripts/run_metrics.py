@@ -155,4 +155,5 @@ if __name__ == "__main__":
             dataset1_name=experiment_cfg["dataset1"],
             dataset2_name=experiment_cfg["dataset2"],
             copy_label_scheme=experiment_cfg["copy_label_scheme"],
+            store_size=args.store_size,
         )
