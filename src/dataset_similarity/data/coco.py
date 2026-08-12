@@ -139,7 +139,10 @@ class COCODataset(ImageDataset):
         self.drop_labels: set[int] | None = None
 
         if self.drop_subclasses is not None:
-            self.drop_labels = {self.class_to_label_map[cls] for cls in drop_subclasses}
+            assert self.positive_class is not None
+            self.drop_labels = {
+                self.class_to_label_map[cls] for cls in self.drop_subclasses
+            }
             self.positive_class = [
                 cls for cls in self.positive_class if cls not in self.drop_labels
             ]
@@ -203,9 +206,10 @@ class COCODataset(ImageDataset):
 
         # exclude images that would only be positive via a dropped subclass
         if self.drop_labels is not None:
-            positive = df.cats.apply(
-                lambda x: any(cls in x for cls in self.positive_class)
-            )
+            # for making mypy happy
+            positive_class = self.positive_class
+            assert positive_class is not None
+            positive = df.cats.apply(lambda x: any(cls in x for cls in positive_class))
             dropped = df.cats.apply(lambda x: any(cls in x for cls in self.drop_labels))
             df = df[~(dropped & ~positive)]
 
