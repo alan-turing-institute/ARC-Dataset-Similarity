@@ -88,7 +88,6 @@ def main(
 
     result_path = METRICS_RESULT_DIR / f"{cfg_name}.yaml"
 
-
     ds2 = load_dataset_from_config(dataset2_cfg)
     print("Datasets loaded successfully")
 
@@ -105,7 +104,7 @@ def main(
         "dataset2": dataset2_name,
         **metrics_results,
     }
-    
+
     result_path.parent.mkdir(parents=True, exist_ok=True)
     save_yaml_to_path(results, result_path)
 
