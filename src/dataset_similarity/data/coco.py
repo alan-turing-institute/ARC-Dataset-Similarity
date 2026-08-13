@@ -138,11 +138,17 @@ class COCODataset(ImageDataset):
         self.drop_subclasses = drop_subclasses
         self.drop_labels: set[int] | None = None
 
+        # validate that drop_subclasses are part of the superclass
         if self.drop_subclasses is not None:
-            assert self.positive_class is not None
+            assert self.positive_class is not None  # for mypy
             self.drop_labels = {
                 self.class_to_label_map[cls] for cls in self.drop_subclasses
             }
+            if not self.drop_labels <= set(self.positive_class):
+                msg = (
+                    "drop_subclasses must be a subset of the resolved positive classes."
+                )
+                raise ValueError(msg)
             self.positive_class = [
                 cls for cls in self.positive_class if cls not in self.drop_labels
             ]
