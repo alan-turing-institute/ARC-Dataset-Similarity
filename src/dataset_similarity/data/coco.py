@@ -94,6 +94,10 @@ class COCODataset(ImageDataset):
                 meta["supercategory"], []
             ).append(label)
 
+        # Store filtering attributes for use in _load_data
+        self.positive_superclass = positive_superclass
+        self.drop_subclasses = drop_subclasses
+
         # Validate class inputs
         if drop_subclasses is not None and multi_label:
             msg = "`drop_subclasses` is not supported for multi-label tasks."
@@ -133,12 +137,9 @@ class COCODataset(ImageDataset):
                 cls for cls in _negative_class if cls not in self.positive_class
             ]
 
-        # Store filtering attributes for use in _load_data
-        self.positive_superclass = positive_superclass
-        self.drop_subclasses = drop_subclasses
-        self.drop_labels: set[int] | None = None
-
         # validate that drop_subclasses are part of the superclass
+        self.drop_labels: set[int] | None = None  # for mypy reasons
+
         if self.drop_subclasses is not None:
             assert self.positive_class is not None  # for mypy
             self.drop_labels = {

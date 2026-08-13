@@ -15,8 +15,8 @@ dataset_kwargs:
   embedding: dinov3
   random_seed: 42
   positive_superclass: [[animal]]
-  # control, cats/dogs, farm animals, safari, bird, bear, bird+bear
-  drop_subclasses: [null, [cat], [dog], [cat, dog], [sheep, horse, cow], [zebra, giraffe, elephant], [bird], [bear], [bird, bear]]
+  # control, cats/dogs, farm animals, safari, bird, bear, bird+bear, one/two from each semantic group
+  drop_subclasses: [null, [cat], [dog], [cat, dog], [sheep, horse, cow], [zebra, giraffe, elephant], [bird], [bear], [bird, bear], [cat, sheep, cow, zebra, bird]]
   negative_superclass: [null, [vehicle], [food], [furniture], [sports], [kitchen], [electronic], [indoor], [appliance], [accessory], [outdoor]]
 
 
