@@ -6,7 +6,7 @@ ARC project investigating whether dataset similarity metrics predict how well a 
 
 This project studies whether distributional similarity metrics computed between a candidate task dataset and a held-out data store can predict the difference between a model's performance on its own held-out test set and its performance on the store.
 
-The package implements five similarity metrics (three label-agnostic, two label-aware, shown below) and a pipeline for fine-tuning binary/multi-label classifiers on many systematically varied task-dataset configurations, evaluating each on its own test split and on a shared data store, and comparing the resulting performance gap against each metric's score. 
+The package implements five similarity metrics (three label-agnostic, two label-aware, shown below) and a pipeline for fine-tuning binary/multi-label classifiers on many systematically varied task-dataset configurations, evaluating each on its own test split and on a shared data store, and comparing the resulting performance gap against each metric's score.
 
 Experiments are run predominantly on MS COCO, with an additional DomainNet-based proof-of-concept used to validate the metrics against a family of datasets with a known ground-truth ordering.
 
@@ -66,7 +66,7 @@ MLFLOW_TRACKING_PASSWORD=...
 
 ## Configuration System
 
-Everything is driven by YAML configs under `configs/`:
+Everything is driven by YAML configs under `configs/` (see [`configs/README.md`](configs/README.md) for the full schema of each config type, per-metric hyperparameters, and a breakdown of what each numbered experiment sweeps):
 
 ```
 configs/
