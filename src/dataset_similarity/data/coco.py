@@ -31,6 +31,11 @@ class COCODataset(ImageDataset):
             If ``None``, no binary labelling is applied. Defaults to ``None``.
         positive_superclass: COCO supercategory names whose member categories are
             treated as positive. Merged with ``positive_class``. Defaults to ``None``.
+        drop_subclasses: COCO category names removed from the resolved positive class
+            list. Images that would only be positive via one of these dropped
+            subclasses (i.e. contain no other retained positive-class category) are
+            excluded entirely from the dataset. Requires ``positive_superclass`` to be
+            set. Defaults to ``None``.
         negative_class: COCO category names whose images are labelled ``0`` (negative).
             Requires ``positive_class`` or ``positive_superclass`` to be set. Defaults
             to ``None``.
@@ -60,10 +65,11 @@ class COCODataset(ImageDataset):
         split: str = "trainARC",
         size: float | int | None = None,
         random_seed: int | None = None,
-        embedding: None | str = None,
+        embedding: str | None = None,
         return_paths: bool = False,
         positive_class: list[str] | None = None,
         positive_superclass: list[str] | None = None,
+        drop_subclasses: list[str] | None = None,
         negative_class: list[str] | None = None,
         negative_superclass: list[str] | None = None,
         min_objects_per_image: int | None = None,
@@ -88,7 +94,19 @@ class COCODataset(ImageDataset):
                 meta["supercategory"], []
             ).append(label)
 
+        # Store filtering attributes for use in _load_data
+        self.positive_superclass = positive_superclass
+        self.drop_subclasses = drop_subclasses
+
         # Validate class inputs
+        if drop_subclasses is not None and multi_label:
+            msg = "`drop_subclasses` is not supported for multi-label tasks."
+            raise ValueError(msg)
+
+        if drop_subclasses is not None and positive_superclass is None:
+            msg = "`drop_subclasses` requires `positive_superclass` to be specified."
+            raise ValueError(msg)
+
         positive_passed = positive_class is not None or positive_superclass is not None
         negative_passed = negative_class is not None or negative_superclass is not None
 
@@ -118,6 +136,24 @@ class COCODataset(ImageDataset):
             _negative_class = [
                 cls for cls in _negative_class if cls not in self.positive_class
             ]
+
+        # validate that drop_subclasses are part of the superclass
+        self.drop_labels: set[int] | None = None  # for mypy reasons
+
+        if self.drop_subclasses is not None:
+            assert self.positive_class is not None  # for mypy
+            self.drop_labels = {
+                self.class_to_label_map[cls] for cls in self.drop_subclasses
+            }
+            if not self.drop_labels <= set(self.positive_class):
+                msg = (
+                    "drop_subclasses must be a subset of the resolved positive classes."
+                )
+                raise ValueError(msg)
+            self.positive_class = [
+                cls for cls in self.positive_class if cls not in self.drop_labels
+            ]
+
         self.negative_class = _negative_class
 
         # Whether we need to drop classes depends on if all classes are negative
@@ -174,6 +210,15 @@ class COCODataset(ImageDataset):
         # Filter dataset for keep classes
         if self.keep_labels is not None:
             df = df[df.cats.apply(lambda x: any(cls in x for cls in self.keep_labels))]
+
+        # exclude images that would only be positive via a dropped subclass
+        if self.drop_labels is not None:
+            # for making mypy happy
+            positive_class = self.positive_class
+            assert positive_class is not None
+            positive = df.cats.apply(lambda x: any(cls in x for cls in positive_class))
+            dropped = df.cats.apply(lambda x: any(cls in x for cls in self.drop_labels))
+            df = df[~(dropped & ~positive)]
 
         # Create binary task if requested
         if self.positive_class is not None:

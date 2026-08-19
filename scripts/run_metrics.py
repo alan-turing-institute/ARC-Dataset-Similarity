@@ -75,12 +75,15 @@ def main(
     print("Loading datasets")
     ds1 = load_dataset_from_config(dataset1_cfg)
     if copy_label_scheme:
-        label_to_class_map = {
-            label: cat for cat, label in ds1.class_to_label_map.items()
-        }
-        dataset2_cfg["kwargs"]["positive_class"] = [
-            label_to_class_map[label] for label in ds1.positive_class
-        ]
+        if ds1.positive_superclass is not None:
+            dataset2_cfg["kwargs"]["positive_superclass"] = ds1.positive_superclass
+        else:
+            label_to_class_map = {
+                label: cat for cat, label in ds1.class_to_label_map.items()
+            }
+            dataset2_cfg["kwargs"]["positive_class"] = [
+                label_to_class_map[label] for label in ds1.positive_class
+            ]
 
     if store_size is not None:
         dataset2_cfg["kwargs"]["size"] = store_size
