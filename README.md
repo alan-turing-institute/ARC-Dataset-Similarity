@@ -15,7 +15,7 @@ Experiments are run predominantly on MS COCO, with an additional DomainNet-based
 | Config key | Method | Summary |
 |---|---|---|
 | `mmd` | Maximum Mean Discrepancy | Biased V-statistic estimate of $\lVert\hat\mu_A-\hat\mu_B\rVert^2_{\mathcal H}$ under a fixed-bandwidth Gaussian RBF kernel |
-| `ot_exact` | Optimal Transport (exact) | Unregularised OT distance ([POT](python optimal transport) network-simplex solver) with squared-Euclidean ground cost |
+| `ot_exact` | Optimal Transport (exact) | Unregularised OT distance ([POT](https://pythonot.github.io/) network-simplex solver) with squared-Euclidean ground cost |
 | `ot_sinkhorn` | Optimal Transport (Sinkhorn) | Entropic-regularised OT distance via [`geomloss`](https://www.kernel-operations.io/geomloss/) multiscale Sinkhorn |
 | `otdd_approx` | Optimal Transport Dataset Distance | OT over augmented feature–label pairs; inner label-to-label distance approximated by a Gaussian (Bures–Wasserstein) |
 | `otce_ot_sinkhorn_coupling` | OTCE (F-OTCE) | Conditional entropy $H(Y_t\mid Y_s)$ of target labels given source labels, read off the OT/Sinkhorn transport plan |
@@ -54,6 +54,14 @@ Set up pre-commit hooks:
 
 ```bash
 pre-commit install
+```
+
+`finetune.py`, `eval.py`, and `run_metrics.py` all log to MLflow, so before running any of them, export tracking credentials for a reachable server (e.g. in a `.env` file, sourced before invocation):
+
+```
+MLFLOW_TRACKING_URI=...
+MLFLOW_TRACKING_USERNAME=...
+MLFLOW_TRACKING_PASSWORD=...
 ```
 
 ## Configuration System
