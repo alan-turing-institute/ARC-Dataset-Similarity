@@ -20,8 +20,8 @@ def get_ann_path(split: str) -> Path:
     annotations, only image_info).
     """
     if split == "test2017":
-        return str(COCO_DIR / "annotations" / f"image_info_{split}.json")
-    return str(COCO_DIR / "annotations" / f"instances_{split}.json")
+        return COCO_DIR / "annotations" / f"image_info_{split}.json"
+    return COCO_DIR / "annotations" / f"instances_{split}.json"
 
 
 def read_ann_json(split: str) -> dict:
