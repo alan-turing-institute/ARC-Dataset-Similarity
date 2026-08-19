@@ -1,0 +1,74 @@
+# This config implements the quick experiment comparing three example test sets against
+# the data store, using three different metrics.
+train_split: trainARC
+val_split: valARC
+test_split: testARC
+data_store: coco_data_store
+
+# Slurm job times
+train_time: "02:00:00"
+eval_time: "01:00:00"
+metrics_time: "00:30:00"
+
+# The following used to generate combinations of datasets for the experiment
+dataset_name: COCO
+dataset_kwargs:
+  embedding: dinov3
+  random_seed: 42
+  positive_class:
+  # total percent / total N | percent single image / N
+  - [person]  # 54% / 23488 | 9% / 3679
+  - [car] # 10% / 4509 | 0% / 207
+  - [book] # 5% / 1975 | 0% /
+  negative_superclass: [null, [vehicle], [food]]
+  max_objects_per_image: [null, 4]
+  filter_class: [null, positive]
+  positive_fraction: [null, 0.05, .1, .2, .3, .4, .5]
+
+# If specified, the following overwrites dataset_kwargs for train and val splits
+overwrite: null
+
+# The following contains a fine-tuning config for the experiments. The same sweep is always used
+finetune:
+  model_args:
+    pretrained_model_name_or_path: "microsoft/resnet-50"
+    device_map: auto
+
+  training_args:
+    eval_strategy: epoch
+    save_strategy: epoch
+    save_total_limit: 1
+    dataloader_num_workers: 8
+    dataloader_persistent_workers: true
+    num_train_epochs: 1
+    per_device_train_batch_size: 128
+    per_device_eval_batch_size: 128
+
+  sweep_args:
+    sampler: RandomSampler
+    sweep_seed: 42
+    n_trials: 10
+    objective: eval_average_precision
+    direction: maximize  # minimize or maximize
+    params:
+      learning_rate:
+        type: float
+        low: 0.00001   # 1e-5
+        high: 0.001     # 1e-3
+        log: true
+      weight_decay:
+        type: float
+        low: 0.00001   # 1e-5
+        high: 0.001      # 1e-3
+        log: true
+
+# The following contains the metrics to be used in the experiment
+metrics:
+  # Unlabelled metrics
+  - mmd
+  - ot_exact
+  - ot_sinkhorn
+
+  # Labelled metrics
+  - otdd_approx
+  - otce_ot_sinkhorn_coupling
