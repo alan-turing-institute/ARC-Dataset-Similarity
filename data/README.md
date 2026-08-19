@@ -6,13 +6,13 @@
 Use the provided helper script to download and extract all domains into the expected directory layout:
 
 ```bash
-python scripts/download_domainnet.py --dataset domainnet --data-root data/DomainNet
+python scripts/download_domainnet.py --data-root data/DomainNet
 ```
 
 To download only specific domains, pass `--domains`:
 
 ```bash
-python scripts/download_domainnet.py --dataset domainnet --data-root data/DomainNet \
+python scripts/download_domainnet.py --data-root data/DomainNet \
     --domains clipart real sketch
 ```
 
@@ -48,47 +48,6 @@ The `data/metadata/domainnet_class_mapping.yaml` file maps each human-readable c
     ...
     zigzag: 344
 
-## ImageNet
-
-[ImageNet ILSVRC](https://image-net.org/) is a large-scale image classification benchmark containing ~1.2 M training images across 1,000 synset categories.
-
-### Downloading
-
-ImageNet requires a free account at [https://image-net.org/](https://image-net.org/). Once registered:
-
-1. Download the ILSVRC 2012 training set (`ILSVRC2012_img_train.tar`, ~138 GB) and validation set (`ILSVRC2012_img_val.tar`, ~6.3 GB) from the [ImageNet download page](https://image-net.org/download-images).
-2. Extract and organise them like so
-
-### Directory layout
-
-    data/
-        ImageNet/
-            train/
-                n01440764/
-                    *.JPEG
-                ...
-            val/
-                n01440764/
-                    *.JPEG
-                ...
-
-Each class sub-directory is named by its WordNet synset ID (e.g. `n01440764`). The `data/metadata/imagenet_class_mapping.yaml` file maps each synset ID to its class number and human-readable name:
-
-    n01440764:
-      class_number: 1
-      name: tench
-    n01443537:
-      class_number: 2
-      name: goldfish
-    ...
-
-When constructing an `ImageNetDataset`, you can optionally pass a `target_classes` list to restrict loading to a subset of classes. Each entry can be either a synset ID (e.g. `"n01440764"`) or a human-readable name (e.g. `"tench"`):
-
-    target_classes:
-      - n01440764
-      - tench
-      - n01484850
-
 ## COCO
 
 [COCO](https://cocodataset.org/) (Common Objects in Context) is a large-scale object detection, segmentation, and captioning benchmark. The 2017 release contains ~123 K labelled images (118 K train / 5 K val) spanning 80 object categories, plus a ~41 K-image unlabelled test set.
@@ -98,7 +57,7 @@ When constructing an `ImageNetDataset`, you can optionally pass a `target_classe
 Use the provided helper script to download and extract the 2017 images and annotations into the expected directory layout:
 
 ```bash
-python scripts/download_coco.py --split train val test
+python scripts/download_coco.py --splits train val test
 ```
 
 Alternatively, download the zip files manually from [https://cocodataset.org/#download](https://cocodataset.org/#download) and extract them into `data/COCO/`:
