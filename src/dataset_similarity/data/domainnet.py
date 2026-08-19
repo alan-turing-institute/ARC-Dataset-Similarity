@@ -103,6 +103,7 @@ class DomainNetDataset(ImageDataset):
         )
 
     def _load_data(self) -> pd.DataFrame:
+        """Concatenate per-domain dataframes into the full split."""
         return pd.concat(
             [self._load_domain(domain) for domain in self.domains], ignore_index=True
         )
@@ -155,6 +156,8 @@ class DomainNetDataset(ImageDataset):
         """
         if len(self.domains) == 1:
             return super().subsample_data()
+        # Fold domain into the label string so the base class's label-stratified
+        # split (which only sees "label") is effectively stratified by domain too.
         self.data.label = self.data.apply(
             lambda row: str(row.label) + "-" + str(row.domain), axis=1
         )

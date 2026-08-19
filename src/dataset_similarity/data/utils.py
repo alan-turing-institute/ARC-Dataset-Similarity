@@ -8,6 +8,7 @@ from dataset_similarity.data.mix import DatasetMix
 def load_dataset_from_config(
     cfg: dict[str, Any],
 ) -> ImageDataset | DatasetMix:
+    """Instantiate a dataset (or DatasetMix) from a config dict, keyed by ``name``."""
     name = cfg["name"]
     if name == "DatasetMix":
         return DatasetMix.from_dict(cfg["kwargs"])

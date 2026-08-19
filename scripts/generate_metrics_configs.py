@@ -16,6 +16,7 @@ from dataset_similarity.utils import load_yaml_from_path
 
 
 def main(args):
+    """Write one metrics config per dataset pair, or per dataset vs a fixed store."""
     cfg_path = CONFIG_DIR / "experiments" / f"{args.config_name}.yaml"
     experiment_config = load_yaml_from_path(cfg_path)
     if "store" not in experiment_config:
