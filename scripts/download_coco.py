@@ -28,6 +28,7 @@ CHUNK_SIZE = 1 << 20  # 1 MiB
 
 
 def human_bytes(n: float) -> str:
+    """Format a byte count as a human-readable string (e.g. "1.2 GiB")."""
     size = float(n)
     for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
         if size < 1024.0:
@@ -37,6 +38,7 @@ def human_bytes(n: float) -> str:
 
 
 def _print_progress(name: str, downloaded: int, total: int) -> None:
+    """Print an in-place download progress bar to stderr."""
     if total:
         pct = downloaded / total * 100
         filled = int(30 * downloaded / total)
@@ -92,6 +94,7 @@ def download_file(url: str, dest: Path) -> None:
 
 
 def extract_zip(archive: Path, dest: Path) -> None:
+    """Extract a zip archive, raising a clear error if it is corrupt."""
     dest.mkdir(parents=True, exist_ok=True)
     print(f"  extracting {archive.name} -> {dest}/")
     try:
@@ -106,6 +109,9 @@ def extract_zip(archive: Path, dest: Path) -> None:
 
 
 def download_images(split: str, data_root: Path, archive_dir: Path) -> None:
+    """
+    Download and extract the image archive for a split, skipping if already present.
+    """
     filename, size = IMAGE_ARCHIVES[split]
     target = data_root / "images" / f"{split}2017"
     if target.is_dir() and any(target.iterdir()):
@@ -127,6 +133,9 @@ def download_annotations(
     data_root: Path,
     archive_dir: Path,
 ) -> None:
+    """
+    Download and extract an annotation archive if its marker file isn't present yet.
+    """
     filename, size = url_name
     if marker.exists():
         print(f"[annotations] {label} already present, skipping")
@@ -141,6 +150,7 @@ def download_annotations(
 
 
 def parse_args(argv=None) -> argparse.Namespace:
+    """Parse CLI arguments."""
     p = argparse.ArgumentParser(
         description="Download and extract the COCO 2017 dataset."
     )
@@ -155,6 +165,7 @@ def parse_args(argv=None) -> argparse.Namespace:
 
 
 def main(argv=None) -> int:
+    """Download and extract the requested COCO image splits and annotations."""
     args = parse_args(argv)
     data_root: Path = COCO_DIR
     archive_dir: Path = data_root / "_archives"

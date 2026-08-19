@@ -1,3 +1,8 @@
+"""
+Generate per-condition dataset/finetune/metrics configs and Slurm array scripts
+for a numbered experiment, by taking all combinations of swept dataset_kwargs.
+"""
+
 import argparse
 from copy import deepcopy
 from itertools import product
@@ -21,11 +26,13 @@ SCRIPTS_DIR = PROJECT_DIR / "scripts"
 def _build_dataset_cfgs(
     name: str, kwarg_options: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    """All combinations of list-valued kwargs into one dataset config per condition."""
     combo_dict = {}
     for kwarg, value in kwarg_options.items():
         if isinstance(value, list):
             combo_dict[kwarg] = value
         else:
+            # Wrap scalars as single lists so they're held fixed by the product below.
             combo_dict[kwarg] = [value]
 
     combo_dict_keys, combo_dict_vals = zip(*combo_dict.items(), strict=False)
@@ -42,6 +49,7 @@ def _save_dataset_cfg(
     i: int,
     overwrite: None | dict = None,
 ) -> Path:
+    """Write one split's dataset config (optionally with kwarg overrides) to disk."""
     dataset_cfg = deepcopy(dataset)
     dataset_cfg["kwargs"]["split"] = split
     if overwrite is not None:
@@ -60,6 +68,10 @@ def _save_dataset_cfgs(
     test_split: str,
     overwrite: None | dict = None,
 ) -> tuple[list[Path], list[Path], list[Path]]:
+    """
+    Write train/val/test dataset configs for every condition; overwrite is applied
+    to train/val only, never test, so test-time distribution stays as swept.
+    """
     save_dir = DATA_CONFIG_DIR / experiment_name
     save_dir.mkdir(parents=True, exist_ok=True)
     train_paths = [
@@ -70,6 +82,7 @@ def _save_dataset_cfgs(
         _save_dataset_cfg(save_dir, val_split, dataset, i, overwrite)
         for i, dataset in enumerate(datasets)
     ]
+    # test always uses overwrite=None: never force test-time balance/overrides.
     test_paths = [
         _save_dataset_cfg(save_dir, test_split, dataset, i, None)
         for i, dataset in enumerate(datasets)
@@ -78,6 +91,7 @@ def _save_dataset_cfgs(
 
 
 def _get_name_from_path(cfg_path: Path) -> str:
+    """Convert a saved config path to the dotted name used to reference it elsewhere."""
     return str(cfg_path.relative_to(DATA_CONFIG_DIR).with_suffix(""))
 
 
@@ -87,6 +101,10 @@ def _build_finetune_cfg(
     experiment_name: str,
     i: int,
 ) -> None:
+    """
+    Build and save the finetune config for one condition, with a per-condition
+    sweep_seed so hyperparameter trials differ across conditions but stay reproducible.
+    """
     cfg = {
         "train_data_config": _get_name_from_path(task[0]),
         "val_data_config": _get_name_from_path(task[1]),
@@ -108,6 +126,9 @@ def _build_finetune_cfg(
 def _write_metrics_cfg(
     test_path: Path, data_store: str, metrics: list[str], experiment_name: str, i: int
 ) -> None:
+    """
+    Write a metrics config pairing the condition's test split against the data store.
+    """
     cfg = {
         "dataset1": _get_name_from_path(test_path),
         "dataset2": data_store,  # This MUST be second to correctly copy the labels
@@ -129,6 +150,9 @@ def _write_slurm_script(
     time: str,
     root: str | None = None,
 ):
+    """
+    Render a Slurm array job script from a Jinja template and write it to disk.
+    """
     template_dir = SCRIPTS_DIR / "templates"
     environment = Environment(loader=FileSystemLoader(template_dir))
     template = environment.get_template(template)
@@ -143,6 +167,9 @@ def _write_slurm_script(
 
 
 def main(experiment_name: str, root: str | None):
+    """
+    Generate all dataset/finetune/metrics configs and Slurm scripts for an experiment.
+    """
     # Load top-level config
     CFG_PATH = EXPERIMENT_CONFIG_DIR / f"{experiment_name}.yaml"
     top_cfg = load_yaml_from_path(CFG_PATH)

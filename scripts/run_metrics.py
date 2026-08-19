@@ -53,6 +53,9 @@ def apply_metric(
     ds1: ImageDataset | DatasetMix,
     ds2: ImageDataset | DatasetMix,
 ) -> float:
+    """
+    Load a metric's config, resolve its function, and compute it for the two datasets.
+    """
     metric_cfg = load_yaml_from_path(METRIC_CONFIG_DIR / f"{metric_name}.yaml")
     metric_fn = getattr(metrics, metric_cfg["metric"])
     print(
@@ -71,11 +74,20 @@ def main(
     copy_label_scheme: bool,
     store_size: int | None = None,
 ) -> None:
+    """
+    Load ds1/ds2 (optionally copying ds1's label scheme onto ds2), compute the
+    configured metrics between them, and save/log the results.
+    """
     # Instantiate datasets
     print("Loading datasets")
     ds1 = load_dataset_from_config(dataset1_cfg)
     if copy_label_scheme:
         if ds1.positive_superclass is not None:
+            # copies positive_superclass onto ds2 verbatim. COCODataset's
+            # drop_subclasses only narrows the resolved positive_class list, it never
+            # mutates positive_superclass, so ds2 (typically the unlabelled store)
+            # ends up positive on the FULL superclass even when ds1 had subclasses
+            # excised.
             dataset2_cfg["kwargs"]["positive_superclass"] = ds1.positive_superclass
         else:
             label_to_class_map = {

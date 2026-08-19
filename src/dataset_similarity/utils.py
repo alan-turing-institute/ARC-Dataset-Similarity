@@ -94,12 +94,14 @@ class FixCheckpointPermissionsCallback(TrainerCallback):  # type: ignore[misc]
         control: TrainerControl,
         **kwargs: dict[str, Any],
     ) -> TrainerControl:
+        """Grant group read access to the just-saved checkpoint's safetensors file."""
         model_file = (
             Path(args.output_dir)
             / f"checkpoint-{state.global_step}"
             / "model.safetensors"
         )
         if model_file.exists():
+            # Trainer writes checkpoints without group-read; needed for shared access.
             model_file.chmod(model_file.stat().st_mode | stat.S_IRGRP)
         return control
 

@@ -125,6 +125,8 @@ def otce_distance(
     h = conditional_entropy(coupling, src_labels, tgt_labels)
 
     # --- Step 3: OTCE ---
+    # Unweighted W + H (implicit lambda1=lambda2=1, b=0), not the paper's regression-
+    # calibrated score - avoids needing an auxiliary task suite to fit the combination.
     if use_wasserstein:
         otce_dist: float = (wasserstein + h).item()
     else:

@@ -15,12 +15,17 @@ from dataset_similarity.constants import COCO_DIR
 
 
 def get_ann_path(split: str) -> Path:
+    """
+    Path to the source annotation file for a split (test2017 has no instance
+    annotations, only image_info).
+    """
     if split == "test2017":
         return str(COCO_DIR / "annotations" / f"image_info_{split}.json")
     return str(COCO_DIR / "annotations" / f"instances_{split}.json")
 
 
 def read_ann_json(split: str) -> dict:
+    """Load the raw COCO annotation json for a source split."""
     with open(get_ann_path(split)) as f:
         return json.load(f)
 
@@ -28,6 +33,8 @@ def read_ann_json(split: str) -> dict:
 def _make_ann_dict(
     split_images: list[dict], template: dict, annotations: list[dict]
 ) -> dict:
+    """Build a COCO-format annotation dict for a subset of images, filtering
+    annotations down to just those images and merging in the shared template fields."""
     image_ids = {image["id"] for image in split_images}
     split_annotations = [
         annotation for annotation in annotations if annotation["image_id"] in image_ids
@@ -42,6 +49,7 @@ def _make_ann_dict(
 def make_new_ann(
     split_images: list[dict], output_name: str, template: dict, annotations: list[dict]
 ) -> None:
+    """Build and write a new instances_<output_name>.json annotation file."""
     ann_dict = _make_ann_dict(split_images, template, annotations)
     output_path = COCO_DIR / "annotations" / f"instances_{output_name}.json"
     with open(output_path, "w") as f:
@@ -49,6 +57,10 @@ def make_new_ann(
 
 
 def main():
+    """
+    Re-split combined train2017+val2017 images into store/train/val/test and
+    write new annotation files for each.
+    """
     # Read in the original train and val annotations
     train_anns = read_ann_json("train2017")
     val_anns = read_ann_json("val2017")
@@ -66,8 +78,11 @@ def main():
 
     # Split the images into store, train, val, and test
     N = len(images)
-    val_p = int(N * 0.15 / 2)
+    val_p = int(
+        N * 0.15 / 2
+    )  # target count (not fraction) for val and, separately, test
     store, rest = train_test_split(images, test_size=0.5, random_state=42)
+    # test_size as an int is an absolute sample count here, not a fraction.
     train, test = train_test_split(rest, test_size=val_p, random_state=42)
     train, val = train_test_split(train, test_size=val_p, random_state=42)
 

@@ -82,12 +82,16 @@ def otdd(
     """
     tds1 = _prepare_otdd_tensor_dataset(dataset1)
     tds2 = _prepare_otdd_tensor_dataset(dataset2)
+    # Per-class label statistics (used for the inner Gaussian/Bures-Wasserstein label
+    # distance) are computed from the full tds1/tds2 here; only the outer sample-level
+    # transport below is subsampled to maxsamples.
     otdd_distance = DatasetDistance(
         D1=tds1,
         D2=tds2,
         **kwargs,
     )
     if return_coupling:
+        # otdd subsamples via np.random.choice internally
         distance_tensor, coupling = otdd_distance.distance(
             return_coupling=True, maxsamples=maxsamples
         )

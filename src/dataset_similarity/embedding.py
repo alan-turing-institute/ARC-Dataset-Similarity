@@ -53,6 +53,7 @@ class Extractor:
         hf_model_id: str | None = None,
         device: str | torch.device = "cpu",
     ) -> None:
+        """Load the processor and model for *model_name* onto *device*."""
         if model_name not in MODEL_NAMES:
             msg = f"Unknown model '{model_name}'. Available: {sorted(MODEL_NAMES)}"
             raise ValueError(msg)
@@ -80,6 +81,8 @@ class Extractor:
         Returns:
             Embedding tensor of shape ``(B, D)``.
         """
+        # CLIP is a text+vision models, so the vision tower must be
+        # extracted; DINOv3 is a vision-only model and already is the encoder.
         encoder = (
             self._model if self.model_name == "dinov3" else self._model.vision_model
         )

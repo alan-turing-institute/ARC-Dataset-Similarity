@@ -153,6 +153,8 @@ class COCODataset(ImageDataset):
             self.positive_class = [
                 cls for cls in self.positive_class if cls not in self.drop_labels
             ]
+            # self.positive_superclass is NOT pruned here - it still names the full
+            # superclass, e.g. when copied verbatim onto a comparison dataset.
 
         self.negative_class = _negative_class
 
@@ -197,10 +199,12 @@ class COCODataset(ImageDataset):
 
     @property
     def num_labels(self) -> int:
+        """Number of labels; length of the resolved ``positive_class`` list."""
         assert self.positive_class is not None, "This dataset has no labels defined."
         return len(self.positive_class)
 
     def _load_data(self) -> pd.DataFrame:
+        """Build dataframe from COCO annotations, apply class/filter rules."""
         ann_file = self.dataset_dir / "annotations" / f"instances_{self.split}.json"
         coco = COCO(str(ann_file))
         df = pd.DataFrame(
@@ -240,6 +244,7 @@ class COCODataset(ImageDataset):
         return self._apply_object_filters(df)
 
     def _apply_object_filters(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Apply min/max object-count and bbox-area-fraction filters."""
         if self.min_objects_per_image is not None:
             df = df[df.num_objects >= self.min_objects_per_image]
         if self.max_objects_per_image is not None:

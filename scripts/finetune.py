@@ -1,3 +1,7 @@
+"""
+Fine-tune an image classifier per experimental condition, with optional Optuna sweep.
+"""
+
 import argparse
 import os
 from datetime import datetime
@@ -162,10 +166,14 @@ def _generate_objective_fn(
     model_init: callable,
     collate_fn: callable,
 ) -> callable:
+    """Build an Optuna objective closure that trains and evaluates one trial."""
     init_training_args = config.get("training_args", {})
     sweep_args = config["sweep_args"]
 
     def objective(trial):
+        """
+        Sample hyperparams for this trial, train, evaluate, return objective metric.
+        """
         trial_output_dir = sweep_dir / f"run{trial.number}"
         sweep_parameters = {
             name: suggest(trial, name, spec)
@@ -237,6 +245,9 @@ def run_sweep(
     collate_fn: callable,
     model_init: callable,
 ):
+    """
+    Run an Optuna hyperparameter sweep and symlink the winning trial as best_model.
+    """
     print("Starting hyperparameter sweep with Optuna...")
     sweep_args = config["sweep_args"]
     output_dir = TRAINED_MODELS_DIR / config_name
@@ -291,6 +302,9 @@ def run_finetune(
     collate_fn: callable,
     model_init: callable,
 ):
+    """
+    Run a single (non-swept) fine-tuning run and save the trained model.
+    """
     init_training_args = config.get("training_args", {})
     output_dir = TRAINED_MODELS_DIR / config_name
     model = model_init(None)
@@ -380,6 +394,9 @@ def main(config_name: str) -> None:
         mlflow.log_param("num_labels", num_labels)
 
         def model_init(_):
+            """
+            Build a fresh model; arg unused, matches Trainer's model_init signature.
+            """
             modelCls = AutoModelForImageClassification
             if config["model_args"]["pretrained_model_name_or_path"].startswith(
                 "facebook/dinov3"
@@ -387,7 +404,11 @@ def main(config_name: str) -> None:
                 modelCls = DINOv3Classifier
             return modelCls.from_pretrained(
                 num_labels=num_labels,
+                # multi_label_classification also covers the binary case here,
+                # since binary_cross_entropy_loss expects BCE-with-logits either way.
                 problem_type="multi_label_classification",
+                # head size varies per condition (num_labels), so pretrained
+                # classifier head can't be reused as-is.
                 ignore_mismatched_sizes=True,
                 **config["model_args"],
             )
@@ -397,6 +418,9 @@ def main(config_name: str) -> None:
         def collate_fn(
             batch: list[tuple[torch.Tensor, int]],
         ) -> dict[str, torch.Tensor]:
+            """
+            Batch raw images through the processor and stack labels into a tensor.
+            """
             inputs = processor(images=[item[0] for item in batch], return_tensors="pt")
             return {
                 **inputs,
