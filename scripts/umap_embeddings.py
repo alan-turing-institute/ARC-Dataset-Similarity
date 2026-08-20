@@ -56,7 +56,7 @@ def main(config_path: str):
     Load a dataset from a config file and plot UMAP embeddings.
     """
 
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         cfg = json.load(f)
 
     dataset, model = load_from_config(cfg)
