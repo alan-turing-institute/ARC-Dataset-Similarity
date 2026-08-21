@@ -341,7 +341,6 @@ def run_finetune(
 
 
 def main(config_name: str) -> None:
-
     configure_mlflow()
 
     with mlflow.start_run(

@@ -136,9 +136,9 @@ def _run(cfg_name: str) -> None:
         # resolved positive_class list, never positive_superclass, so the store ends
         # up with the FULL superclass as positive even if eval_dataset had subclasses
         # excised (see COCODataset.drop_subclasses).
-        data_store_config["kwargs"][
-            "positive_superclass"
-        ] = eval_dataset.positive_superclass
+        data_store_config["kwargs"]["positive_superclass"] = (
+            eval_dataset.positive_superclass
+        )
     else:
         label_to_class_map = {
             label: cat for cat, label in eval_dataset.class_to_label_map.items()
