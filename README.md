@@ -6,32 +6,9 @@ ARC project investigating whether dataset similarity metrics predict how well a 
 
 This project studies whether distributional similarity metrics computed between a candidate task dataset and a held-out data store can predict the difference between a model's performance on its own held-out test set and its performance on the store.
 
-The package implements five similarity metrics (three label-agnostic, two label-aware, shown below) and a pipeline for fine-tuning binary/multi-label classifiers on many systematically varied task-dataset configurations, evaluating each on its own test split and on a shared data store, and comparing the resulting performance gap against each metric's score.
+The package implements five similarity metrics and a pipeline for fine-tuning binary/multi-label classifiers on many systematically varied task-dataset configurations, evaluating each on its own test split and on a shared data store, and comparing the resulting performance gap against each metric's score.
 
-Experiments are run predominantly on MS COCO, with an additional DomainNet-based proof-of-concept used to validate the metrics against a family of datasets with a known ground-truth ordering.
-
-## Metrics
-
-| Config key | Method | Summary |
-|---|---|---|
-| `mmd` | Maximum Mean Discrepancy | Biased V-statistic estimate of $\lVert\hat\mu_A-\hat\mu_B\rVert^2_{\mathcal H}$ under a fixed-bandwidth Gaussian RBF kernel |
-| `ot_exact` | Optimal Transport (exact) | Unregularised OT distance ([POT](https://pythonot.github.io/) network-simplex solver) with squared-Euclidean ground cost |
-| `ot_sinkhorn` | Optimal Transport (Sinkhorn) | Entropic-regularised OT distance via [`geomloss`](https://www.kernel-operations.io/geomloss/) multiscale Sinkhorn |
-| `otdd_approx` | Optimal Transport Dataset Distance | OT over augmented feature–label pairs; inner label-to-label distance approximated by a Gaussian (Bures–Wasserstein) |
-| `otce_ot_sinkhorn_coupling` | OTCE (F-OTCE) | Conditional entropy $H(Y_t\mid Y_s)$ of target labels given source labels, read off the OT/Sinkhorn transport plan |
-
-All metrics are computed between a condition's test split and the data store; the two label-aware metrics require `copy_label_scheme: true` so the (otherwise unlabelled) store adopts the test set's label definition for the comparison.
-
-## Datasets
-
-Notes on dataset preparation can be found in [`data/README.md`](data/README.md).
-
-| Dataset | Role | Notes |
-|---|---|---|
-| [COCO 2017](https://cocodataset.org/) | Primary benchmark | Re-split into a data store plus train/val/test ARC splits; binary/multi-label tasks constructed from instance annotations |
-| [DomainNet](http://ai.bu.edu/M3SDA/) | Metric validation (proof-of-concept) | Real/clipart domain mixtures with a known ground-truth similarity ordering, used to sanity-check the metrics before the main sweeps |
-
-Datasets are **not** included in this repository. Each dataset must be downloaded separately; see `data/README.md` and the `scripts/download_*.py` helpers.
+Experiments are run predominantly on MS COCO, with an additional DomainNet-based proof-of-concept used to validate the metrics against a family of datasets with a known ground-truth ordering. Dataset preparation is covered in [`data/README.md`](data/README.md).
 
 ## Installation
 
@@ -60,7 +37,7 @@ MLFLOW_TRACKING_PASSWORD=...
 
 ## Configuration System
 
-Everything is driven by YAML configs under `configs/` (see [`configs/README.md`](configs/README.md) for the full schema of each config type, per-metric hyperparameters, and a breakdown of what each numbered experiment sweeps):
+Everything is driven by YAML configs under `configs/` (see [`configs/README.md`](configs/README.md) for how each config type is structured):
 
 ```
 configs/
