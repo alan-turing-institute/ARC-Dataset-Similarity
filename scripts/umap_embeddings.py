@@ -1,18 +1,30 @@
-import json
-from argparse import ArgumentParser
-from glob import glob
-from zipfile import Path
+import argparse
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import torch
+import umap
+from plotnine import aes, geom_point, ggplot, labs, theme_bw
+from torch.utils.data import DataLoader
+
+from dataset_similarity.constants import (
+    DATA_CONFIG_DIR,
+    FINETUNE_CONFIG_DIR,
+    UMAP_PLOTS_DIR,
+    UMAP_RESULT_DIR,
+)
+from dataset_similarity.data.base import ImageDataset
+from dataset_similarity.data.mix import DatasetMix
+from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.utils import load_yaml_from_path
 
-import torch
-from dataset_similarity.dinov3 import DINOv3Classifier
-from transformers import AutoModelForImageClassification, AutoImageProcessor
+Dataset = ImageDataset | DatasetMix
 
-from dataset_similarity.data.utils import load_dataset_from_config
 
-from dataset_similarity.constants import TRAINED_MODELS_DIR, DATA_CONFIG_DIR, DATA_DIR, FINETUNE_CONFIG_DIR
-
-def get_datasets_from_configs(cfg_name, return_store=False):
+def get_datasets_from_configs(
+    cfg_name: str, return_store: bool = False
+) -> Dataset | tuple[Dataset, Dataset]:
     # load_config
     config_path = FINETUNE_CONFIG_DIR / f"{cfg_name}.yaml"
     config = load_yaml_from_path(config_path)
@@ -47,28 +59,175 @@ def get_datasets_from_configs(cfg_name, return_store=False):
     return eval_dataset, data_store
 
 
-def main(args):
-    eval_datasets = []
-    if len(args.configs) == 1:
-        eval_dataset, data_store = get_datasets_from_configs(args.configs[0], return_store=True)
-        eval_datasets.append(eval_dataset)
+def build_fit_matrix(
+    dataset: Dataset,
+    batch_size: int,
+    num_workers: int,
+    random_seed: int,
+    sample_size: int | None = None,
+) -> np.ndarray:
+    """Stream `dataset` into memory as a single (N, D) matrix to fit UMAP on.
+
+    UMAP has no incremental/partial-fit mode, so it must be fit on a matrix held
+    fully in memory. The dataset is never indexed as a whole; it is streamed through
+    a DataLoader in batches and the batches concatenated, so no more than one batch
+    of raw samples is materialised at a time. By default every sample is collected
+    (feasible even for the full store, since it holds precomputed embedding vectors
+    rather than raw images). If `sample_size` is given, a shuffled DataLoader is
+    drawn from instead until `sample_size` rows have been collected, bounding memory
+    use to the sample size rather than the size of the dataset.
+    """
+    shuffle = sample_size is not None
+    generator = torch.Generator().manual_seed(random_seed) if shuffle else None
+    loader: DataLoader[Any] = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        generator=generator,
+    )
+    batches = []
+    n_collected = 0
+    for features, _ in loader:
+        batches.append(features.numpy())
+        n_collected += features.shape[0]
+        if sample_size is not None and n_collected >= sample_size:
+            break
+    fit_matrix = np.concatenate(batches, axis=0)
+    if sample_size is not None:
+        fit_matrix = fit_matrix[:sample_size]
+    return fit_matrix
+
+
+def batched_transform(
+    dataset: Dataset,
+    reducer: umap.UMAP,
+    batch_size: int,
+    num_workers: int,
+) -> pd.DataFrame:
+    """Project every sample in `dataset` through an already-fit UMAP `reducer`.
+
+    Streams the dataset through a DataLoader so only one batch of embeddings is ever
+    held in memory; the resulting low-dimensional coordinates (a handful of floats per
+    sample) are accumulated in full, since they are orders of magnitude smaller than
+    the source embeddings.
+    """
+    loader: DataLoader[Any] = DataLoader(
+        dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
+    coords = []
+    for features, _ in loader:
+        coords.append(reducer.transform(features.numpy()))
+    coords_arr = np.concatenate(coords, axis=0)
+    columns = [f"umap_{i + 1}" for i in range(coords_arr.shape[1])]
+    return pd.DataFrame(coords_arr, columns=columns)
+
+
+def main(args: argparse.Namespace) -> None:
+    print(f"Loading store and eval dataset for '{args.configs[0]}'")
+    eval_dataset, data_store = get_datasets_from_configs(
+        args.configs[0], return_store=True
+    )
+    eval_datasets = [(args.configs[0], eval_dataset)]
+    for cfg_name in args.configs[1:]:
+        print(f"Loading eval dataset for '{cfg_name}'")
+        eval_datasets.append(
+            (cfg_name, get_datasets_from_configs(cfg_name, return_store=False))
+        )
+
+    fit_size_desc = (
+        "the whole store"
+        if args.fit_sample_size is None
+        else f"a sample of {args.fit_sample_size} store embeddings"
+    )
+    print(f"Fitting UMAP on {fit_size_desc} (store size: {len(data_store)})")
+    fit_matrix = build_fit_matrix(
+        data_store,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        random_seed=args.random_seed,
+        sample_size=args.fit_sample_size,
+    )
+    reducer = umap.UMAP(
+        n_neighbors=args.n_neighbors,
+        min_dist=args.min_dist,
+        n_components=args.n_components,
+        random_state=args.random_seed,
+    )
+    reducer.fit(fit_matrix)
+
+    print("Transforming data store")
+    store_df = batched_transform(data_store, reducer, args.batch_size, args.num_workers)
+    store_df["dataset"] = "coco_data_store"
+    all_dfs = [store_df]
+
+    for cfg_name, dataset in eval_datasets:
+        print(f"Transforming '{cfg_name}'")
+        df = batched_transform(dataset, reducer, args.batch_size, args.num_workers)
+        df["dataset"] = cfg_name
+        all_dfs.append(df)
+
+    result_df = pd.concat(all_dfs, ignore_index=True)
+
+    UMAP_RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    result_path = UMAP_RESULT_DIR / f"{args.output_name}.csv"
+    result_df.to_csv(result_path, index=False)
+    print(f"Coordinates saved to {result_path}")
+
+    if args.n_components == 2:
+        plot = (
+            ggplot(result_df, aes(x="umap_1", y="umap_2", color="dataset"))
+            + geom_point(alpha=0.4, size=0.6)
+            + theme_bw()
+            + labs(title=args.output_name)
+        )
+        UMAP_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+        plot_path = UMAP_PLOTS_DIR / f"{args.output_name}.png"
+        plot.save(plot_path, dpi=300)
+        print(f"Plot saved to {plot_path}")
     else:
-        eval_dataset, data_store = get_datasets_from_configs(args.configs[0], return_store=True)
-        eval_datasets.append(eval_dataset)
-        for cfg_name in args.configs[1:]:
-            eval_datasets.append(get_datasets_from_configs(cfg_name, return_store=False))
+        print(
+            f"n_components={args.n_components} != 2, skipping plot "
+            "(only 2D projections are plotted)."
+        )
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="UMAP Embeddings Script")
+    parser = argparse.ArgumentParser(
+        description="Fit UMAP on the COCO data store and apply it to the store and "
+        "one or more evaluation dataset configs."
+    )
     parser.add_argument(
         "configs",
         type=str,
         nargs="+",
-        help="configs to plot against the store UMAP embeddings",
+        help="Finetune config names (relative to configs/finetune/) to plot against "
+        "the store's UMAP embedding. The store used is the one associated with the "
+        "first config.",
     )
+    parser.add_argument(
+        "--output_name",
+        type=str,
+        default=None,
+        help="Base name for the output CSV/plot. Defaults to the first config name.",
+    )
+    parser.add_argument(
+        "--fit_sample_size",
+        type=int,
+        default=None,
+        help="Number of store samples to draw (via a shuffled DataLoader) to fit "
+        "UMAP on. Defaults to None, meaning UMAP is fit on the whole store. Set "
+        "this to bound memory use to a random subsample instead, e.g. if the full "
+        "store's embeddings don't fit in memory.",
+    )
+    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--n_neighbors", type=int, default=15)
+    parser.add_argument("--min_dist", type=float, default=0.1)
+    parser.add_argument("--n_components", type=int, default=2)
+    parser.add_argument("--random_seed", type=int, default=0)
     args = parser.parse_args()
+    if args.output_name is None:
+        args.output_name = args.configs[0].replace("/", "_")
 
     main(args)

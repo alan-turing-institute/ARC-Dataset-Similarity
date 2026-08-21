@@ -39,6 +39,7 @@ dependencies = [
     "transformers>=5.4.0",
     "pyaml>=26.2.1",
     "scikit-learn>=1.7.2",
+    "umap-learn>=0.5.7",
     "pandas>=2.3.3",
     "otdd",
     "geomloss>=0.3.1",
