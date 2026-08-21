@@ -1,5 +1,5 @@
 """
-Fine-tune an image classifier per experimental condition, with optional Optuna sweep.
+Fine-tune an image classifier given a finetuning config with optional Optuna sweep.
 """
 
 import argparse
@@ -341,22 +341,6 @@ def run_finetune(
 
 
 def main(config_name: str) -> None:
-    """
-    Fine-tune an image classification model using a named YAML config.
-
-    Loads the dataset and model specified in ``configs/finetune/<config_name>.yaml``,
-    then either:
-
-    - Runs a single training run and saves metrics to
-      ``trained_models/<config_name>/trained_model/``.
-    - Runs an Optuna hyperparameter sweep (when ``sweep_args`` is present in
-      the config), saves per-trial metrics under
-      ``trained_models/<config_name>/sweep_trials/run<N>/``, and symlinks
-      ``best_model`` to the winning trial.
-
-    Args:
-        config_name: Stem of a YAML file in ``configs/finetune/``.
-    """
 
     configure_mlflow()
 

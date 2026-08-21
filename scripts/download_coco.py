@@ -165,7 +165,6 @@ def parse_args(argv=None) -> argparse.Namespace:
 
 
 def main(argv=None) -> int:
-    """Download and extract the requested COCO image splits and annotations."""
     args = parse_args(argv)
     data_root: Path = COCO_DIR
     archive_dir: Path = data_root / "_archives"

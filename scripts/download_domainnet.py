@@ -74,7 +74,6 @@ def download_domainnet(data_root: Path, domains: list[str]) -> None:
 
 
 def main() -> None:
-    """Parse CLI args and run the DomainNet download."""
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", required=True, type=Path)
     parser.add_argument(

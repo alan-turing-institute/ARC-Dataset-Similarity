@@ -1,6 +1,6 @@
 """
 Generate per-condition dataset/finetune/metrics configs and Slurm array scripts
-for a numbered experiment, by taking all combinations of swept dataset_kwargs.
+for a top-level experiment config, by taking all combinations of swept dataset_kwargs.
 """
 
 import argparse
@@ -47,7 +47,7 @@ def _save_dataset_cfg(
     split: str,
     dataset: dict[str, Any],
     i: int,
-    overwrite: None | dict = None,
+    overwrite: dict | None = None,
 ) -> Path:
     """Write one split's dataset config (optionally with kwarg overrides) to disk."""
     dataset_cfg = deepcopy(dataset)
@@ -66,7 +66,7 @@ def _save_dataset_cfgs(
     train_split: str,
     val_split: str,
     test_split: str,
-    overwrite: None | dict = None,
+    overwrite: dict | None = None,
 ) -> tuple[list[Path], list[Path], list[Path]]:
     """
     Write train/val/test dataset configs for every condition; overwrite is applied
@@ -167,9 +167,6 @@ def _write_slurm_script(
 
 
 def main(experiment_name: str, root: str | None):
-    """
-    Generate all dataset/finetune/metrics configs and Slurm scripts for an experiment.
-    """
     # Load top-level config
     CFG_PATH = EXPERIMENT_CONFIG_DIR / f"{experiment_name}.yaml"
     top_cfg = load_yaml_from_path(CFG_PATH)
