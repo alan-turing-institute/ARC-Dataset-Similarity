@@ -57,10 +57,6 @@ def make_new_ann(
 
 
 def main():
-    """
-    Re-split combined train2017+val2017 images into store/train/val/test and
-    write new annotation files for each.
-    """
     # Read in the original train and val annotations
     train_anns = read_ann_json("train2017")
     val_anns = read_ann_json("val2017")

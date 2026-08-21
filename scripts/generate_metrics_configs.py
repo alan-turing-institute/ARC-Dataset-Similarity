@@ -1,9 +1,6 @@
 """
-Example use:
-
-```bash
-python scripts/generate_metrics_configs.py --config_name experiment_0
-```
+generate per-condition metrics configs for a top-level experiment config, by taking all
+combinations of swept dataset_kwargs.
 """
 
 import argparse
@@ -16,7 +13,6 @@ from dataset_similarity.utils import load_yaml_from_path
 
 
 def main(args):
-    """Write one metrics config per dataset pair, or per dataset vs a fixed store."""
     cfg_path = CONFIG_DIR / "experiments" / f"{args.config_name}.yaml"
     experiment_config = load_yaml_from_path(cfg_path)
     if "store" not in experiment_config:

@@ -37,9 +37,6 @@ from dataset_similarity.utils import load_yaml_from_path
 
 
 def main(args: argparse.Namespace) -> None:
-    """
-    Load a dataset from config, extract embeddings, and save per-image safetensors.
-    """
     data_cfg = load_yaml_from_path(CONFIG_DIR / "data" / args.dataset)
     init_kwargs = dict(data_cfg["kwargs"])
     extractor_name = init_kwargs.pop("embedding")

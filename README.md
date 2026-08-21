@@ -44,12 +44,6 @@ uv sync
 source .venv/bin/activate
 ```
 
-On a Linux HPC with CUDA GPUs, pin the interpreter first:
-
-```bash
-uv venv --python 3.10.20
-```
-
 Set up pre-commit hooks:
 
 ```bash

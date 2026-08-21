@@ -1,13 +1,6 @@
 """
-Simple script for checking the OTDD runs on Isambard without error. Long-term this will
-be deleted and the functionality will be re-implemented in a broader script for running
-all metrics with args for controlling which metrics to run, which datasets to use, etc.
-
-Example usage:
-
-```bash
-python scripts/run_metrics.py --metrics otdd_exact mmd
-```
+Run metrics between two datasets, as specified in provided config file. Metrics are
+provided as a list of metric names which are resolved against configs/metrics/*.yaml
 """
 
 import argparse
@@ -74,10 +67,6 @@ def main(
     copy_label_scheme: bool,
     store_size: int | None = None,
 ) -> None:
-    """
-    Load ds1/ds2 (optionally copying ds1's label scheme onto ds2), compute the
-    configured metrics between them, and save/log the results.
-    """
     # Instantiate datasets
     print("Loading datasets")
     ds1 = load_dataset_from_config(dataset1_cfg)
