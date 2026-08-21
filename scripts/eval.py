@@ -123,12 +123,17 @@ def _run(cfg_name: str) -> None:
     data_store_config: dict[str, str | dict] = load_yaml_from_path(
         DATA_CONFIG_DIR / "coco_data_store.yaml"
     )
-    label_to_class_map = {
-        label: cat for cat, label in eval_dataset.class_to_label_map.items()
-    }
-    data_store_config["kwargs"]["positive_class"] = [
-        label_to_class_map[label] for label in eval_dataset.positive_class
-    ]
+    if eval_dataset.positive_superclass is not None:
+        data_store_config["kwargs"]["positive_superclass"] = (
+            eval_dataset.positive_superclass
+        )
+    else:
+        label_to_class_map = {
+            label: cat for cat, label in eval_dataset.class_to_label_map.items()
+        }
+        data_store_config["kwargs"]["positive_class"] = [
+            label_to_class_map[label] for label in eval_dataset.positive_class
+        ]
     data_store_config["kwargs"]["multi_label"] = eval_dataset.multi_label
     data_store = load_dataset_from_config(data_store_config)
     data_store.embedding = None  # remove embedding from dataset
