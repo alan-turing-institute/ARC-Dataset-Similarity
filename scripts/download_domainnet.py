@@ -23,6 +23,7 @@ _DOMAINNET_TXT_BASE = f"{_DOMAINNET_BASE}/domainnet/txt"
 
 
 def _reporthook(block: int, block_size: int, total: int) -> None:
+    """urlretrieve progress callback: print percent and MB downloaded in place."""
     downloaded = block * block_size
     pct = min(100, downloaded * 100 // total) if total > 0 else 0
     print(
@@ -33,6 +34,7 @@ def _reporthook(block: int, block_size: int, total: int) -> None:
 
 
 def download_domainnet(data_root: Path, domains: list[str]) -> None:
+    """Download and extract images plus split txt files for each requested domain."""
     data_root.mkdir(parents=True, exist_ok=True)
 
     for domain in domains:

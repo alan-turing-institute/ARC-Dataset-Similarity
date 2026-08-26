@@ -1,13 +1,6 @@
 """
-Simple script for checking the OTDD runs on Isambard without error. Long-term this will
-be deleted and the functionality will be re-implemented in a broader script for running
-all metrics with args for controlling which metrics to run, which datasets to use, etc.
-
-Example usage:
-
-```bash
-python scripts/run_metrics.py --metrics otdd_exact mmd
-```
+Run metrics between two datasets, as specified in provided config file. Metrics are
+provided as a list of metric names which are resolved against configs/metrics/*.yaml
 """
 
 import argparse
@@ -53,6 +46,9 @@ def apply_metric(
     ds1: ImageDataset | DatasetMix,
     ds2: ImageDataset | DatasetMix,
 ) -> float:
+    """
+    Load a metric's config, resolve its function, and compute it for the two datasets.
+    """
     metric_cfg = load_yaml_from_path(METRIC_CONFIG_DIR / f"{metric_name}.yaml")
     metric_fn = getattr(metrics, metric_cfg["metric"])
     print(
@@ -76,6 +72,11 @@ def main(
     ds1 = load_dataset_from_config(dataset1_cfg)
     if copy_label_scheme:
         if ds1.positive_superclass is not None:
+            # copies positive_superclass onto ds2 verbatim. COCODataset's
+            # drop_subclasses only narrows the resolved positive_class list, it never
+            # mutates positive_superclass, so ds2 (typically the unlabelled store)
+            # ends up positive on the FULL superclass even when ds1 had subclasses
+            # excised.
             dataset2_cfg["kwargs"]["positive_superclass"] = ds1.positive_superclass
         else:
             label_to_class_map = {

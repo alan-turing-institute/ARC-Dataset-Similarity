@@ -1,9 +1,6 @@
 """
-Example use:
-
-```bash
-python scripts/generate_metrics_configs.py --config_name experiment_0
-```
+generate per-condition metrics configs for a top-level experiment config, by taking all
+combinations of swept dataset_kwargs.
 """
 
 import argparse

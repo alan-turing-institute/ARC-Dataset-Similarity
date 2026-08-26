@@ -39,4 +39,5 @@ def extract_dataset_tensors(
 
 
 def array_to_matrix(array: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
+    """Flatten all but the leading (sample) dimension."""
     return array.reshape(array.shape[0], -1)

@@ -1,3 +1,8 @@
+"""
+Evaluate a fine-tuned model: report average precision on the held-out test split and the
+full data store.
+"""
+
 import argparse
 import json
 import os
@@ -36,6 +41,7 @@ WorkspaceRestStoreMixin._probe_workspace_support = (
 
 
 def configure_mlflow() -> None:
+    """Configure mlflow tracking workspace and experiment for this script."""
     mlflow.set_workspace("dataset-similarity")
     mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.enable_system_metrics_logging()
@@ -46,6 +52,7 @@ def eval(
     processor: AutoImageProcessor,
     dataset: ImageDataset | DatasetMix,
 ) -> dict[str, float]:
+    """Run model over dataset sample-by-sample and compute classification metrics."""
     device = next(model.parameters()).device
     logits, labels = [], []
     with torch.no_grad():
@@ -75,6 +82,7 @@ def main(cfg_name: str):
 
 
 def _run(cfg_name: str) -> None:
+    """Load model and eval/store data per config, evaluate both, and save results."""
     # load_config
     config_path = FINETUNE_CONFIG_DIR / f"{cfg_name}.yaml"
     config = load_yaml_from_path(config_path)
@@ -124,6 +132,10 @@ def _run(cfg_name: str) -> None:
         DATA_CONFIG_DIR / "coco_data_store.yaml"
     )
     if eval_dataset.positive_superclass is not None:
+        # copies positive_superclass verbatim. drop_subclasses only narrows the
+        # resolved positive_class list, never positive_superclass, so the store ends
+        # up with the FULL superclass as positive even if eval_dataset had subclasses
+        # excised (see COCODataset.drop_subclasses).
         data_store_config["kwargs"]["positive_superclass"] = (
             eval_dataset.positive_superclass
         )
