@@ -5,7 +5,15 @@ import numpy as np
 import pandas as pd
 import torch
 import umap
-from plotnine import aes, geom_point, ggplot, labs, theme_bw
+from plotnine import (
+    aes,
+    facet_wrap,
+    geom_point,
+    ggplot,
+    labs,
+    scale_color_manual,
+    theme_bw,
+)
 from torch.utils.data import DataLoader
 
 from dataset_similarity.constants import (
@@ -20,6 +28,33 @@ from dataset_similarity.data.utils import load_dataset_from_config
 from dataset_similarity.utils import load_yaml_from_path
 
 Dataset = ImageDataset | DatasetMix
+
+# seaborn's "colorblind" categorical palette, hardcoded to avoid a seaborn dependency.
+COLORBLIND_PALETTE = [
+    "#0173b2",
+    "#de8f05",
+    "#029e73",
+    "#cc78bc",
+    "#d55e00",
+    "#ca9161",
+    "#fbafe4",
+    "#949494",
+    "#ece133",
+    "#56b4e9",
+]
+
+STORE_COLOR = "#bcbcbc"
+STORE_LABEL = "data store"
+POSITIVE_COLOR = COLORBLIND_PALETTE[0]
+NEGATIVE_COLOR = COLORBLIND_PALETTE[1]
+
+FIT_SAMPLE_SIZE = None
+BATCH_SIZE = 256
+NUM_WORKERS = 4
+N_NEIGHBORS = 15
+MIN_DIST = 0.1
+N_COMPONENTS = 2
+RANDOM_SEED = 0
 
 
 def get_datasets_from_configs(
@@ -111,19 +146,32 @@ def batched_transform(
     held in memory; the resulting low-dimensional coordinates (a handful of floats per
     sample) are accumulated in full, since they are orders of magnitude smaller than
     the source embeddings.
+
+    The returned frame also carries a "positive" column, derived from each sample's
+    binary label (or, for a multi-label dataset, whether any positive class fired).
     """
     loader: DataLoader[Any] = DataLoader(
         dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
     coords = []
-    for features, _ in loader:
+    positives = []
+    for features, label in loader:
         coords.append(reducer.transform(features.numpy()))
+        label_arr = label.numpy()
+        if label_arr.ndim > 1:
+            label_arr = label_arr.any(axis=1)
+        positives.append(label_arr.astype(bool))
     coords_arr = np.concatenate(coords, axis=0)
     columns = [f"umap_{i + 1}" for i in range(coords_arr.shape[1])]
-    return pd.DataFrame(coords_arr, columns=columns)
+    df = pd.DataFrame(coords_arr, columns=columns)
+    df["positive"] = np.concatenate(positives, axis=0)
+    return df
 
 
 def main(args: argparse.Namespace) -> None:
+    labels = args.dataset_labels if args.dataset_labels is not None else args.configs
+    config_to_label = dict(zip(args.configs, labels))
+
     print(f"Loading store and eval dataset for '{args.configs[0]}'")
     eval_dataset, data_store = get_datasets_from_configs(
         args.configs[0], return_store=True
@@ -137,34 +185,34 @@ def main(args: argparse.Namespace) -> None:
 
     fit_size_desc = (
         "the whole store"
-        if args.fit_sample_size is None
-        else f"a sample of {args.fit_sample_size} store embeddings"
+        if FIT_SAMPLE_SIZE is None
+        else f"a sample of {FIT_SAMPLE_SIZE} store embeddings"
     )
     print(f"Fitting UMAP on {fit_size_desc} (store size: {len(data_store)})")
     fit_matrix = build_fit_matrix(
         data_store,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        random_seed=args.random_seed,
-        sample_size=args.fit_sample_size,
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS,
+        random_seed=RANDOM_SEED,
+        sample_size=FIT_SAMPLE_SIZE,
     )
     reducer = umap.UMAP(
-        n_neighbors=args.n_neighbors,
-        min_dist=args.min_dist,
-        n_components=args.n_components,
-        random_state=args.random_seed,
+        n_neighbors=N_NEIGHBORS,
+        min_dist=MIN_DIST,
+        n_components=N_COMPONENTS,
+        random_state=RANDOM_SEED,
     )
     reducer.fit(fit_matrix)
 
     print("Transforming data store")
-    store_df = batched_transform(data_store, reducer, args.batch_size, args.num_workers)
-    store_df["dataset"] = "coco_data_store"
+    store_df = batched_transform(data_store, reducer, BATCH_SIZE, NUM_WORKERS)
+    store_df["dataset"] = STORE_LABEL
     all_dfs = [store_df]
 
     for cfg_name, dataset in eval_datasets:
         print(f"Transforming '{cfg_name}'")
-        df = batched_transform(dataset, reducer, args.batch_size, args.num_workers)
-        df["dataset"] = cfg_name
+        df = batched_transform(dataset, reducer, BATCH_SIZE, NUM_WORKERS)
+        df["dataset"] = config_to_label[cfg_name]
         all_dfs.append(df)
 
     result_df = pd.concat(all_dfs, ignore_index=True)
@@ -174,22 +222,54 @@ def main(args: argparse.Namespace) -> None:
     result_df.to_csv(result_path, index=False)
     print(f"Coordinates saved to {result_path}")
 
-    if args.n_components == 2:
-        plot = (
-            ggplot(result_df, aes(x="umap_1", y="umap_2", color="dataset"))
-            + geom_point(alpha=0.4, size=0.6)
-            + theme_bw()
-            + labs(title=args.output_name)
+    store_mask = result_df["dataset"] == STORE_LABEL
+    background_df = result_df[store_mask].copy()
+    foreground_df = result_df[~store_mask].copy()
+    foreground_datasets = [config_to_label[cfg_name] for cfg_name, _ in eval_datasets]
+    # A separate "panel" column (rather than facetting on "dataset" directly) lets the
+    # background layer - which only has "dataset" == STORE_LABEL and no "panel" column
+    # - be recycled into every facet instead of only matching one.
+    foreground_df["panel"] = pd.Categorical(
+        foreground_df["dataset"], categories=foreground_datasets, ordered=True
+    )
+    # "series" carries the color legend: the store stays a single neutral color, while
+    # each eval split's points are colored by positive/negative class instead of by
+    # dataset - the dataset is already conveyed by the facet strip.
+    background_df["series"] = STORE_LABEL
+    foreground_df["series"] = foreground_df["positive"].map(
+        {True: "Positive", False: "Negative"}
+    )
+    color_map = {
+        STORE_LABEL: STORE_COLOR,
+        "Positive": POSITIVE_COLOR,
+        "Negative": NEGATIVE_COLOR,
+    }
+
+    plot = (
+        ggplot()
+        + geom_point(
+            data=background_df,
+            mapping=aes(x="umap_1", y="umap_2", color="series"),
+            alpha=0.2,
+            size=1.5,
+            stroke=0,
         )
-        UMAP_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-        plot_path = UMAP_PLOTS_DIR / f"{args.output_name}.png"
-        plot.save(plot_path, dpi=300)
-        print(f"Plot saved to {plot_path}")
-    else:
-        print(
-            f"n_components={args.n_components} != 2, skipping plot "
-            "(only 2D projections are plotted)."
+        + geom_point(
+            data=foreground_df,
+            mapping=aes(x="umap_1", y="umap_2", color="series"),
+            alpha=0.4,
+            size=1.5,
+            stroke=0,
         )
+        + scale_color_manual(values=color_map)
+        + facet_wrap("~panel", nrow=1)
+        + theme_bw()
+        + labs(x="", y="", color="Class")
+    )
+    UMAP_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    plot_path = UMAP_PLOTS_DIR / f"{args.output_name}.png"
+    plot.save(plot_path, width=10, height=2.5, dpi=300)
+    print(f"Plot saved to {plot_path}")
 
 
 if __name__ == "__main__":
@@ -212,22 +292,24 @@ if __name__ == "__main__":
         help="Base name for the output CSV/plot. Defaults to the first config name.",
     )
     parser.add_argument(
-        "--fit_sample_size",
-        type=int,
+        "--dataset_labels",
+        type=str,
+        nargs="+",
         default=None,
-        help="Number of store samples to draw (via a shuffled DataLoader) to fit "
-        "UMAP on. Defaults to None, meaning UMAP is fit on the whole store. Set "
-        "this to bound memory use to a random subsample instead, e.g. if the full "
-        "store's embeddings don't fit in memory.",
+        help="Display labels for `configs`, in the same order, used for the "
+        "'dataset' column and plot legend instead of the raw config names. Must "
+        "match the number of `configs` if given, e.g. --dataset_labels "
+        '"High ΔAP, high Δmetric" "Low ΔAP, high Δmetric".',
     )
-    parser.add_argument("--batch_size", type=int, default=256)
-    parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--n_neighbors", type=int, default=15)
-    parser.add_argument("--min_dist", type=float, default=0.1)
-    parser.add_argument("--n_components", type=int, default=2)
-    parser.add_argument("--random_seed", type=int, default=0)
     args = parser.parse_args()
     if args.output_name is None:
         args.output_name = args.configs[0].replace("/", "_")
+    if args.dataset_labels is not None and len(args.dataset_labels) != len(
+        args.configs
+    ):
+        parser.error(
+            f"--dataset_labels has {len(args.dataset_labels)} entries but there are "
+            f"{len(args.configs)} configs; they must match 1:1."
+        )
 
     main(args)
