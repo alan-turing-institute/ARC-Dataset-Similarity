@@ -29,7 +29,7 @@ from dataset_similarity.utils import load_yaml_from_path
 
 Dataset = ImageDataset | DatasetMix
 
-# seaborn's "colorblind" categorical palette, hardcoded to avoid a seaborn dependency.
+# seaborn's "colorblind" categorical palette
 COLORBLIND_PALETTE = [
     "#0173b2",
     "#de8f05",
@@ -51,9 +51,6 @@ NEGATIVE_COLOR = COLORBLIND_PALETTE[1]
 FIT_SAMPLE_SIZE = None
 BATCH_SIZE = 256
 NUM_WORKERS = 4
-N_NEIGHBORS = 15
-MIN_DIST = 0.1
-N_COMPONENTS = 2
 RANDOM_SEED = 0
 
 
@@ -78,9 +75,9 @@ def get_datasets_from_configs(
         DATA_CONFIG_DIR / "coco_data_store.yaml"
     )
     if eval_dataset.positive_superclass is not None:
-        data_store_config["kwargs"][
-            "positive_superclass"
-        ] = eval_dataset.positive_superclass
+        data_store_config["kwargs"]["positive_superclass"] = (
+            eval_dataset.positive_superclass
+        )
     else:
         label_to_class_map = {
             label: cat for cat, label in eval_dataset.class_to_label_map.items()
@@ -101,18 +98,10 @@ def build_fit_matrix(
     random_seed: int,
     sample_size: int | None = None,
 ) -> np.ndarray:
-    """Stream `dataset` into memory as a single (N, D) matrix to fit UMAP on.
-
-    UMAP has no incremental/partial-fit mode, so it must be fit on a matrix held
-    fully in memory. The dataset is never indexed as a whole; it is streamed through
-    a DataLoader in batches and the batches concatenated, so no more than one batch
-    of raw samples is materialised at a time. By default every sample is collected
-    (feasible even for the full store, since it holds precomputed embedding vectors
-    rather than raw images). If `sample_size` is given, a shuffled DataLoader is
-    drawn from instead until `sample_size` rows have been collected, bounding memory
-    use to the sample size rather than the size of the dataset.
     """
-    shuffle = sample_size is not None
+    Stream `dataset` into memory as a single (N, D) matrix to fit UMAP on.
+    """
+    shuffle = sample_size is not None  # only shuffle if not using the whole thing
     generator = torch.Generator().manual_seed(random_seed) if shuffle else None
     loader: DataLoader[Any] = DataLoader(
         dataset,
@@ -123,6 +112,7 @@ def build_fit_matrix(
     )
     batches = []
     n_collected = 0
+    # not using labels for fitting
     for features, _ in loader:
         batches.append(features.numpy())
         n_collected += features.shape[0]
@@ -140,38 +130,36 @@ def batched_transform(
     batch_size: int,
     num_workers: int,
 ) -> pd.DataFrame:
-    """Project every sample in `dataset` through an already-fit UMAP `reducer`.
-
-    Streams the dataset through a DataLoader so only one batch of embeddings is ever
-    held in memory; the resulting low-dimensional coordinates (a handful of floats per
-    sample) are accumulated in full, since they are orders of magnitude smaller than
-    the source embeddings.
-
-    The returned frame also carries a "positive" column, derived from each sample's
-    binary label (or, for a multi-label dataset, whether any positive class fired).
+    """
+    Project every sample in `dataset` through an already-fit UMAP `reducer`.
     """
     loader: DataLoader[Any] = DataLoader(
         dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
     coords = []
     positives = []
+    # need labels for positive column
     for features, label in loader:
         coords.append(reducer.transform(features.numpy()))
         label_arr = label.numpy()
         if label_arr.ndim > 1:
             label_arr = label_arr.any(axis=1)
+        # build vector of booleans for the dataset
         positives.append(label_arr.astype(bool))
     coords_arr = np.concatenate(coords, axis=0)
     columns = [f"umap_{i + 1}" for i in range(coords_arr.shape[1])]
     df = pd.DataFrame(coords_arr, columns=columns)
+    # add a boolean column for positive/negative class
     df["positive"] = np.concatenate(positives, axis=0)
     return df
 
 
 def main(args: argparse.Namespace) -> None:
     labels = args.dataset_labels if args.dataset_labels is not None else args.configs
-    config_to_label = dict(zip(args.configs, labels))
+    # custom labels for each split if we're using them
+    config_to_label = dict(zip(args.configs, labels, strict=False))
 
+    # load datasets and store
     print(f"Loading store and eval dataset for '{args.configs[0]}'")
     eval_dataset, data_store = get_datasets_from_configs(
         args.configs[0], return_store=True
@@ -189,6 +177,7 @@ def main(args: argparse.Namespace) -> None:
         else f"a sample of {FIT_SAMPLE_SIZE} store embeddings"
     )
     print(f"Fitting UMAP on {fit_size_desc} (store size: {len(data_store)})")
+    # build embedding matrix for UMAP fitting
     fit_matrix = build_fit_matrix(
         data_store,
         batch_size=BATCH_SIZE,
@@ -196,14 +185,13 @@ def main(args: argparse.Namespace) -> None:
         random_seed=RANDOM_SEED,
         sample_size=FIT_SAMPLE_SIZE,
     )
+    # fit UMAP
     reducer = umap.UMAP(
-        n_neighbors=N_NEIGHBORS,
-        min_dist=MIN_DIST,
-        n_components=N_COMPONENTS,
         random_state=RANDOM_SEED,
     )
     reducer.fit(fit_matrix)
 
+    # transform data store and splits
     print("Transforming data store")
     store_df = batched_transform(data_store, reducer, BATCH_SIZE, NUM_WORKERS)
     store_df["dataset"] = STORE_LABEL
@@ -215,36 +203,43 @@ def main(args: argparse.Namespace) -> None:
         df["dataset"] = config_to_label[cfg_name]
         all_dfs.append(df)
 
+    # create one single dataframe for plotting
     result_df = pd.concat(all_dfs, ignore_index=True)
 
+    # create results dir and save the coordinates
     UMAP_RESULT_DIR.mkdir(parents=True, exist_ok=True)
     result_path = UMAP_RESULT_DIR / f"{args.output_name}.csv"
     result_df.to_csv(result_path, index=False)
     print(f"Coordinates saved to {result_path}")
 
+    # label the store mask
     store_mask = result_df["dataset"] == STORE_LABEL
+    # split into store and eval datasets for plotting
     background_df = result_df[store_mask].copy()
     foreground_df = result_df[~store_mask].copy()
+
+    # add a "panel" column to the foreground dataframe
     foreground_datasets = [config_to_label[cfg_name] for cfg_name, _ in eval_datasets]
-    # A separate "panel" column (rather than facetting on "dataset" directly) lets the
-    # background layer - which only has "dataset" == STORE_LABEL and no "panel" column
-    # - be recycled into every facet instead of only matching one.
+
+    # Don't have this for the store, so we plot on all panels
     foreground_df["panel"] = pd.Categorical(
-        foreground_df["dataset"], categories=foreground_datasets, ordered=True
+        foreground_df["dataset"],
+        categories=foreground_datasets,  # use the dataset name for the panel
+        ordered=True,
     )
-    # "series" carries the color legend: the store stays a single neutral color, while
-    # each eval split's points are colored by positive/negative class instead of by
-    # dataset - the dataset is already conveyed by the facet strip.
+    # "series" carries the color legend the dataset is already conveyed in the panels.
     background_df["series"] = STORE_LABEL
     foreground_df["series"] = foreground_df["positive"].map(
         {True: "Positive", False: "Negative"}
     )
+    # colours for plotting
     color_map = {
         STORE_LABEL: STORE_COLOR,
         "Positive": POSITIVE_COLOR,
         "Negative": NEGATIVE_COLOR,
     }
 
+    # plot everything
     plot = (
         ggplot()
         + geom_point(
@@ -262,7 +257,7 @@ def main(args: argparse.Namespace) -> None:
             stroke=0,
         )
         + scale_color_manual(values=color_map)
-        + facet_wrap("~panel", nrow=1)
+        + facet_wrap("~panel", nrow=1)  # store gets put on all panels
         + theme_bw()
         + labs(x="", y="", color="Class")
     )
@@ -299,11 +294,13 @@ if __name__ == "__main__":
         help="Display labels for `configs`, in the same order, used for the "
         "'dataset' column and plot legend instead of the raw config names. Must "
         "match the number of `configs` if given, e.g. --dataset_labels "
-        '"High ΔAP, high Δmetric" "Low ΔAP, high Δmetric".',
+        '"High ΔAP, high dissimilarity" "Low ΔAP, high dissimilarity".',
     )
     args = parser.parse_args()
+    # so we don't make subdirectories by accident
     if args.output_name is None:
         args.output_name = args.configs[0].replace("/", "_")
+    # check we have the right number of custom labels if we're using them
     if args.dataset_labels is not None and len(args.dataset_labels) != len(
         args.configs
     ):
