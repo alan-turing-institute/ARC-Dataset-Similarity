@@ -10,6 +10,8 @@ from plotnine import (
     facet_wrap,
     geom_point,
     ggplot,
+    guide_legend,
+    guides,
     labs,
     scale_alpha_identity,
     scale_color_manual,
@@ -44,16 +46,20 @@ COLORBLIND_PALETTE = [
     "#56b4e9",
 ]
 
-STORE_COLOR = "#bcbcbc"  # store negative / undifferentiated store background
+STORE_COLOR = "#d6d6d6"  # store negative / undifferentiated store background
 STORE_LABEL = "data store"
-POSITIVE_COLOR = COLORBLIND_PALETTE[0]
-NEGATIVE_COLOR = COLORBLIND_PALETTE[1]
-STORE_POSITIVE_COLOR = "#1b4965"  # store positives, when labelled
+POSITIVE_COLOR = COLORBLIND_PALETTE[2]  # green
+NEGATIVE_COLOR = COLORBLIND_PALETTE[4]  # red
+# pink/magenta - far in hue from POSITIVE_COLOR's green, NEGATIVE_COLOR's red, and
+# STORE_COLOR's grey, so store positives stay distinguishable from all three
+STORE_POSITIVE_COLOR = COLORBLIND_PALETTE[3]  # store positives, when labelled
 
 # only used when --store_labels is given
 BACKGROUND_ALPHA = 0.25  # store layer
-FOREGROUND_ALPHA = 0.6  # eval-split layer
+FOREGROUND_ALPHA = 0.85  # eval-split layer - positives get this alpha directly
 NEGATIVE_ALPHA_SCALE = 0.6  # negatives are additionally more transparent than positives
+
+LEGEND_POINT_SIZE = 4  # bigger than the plotted point size, for legend readability
 
 FIT_SAMPLE_SIZE = None
 BATCH_SIZE = 256
@@ -348,6 +354,11 @@ def main(args: argparse.Namespace) -> None:
             + facet_wrap("~panel", nrow=1)
             + theme_bw()
             + labs(x="", y="", color="Class")
+            + guides(
+                color=guide_legend(
+                    override_aes={"size": LEGEND_POINT_SIZE, "alpha": 1}
+                )
+            )
         )
     else:
         # add a "panel" column to the foreground dataframe
@@ -391,6 +402,11 @@ def main(args: argparse.Namespace) -> None:
             + facet_wrap("~panel", nrow=1)  # store gets put on all panels
             + theme_bw()
             + labs(x="", y="", color="Class")
+            + guides(
+                color=guide_legend(
+                    override_aes={"size": LEGEND_POINT_SIZE, "alpha": 1}
+                )
+            )
         )
 
     UMAP_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
