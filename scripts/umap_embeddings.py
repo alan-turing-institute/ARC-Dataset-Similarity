@@ -7,6 +7,7 @@ import torch
 import umap
 from plotnine import (
     aes,
+    facet_grid,
     facet_wrap,
     geom_point,
     ggplot,
@@ -36,19 +37,18 @@ Dataset = ImageDataset | DatasetMix
 COLORBLIND_PALETTE = [
     "#029e73",
     "#d55e00",
-    "#cc78bc",
 ]
 
-STORE_COLOR = "#d6d6d6"  # store negative / undifferentiated store background
+STORE_COLOR = "#d6d6d6"  # flat store colour, when the store isn't labelled
 STORE_LABEL = "data store"
+EVAL_LABEL = "eval split"
 POSITIVE_COLOR = COLORBLIND_PALETTE[0]  # green
 NEGATIVE_COLOR = COLORBLIND_PALETTE[1]  # red
-STORE_POSITIVE_COLOR = COLORBLIND_PALETTE[2]  # pink store positives, when labelled
 
 # only used when --store_labels is given
-BACKGROUND_ALPHA = 0.25  # store layer
-FOREGROUND_ALPHA = 0.85  # eval-split layer - positives get this alpha directly
-NEGATIVE_ALPHA_SCALE = 0.6  # negatives are additionally more transparent than positives
+BACKGROUND_ALPHA = 0.25  # store row
+FOREGROUND_ALPHA = 0.85  # eval-split row
+NEGATIVE_ALPHA_SCALE = 0.6  # store negatives are additionally more transparent
 
 LEGEND_POINT_SIZE = 4  # bigger than the plotted point size, for legend readability
 
@@ -93,9 +93,9 @@ def get_eval_dataset_and_store_labels(cfg_name: str) -> tuple[Dataset, pd.Series
         DATA_CONFIG_DIR / "coco_data_store.yaml"
     )
     if eval_dataset.positive_superclass is not None:
-        data_store_config["kwargs"]["positive_superclass"] = (
-            eval_dataset.positive_superclass
-        )
+        data_store_config["kwargs"][
+            "positive_superclass"
+        ] = eval_dataset.positive_superclass
     else:
         label_to_class_map = {
             label: cat for cat, label in eval_dataset.class_to_label_map.items()
@@ -299,50 +299,37 @@ def main(args: argparse.Namespace) -> None:
         foreground_df["panel"] = pd.Categorical(
             foreground_df["panel"], categories=foreground_datasets, ordered=True
         )
+        background_df["source"] = STORE_LABEL
+        foreground_df["source"] = EVAL_LABEL
 
-        # store keeps its own colour pair, distinct from the eval-split's
+        # positive/negative coloured consistently
+        background_df["series"] = background_df["positive"].map(
+            {True: "Positive", False: "Negative"}
+        )
         foreground_df["series"] = foreground_df["positive"].map(
             {True: "Positive", False: "Negative"}
         )
-        background_df["series"] = background_df["positive"].map(
-            {True: "Store (positive)", False: "Store (negative)"}
+        background_df["point_alpha"] = np.where(
+            background_df["positive"],
+            BACKGROUND_ALPHA,
+            BACKGROUND_ALPHA * NEGATIVE_ALPHA_SCALE,
         )
-        color_map = {
-            "Positive": POSITIVE_COLOR,
-            "Negative": NEGATIVE_COLOR,
-            "Store (positive)": STORE_POSITIVE_COLOR,
-            "Store (negative)": STORE_COLOR,
-        }
-        for df, layer_alpha in (
-            (background_df, BACKGROUND_ALPHA),
-            (foreground_df, FOREGROUND_ALPHA),
-        ):
-            df["point_alpha"] = np.where(
-                df["positive"], layer_alpha, layer_alpha * NEGATIVE_ALPHA_SCALE
-            )
+        foreground_df["point_alpha"] = FOREGROUND_ALPHA
+
+        plot_df = pd.concat([background_df, foreground_df], ignore_index=True)
+        plot_df["source"] = pd.Categorical(
+            plot_df["source"], categories=[STORE_LABEL, EVAL_LABEL], ordered=True
+        )
 
         # plot everything
         plot = (
-            ggplot()
-            + geom_point(
-                data=background_df,
-                mapping=aes(
-                    x="umap_1", y="umap_2", color="series", alpha="point_alpha"
-                ),
-                size=1.5,
-                stroke=0,
+            ggplot(
+                plot_df,
+                aes(x="umap_1", y="umap_2", color="series", alpha="point_alpha"),
             )
-            + geom_point(
-                data=foreground_df,
-                mapping=aes(
-                    x="umap_1", y="umap_2", color="series", alpha="point_alpha"
-                ),
-                size=1.5,
-                stroke=0,
-            )
-            + scale_color_manual(values=color_map)
+            + geom_point(size=1.5, stroke=0)
             + scale_alpha_identity()
-            + facet_wrap("~panel", nrow=1)
+            + facet_grid("source ~ panel")
             + theme_bw()
             + labs(x="", y="", color="Class")
             + guides(
