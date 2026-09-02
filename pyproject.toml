@@ -97,7 +97,6 @@ xfail_strict = true
 filterwarnings = [
   "error",
   "ignore::DeprecationWarning:geomloss",
-  "ignore::SyntaxWarning:ot.datasets",
 ]
 log_cli_level = "INFO"
 testpaths = [
