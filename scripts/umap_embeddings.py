@@ -11,6 +11,7 @@ from plotnine import (
     geom_point,
     ggplot,
     labs,
+    scale_alpha_identity,
     scale_color_manual,
     theme_bw,
 )
@@ -43,10 +44,16 @@ COLORBLIND_PALETTE = [
     "#56b4e9",
 ]
 
-STORE_COLOR = "#bcbcbc"
+STORE_COLOR = "#bcbcbc"  # store negative / undifferentiated store background
 STORE_LABEL = "data store"
 POSITIVE_COLOR = COLORBLIND_PALETTE[0]
 NEGATIVE_COLOR = COLORBLIND_PALETTE[1]
+STORE_POSITIVE_COLOR = "#1b4965"  # store positives, when labelled
+
+# only used when --store_labels is given
+BACKGROUND_ALPHA = 0.25  # store layer
+FOREGROUND_ALPHA = 0.6  # eval-split layer
+NEGATIVE_ALPHA_SCALE = 0.6  # negatives are additionally more transparent than positives
 
 FIT_SAMPLE_SIZE = None
 BATCH_SIZE = 256
@@ -54,30 +61,44 @@ NUM_WORKERS = 4
 RANDOM_SEED = 0
 
 
-def get_datasets_from_configs(
-    cfg_name: str, return_store: bool = False
-) -> Dataset | tuple[Dataset, Dataset]:
-    # load_config
+def load_store_dataset() -> Dataset:
+    """
+    Load the COCO data store with no label scheme applied.
+    """
+    data_store_config: dict[str, str | dict] = load_yaml_from_path(
+        DATA_CONFIG_DIR / "coco_data_store.yaml"
+    )
+    return load_dataset_from_config(data_store_config)
+
+
+def get_eval_dataset(cfg_name: str) -> Dataset:
+    """
+    Load the evaluation dataset for a given finetune config.
+    """
     config_path = FINETUNE_CONFIG_DIR / f"{cfg_name}.yaml"
     config = load_yaml_from_path(config_path)
-
-    # load evaluation data
     eval_data_config: dict[str, str | dict] = load_yaml_from_path(
         DATA_CONFIG_DIR / f"{config['test_data_config']}.yaml"
     )
-    eval_dataset = load_dataset_from_config(eval_data_config)
+    return load_dataset_from_config(eval_data_config)
 
-    if return_store is False:
-        return eval_dataset
 
-    # load data store - create binary label but do not otherwise filter down
+def get_eval_dataset_and_store_labels(cfg_name: str) -> tuple[Dataset, pd.Series]:
+    """
+    Load the eval dataset for `cfg_name`, plus a boolean positive/negative label for
+    every store image under this config's class definition, indexed by `img_id`.
+    """
+    eval_dataset = get_eval_dataset(cfg_name)
+
+    # relabel a copy of the store under this config's class definition
+    # does not filter/reorder the store
     data_store_config: dict[str, str | dict] = load_yaml_from_path(
         DATA_CONFIG_DIR / "coco_data_store.yaml"
     )
     if eval_dataset.positive_superclass is not None:
-        data_store_config["kwargs"]["positive_superclass"] = (
-            eval_dataset.positive_superclass
-        )
+        data_store_config["kwargs"][
+            "positive_superclass"
+        ] = eval_dataset.positive_superclass
     else:
         label_to_class_map = {
             label: cat for cat, label in eval_dataset.class_to_label_map.items()
@@ -86,9 +107,10 @@ def get_datasets_from_configs(
             label_to_class_map[label] for label in eval_dataset.positive_class
         ]
     data_store_config["kwargs"]["multi_label"] = eval_dataset.multi_label
-    data_store = load_dataset_from_config(data_store_config)
+    labelled_store = load_dataset_from_config(data_store_config)
+    store_labels = labelled_store.data.set_index("img_id")["label"].astype(bool)
 
-    return eval_dataset, data_store
+    return eval_dataset, store_labels
 
 
 def build_fit_matrix(
@@ -154,22 +176,46 @@ def batched_transform(
     return df
 
 
+def transform_store_coords(
+    dataset: Dataset,
+    reducer: umap.UMAP,
+    batch_size: int,
+    num_workers: int,
+) -> pd.DataFrame:
+    """
+    Project every sample in the store through an already-fit UMAP `reducer`.
+    """
+    loader: DataLoader[Any] = DataLoader(
+        dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
+    coords = []
+    for features, _ in loader:
+        coords.append(reducer.transform(features.numpy()))
+    coords_arr = np.concatenate(coords, axis=0)
+    columns = [f"umap_{i + 1}" for i in range(coords_arr.shape[1])]
+    return pd.DataFrame(coords_arr, columns=columns)
+
+
 def main(args: argparse.Namespace) -> None:
     labels = args.dataset_labels if args.dataset_labels is not None else args.configs
     # custom labels for each split if we're using them
     config_to_label = dict(zip(args.configs, labels, strict=False))
 
-    # load datasets and store
-    print(f"Loading store and eval dataset for '{args.configs[0]}'")
-    eval_dataset, data_store = get_datasets_from_configs(
-        args.configs[0], return_store=True
-    )
-    eval_datasets = [(args.configs[0], eval_dataset)]
-    for cfg_name in args.configs[1:]:
-        print(f"Loading eval dataset for '{cfg_name}'")
-        eval_datasets.append(
-            (cfg_name, get_datasets_from_configs(cfg_name, return_store=False))
-        )
+    # load store once - its coordinates don't depend on any config's labelling
+    print("Loading data store")
+    data_store = load_store_dataset()
+
+    eval_datasets: list[tuple[str, Dataset]] = []
+    store_labels_by_config: dict[str, pd.Series] = {}
+    for cfg_name in args.configs:
+        if args.store_labels:
+            print(f"Loading eval dataset and store labels for '{cfg_name}'")
+            eval_dataset, store_labels = get_eval_dataset_and_store_labels(cfg_name)
+            store_labels_by_config[cfg_name] = store_labels
+        else:
+            print(f"Loading eval dataset for '{cfg_name}'")
+            eval_dataset = get_eval_dataset(cfg_name)
+        eval_datasets.append((cfg_name, eval_dataset))
 
     fit_size_desc = (
         "the whole store"
@@ -191,17 +237,45 @@ def main(args: argparse.Namespace) -> None:
     )
     reducer.fit(fit_matrix)
 
-    # transform data store and splits
     print("Transforming data store")
-    store_df = batched_transform(data_store, reducer, BATCH_SIZE, NUM_WORKERS)
-    store_df["dataset"] = STORE_LABEL
-    all_dfs = [store_df]
+    all_dfs = []
+    if args.store_labels:
+        # transform the store once, only the per-panel labels differ
+        store_coords_df = transform_store_coords(
+            data_store, reducer, BATCH_SIZE, NUM_WORKERS
+        )
+        store_coords_df["img_id"] = data_store.data["img_id"].to_numpy()
+    else:
+        # store gets put on all panels, undifferentiated by label
+        store_df = batched_transform(data_store, reducer, BATCH_SIZE, NUM_WORKERS)
+        store_df["dataset"] = STORE_LABEL
+        all_dfs.append(store_df)
 
-    for cfg_name, dataset in eval_datasets:
+    for cfg_name, eval_dataset in eval_datasets:
         print(f"Transforming '{cfg_name}'")
-        df = batched_transform(dataset, reducer, BATCH_SIZE, NUM_WORKERS)
-        df["dataset"] = config_to_label[cfg_name]
-        all_dfs.append(df)
+        panel_label = config_to_label[cfg_name]
+
+        eval_df = batched_transform(eval_dataset, reducer, BATCH_SIZE, NUM_WORKERS)
+        eval_df["dataset"] = panel_label
+        all_dfs.append(eval_df)
+
+        if args.store_labels:
+            # relabel the shared store coordinates for this panel's class definition
+            panel_store_df = store_coords_df.copy()
+            store_labels = store_labels_by_config[cfg_name]
+            panel_store_df["positive"] = panel_store_df["img_id"].map(store_labels)
+            if panel_store_df["positive"].isna().any():
+                msg = (
+                    f"Store labels for '{cfg_name}' are missing img_ids present in "
+                    "the store coordinates - the store and its relabelled copy have "
+                    "diverged."
+                )
+                raise ValueError(msg)
+            panel_store_df["positive"] = panel_store_df["positive"].astype(bool)
+            panel_store_df["dataset"] = STORE_LABEL
+            panel_store_df["panel"] = panel_label
+            all_dfs.append(panel_store_df)
+            eval_df["panel"] = panel_label
 
     # create one single dataframe for plotting
     result_df = pd.concat(all_dfs, ignore_index=True)
@@ -218,49 +292,107 @@ def main(args: argparse.Namespace) -> None:
     background_df = result_df[store_mask].copy()
     foreground_df = result_df[~store_mask].copy()
 
-    # add a "panel" column to the foreground dataframe
+    # order panels to match the order configs were given in
     foreground_datasets = [config_to_label[cfg_name] for cfg_name, _ in eval_datasets]
 
-    # Don't have this for the store, so we plot on all panels
-    foreground_df["panel"] = pd.Categorical(
-        foreground_df["dataset"],
-        categories=foreground_datasets,  # use the dataset name for the panel
-        ordered=True,
-    )
-    # "series" carries the color legend the dataset is already conveyed in the panels.
-    background_df["series"] = STORE_LABEL
-    foreground_df["series"] = foreground_df["positive"].map(
-        {True: "Positive", False: "Negative"}
-    )
-    # colours for plotting
-    color_map = {
-        STORE_LABEL: STORE_COLOR,
-        "Positive": POSITIVE_COLOR,
-        "Negative": NEGATIVE_COLOR,
-    }
+    if args.store_labels:
+        background_df["panel"] = pd.Categorical(
+            background_df["panel"], categories=foreground_datasets, ordered=True
+        )
+        foreground_df["panel"] = pd.Categorical(
+            foreground_df["panel"], categories=foreground_datasets, ordered=True
+        )
 
-    # plot everything
-    plot = (
-        ggplot()
-        + geom_point(
-            data=background_df,
-            mapping=aes(x="umap_1", y="umap_2", color="series"),
-            alpha=0.2,
-            size=1.5,
-            stroke=0,
+        # store keeps its own colour pair, distinct from the eval-split's
+        foreground_df["series"] = foreground_df["positive"].map(
+            {True: "Positive", False: "Negative"}
         )
-        + geom_point(
-            data=foreground_df,
-            mapping=aes(x="umap_1", y="umap_2", color="series"),
-            alpha=0.4,
-            size=1.5,
-            stroke=0,
+        background_df["series"] = background_df["positive"].map(
+            {True: "Store (positive)", False: "Store (negative)"}
         )
-        + scale_color_manual(values=color_map)
-        + facet_wrap("~panel", nrow=1)  # store gets put on all panels
-        + theme_bw()
-        + labs(x="", y="", color="Class")
-    )
+        color_map = {
+            "Positive": POSITIVE_COLOR,
+            "Negative": NEGATIVE_COLOR,
+            "Store (positive)": STORE_POSITIVE_COLOR,
+            "Store (negative)": STORE_COLOR,
+        }
+        for df, layer_alpha in (
+            (background_df, BACKGROUND_ALPHA),
+            (foreground_df, FOREGROUND_ALPHA),
+        ):
+            df["point_alpha"] = np.where(
+                df["positive"], layer_alpha, layer_alpha * NEGATIVE_ALPHA_SCALE
+            )
+
+        # plot everything
+        plot = (
+            ggplot()
+            + geom_point(
+                data=background_df,
+                mapping=aes(
+                    x="umap_1", y="umap_2", color="series", alpha="point_alpha"
+                ),
+                size=1.5,
+                stroke=0,
+            )
+            + geom_point(
+                data=foreground_df,
+                mapping=aes(
+                    x="umap_1", y="umap_2", color="series", alpha="point_alpha"
+                ),
+                size=1.5,
+                stroke=0,
+            )
+            + scale_color_manual(values=color_map)
+            + scale_alpha_identity()
+            + facet_wrap("~panel", nrow=1)
+            + theme_bw()
+            + labs(x="", y="", color="Class")
+        )
+    else:
+        # add a "panel" column to the foreground dataframe
+        # Don't have this for the store, so we plot on all panels
+        foreground_df["panel"] = pd.Categorical(
+            foreground_df["dataset"],
+            categories=foreground_datasets,  # use the dataset name for the panel
+            ordered=True,
+        )
+        # "series" carries the color legend the dataset is already conveyed in the
+        # panels.
+        background_df["series"] = STORE_LABEL
+        foreground_df["series"] = foreground_df["positive"].map(
+            {True: "Positive", False: "Negative"}
+        )
+        # colours for plotting
+        color_map = {
+            STORE_LABEL: STORE_COLOR,
+            "Positive": POSITIVE_COLOR,
+            "Negative": NEGATIVE_COLOR,
+        }
+
+        # plot everything
+        plot = (
+            ggplot()
+            + geom_point(
+                data=background_df,
+                mapping=aes(x="umap_1", y="umap_2", color="series"),
+                alpha=0.2,
+                size=1.5,
+                stroke=0,
+            )
+            + geom_point(
+                data=foreground_df,
+                mapping=aes(x="umap_1", y="umap_2", color="series"),
+                alpha=0.4,
+                size=1.5,
+                stroke=0,
+            )
+            + scale_color_manual(values=color_map)
+            + facet_wrap("~panel", nrow=1)  # store gets put on all panels
+            + theme_bw()
+            + labs(x="", y="", color="Class")
+        )
+
     UMAP_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     plot_path = UMAP_PLOTS_DIR / f"{args.output_name}.png"
     plot.save(plot_path, width=10, height=2.5, dpi=300)
@@ -277,8 +409,7 @@ if __name__ == "__main__":
         type=str,
         nargs="+",
         help="Finetune config names (relative to configs/finetune/) to plot against "
-        "the store's UMAP embedding. The store used is the one associated with the "
-        "first config.",
+        "the store's UMAP embedding.",
     )
     parser.add_argument(
         "--output_name",
@@ -295,6 +426,12 @@ if __name__ == "__main__":
         "'dataset' column and plot legend instead of the raw config names. Must "
         "match the number of `configs` if given, e.g. --dataset_labels "
         '"High ΔAP, high dissimilarity" "Low ΔAP, high dissimilarity".',
+    )
+    parser.add_argument(
+        "--store_labels",
+        action="store_true",
+        help="Optionally add store labels to the plots, to compare against the splits. "
+        "If not given, the store is only used as a background for the splits.",
     )
     args = parser.parse_args()
     # so we don't make subdirectories by accident
