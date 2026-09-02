@@ -34,25 +34,16 @@ Dataset = ImageDataset | DatasetMix
 
 # seaborn's "colorblind" categorical palette
 COLORBLIND_PALETTE = [
-    "#0173b2",
-    "#de8f05",
     "#029e73",
-    "#cc78bc",
     "#d55e00",
-    "#ca9161",
-    "#fbafe4",
-    "#949494",
-    "#ece133",
-    "#56b4e9",
+    "#cc78bc",
 ]
 
 STORE_COLOR = "#d6d6d6"  # store negative / undifferentiated store background
 STORE_LABEL = "data store"
-POSITIVE_COLOR = COLORBLIND_PALETTE[2]  # green
-NEGATIVE_COLOR = COLORBLIND_PALETTE[4]  # red
-# pink/magenta - far in hue from POSITIVE_COLOR's green, NEGATIVE_COLOR's red, and
-# STORE_COLOR's grey, so store positives stay distinguishable from all three
-STORE_POSITIVE_COLOR = COLORBLIND_PALETTE[3]  # store positives, when labelled
+POSITIVE_COLOR = COLORBLIND_PALETTE[0]  # green
+NEGATIVE_COLOR = COLORBLIND_PALETTE[1]  # red
+STORE_POSITIVE_COLOR = COLORBLIND_PALETTE[2]  # pink store positives, when labelled
 
 # only used when --store_labels is given
 BACKGROUND_ALPHA = 0.25  # store layer
@@ -102,9 +93,9 @@ def get_eval_dataset_and_store_labels(cfg_name: str) -> tuple[Dataset, pd.Series
         DATA_CONFIG_DIR / "coco_data_store.yaml"
     )
     if eval_dataset.positive_superclass is not None:
-        data_store_config["kwargs"][
-            "positive_superclass"
-        ] = eval_dataset.positive_superclass
+        data_store_config["kwargs"]["positive_superclass"] = (
+            eval_dataset.positive_superclass
+        )
     else:
         label_to_class_map = {
             label: cat for cat, label in eval_dataset.class_to_label_map.items()
@@ -355,9 +346,7 @@ def main(args: argparse.Namespace) -> None:
             + theme_bw()
             + labs(x="", y="", color="Class")
             + guides(
-                color=guide_legend(
-                    override_aes={"size": LEGEND_POINT_SIZE, "alpha": 1}
-                )
+                color=guide_legend(override_aes={"size": LEGEND_POINT_SIZE, "alpha": 1})
             )
         )
     else:
@@ -403,9 +392,7 @@ def main(args: argparse.Namespace) -> None:
             + theme_bw()
             + labs(x="", y="", color="Class")
             + guides(
-                color=guide_legend(
-                    override_aes={"size": LEGEND_POINT_SIZE, "alpha": 1}
-                )
+                color=guide_legend(override_aes={"size": LEGEND_POINT_SIZE, "alpha": 1})
             )
         )
 
