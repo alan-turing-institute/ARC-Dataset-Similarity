@@ -6,13 +6,11 @@ ARC project investigating whether dataset similarity metrics predict how well a 
 
 This project studies whether distributional similarity metrics computed between a candidate task dataset and a held-out data store can predict the difference between a model's performance on its own held-out test set and its performance on the store.
 
-The package implements five similarity metrics and a pipeline for fine-tuning binary/multi-label classifiers on many systematically varied task-dataset configurations, evaluating each on its own test split and on a shared data store, and comparing the resulting performance gap against each metric's score.
+The package implements four dataset similarity measures and a pipeline for fine-tuning binary/multi-label classifiers on many systematically varied task-dataset configurations, evaluating each on its own test split and on a shared data store, and comparing the resulting performance gap against each metric's score.
 
 Experiments are run predominantly on MS COCO, with an additional DomainNet-based proof-of-concept used to validate the metrics against a family of datasets with a known ground-truth ordering. Dataset preparation is covered in [`data/README.md`](data/README.md).
 
 ## Installation
-
-**Python 3.10–3.12 is required.**
 
 ```bash
 git clone https://github.com/alan-turing-institute/ARC-Dataset-Similarity
@@ -49,8 +47,8 @@ configs/
 
 Two generator scripts turn a single top-level config into the many per-condition configs an experiment needs:
 
-- **`scripts/generate_experiment_configs.py`** — used for the four numbered experiments (`configs/experiments/experiment_{1_main,2_balance,3_multilabel,4_ood_positive}.yaml`). Each top-level file gives a `dataset_kwargs` block where every key is a fixed value or a list of candidates; the script takes the Cartesian product of the list-valued keys and writes, per resulting condition, train/val/test dataset configs, a fine-tuning config, a metrics config (test split vs. the data store), and Slurm array scripts sized to the number of conditions.
-- **`scripts/generate_metrics_configs.py`** — a simpler generator for metrics-only jobs: given a list of datasets (all pairwise combinations) or a list of datasets plus a fixed store, it writes one metrics config per pair. Used for the DomainNet proof-of-concept and any ad hoc dataset comparison.
+- **`scripts/generate_experiment_configs.py`** — used to setup most experiments in the report (e.g. `configs/experiments/experiment_1_main.yaml`). Each top-level file gives a `dataset_kwargs` block where every key is a fixed value or a list of candidates; the script takes the Cartesian product of the list-valued keys and writes, per resulting condition, train/val/test dataset configs, a fine-tuning config, a metrics config (test split vs. the data store), and Slurm array scripts sized to the number of conditions.
+- **`scripts/generate_metrics_configs.py`** — a simpler generator for metrics-only jobs: given a list of datasets (all pairwise combinations) or a list of datasets plus a fixed store, it writes one metrics config per pair. Used for the DomainNet proof-of-concept.
 
 ## Usage
 
