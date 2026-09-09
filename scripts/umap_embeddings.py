@@ -93,9 +93,9 @@ def get_eval_dataset_and_store_labels(cfg_name: str) -> tuple[Dataset, pd.Series
         DATA_CONFIG_DIR / "coco_data_store.yaml"
     )
     if eval_dataset.positive_superclass is not None:
-        data_store_config["kwargs"][
-            "positive_superclass"
-        ] = eval_dataset.positive_superclass
+        data_store_config["kwargs"]["positive_superclass"] = (
+            eval_dataset.positive_superclass
+        )
     else:
         label_to_class_map = {
             label: cat for cat, label in eval_dataset.class_to_label_map.items()
